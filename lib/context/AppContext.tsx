@@ -458,30 +458,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           })
         }
 
-        // Load clients (only if not already loaded)
+        // Load clients - always load from localStorage to ensure all users see all clients
         const clientsData = localStorage.getItem("clients")
-        if (clientsData && state.clients.length === mockClients.length) {
+        if (clientsData) {
           const clients = JSON.parse(clientsData)
-          clients.forEach((client: any) => {
-            // Check if client already exists
-            const existingClient = state.clients.find(c => c.id === client.id)
-            if (!existingClient) {
-              dispatch({ type: "ADD_CLIENT", payload: client })
-            }
-          })
+          console.log("Loading clients from localStorage:", clients)
+          // Replace all clients with localStorage data to ensure consistency
+          dispatch({ type: "LOAD_CLIENTS", payload: clients })
         }
 
-        // Load tasks (only if not already loaded)
+        // Load tasks - always load from localStorage to ensure all users see all tasks
         const tasksData = localStorage.getItem("tasks")
-        if (tasksData && state.tasks.length === mockTasks.length) {
+        if (tasksData) {
           const tasks = JSON.parse(tasksData)
-          tasks.forEach((task: any) => {
-            // Check if task already exists
-            const existingTask = state.tasks.find(t => t.id === task.id)
-            if (!existingTask) {
-              dispatch({ type: "ADD_TASK", payload: task })
-            }
-          })
+          console.log("Loading tasks from localStorage:", tasks)
+          // Replace all tasks with localStorage data to ensure consistency
+          dispatch({ type: "LOAD_TASKS", payload: tasks })
         }
 
         // Load transactions (only if not already loaded)
@@ -512,17 +504,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           })
         }
 
-        // Load attendance records (only if not already loaded)
+        // Load attendance records - always load from localStorage to ensure manager sees all records
         const attendanceData = localStorage.getItem("attendanceRecords")
-        if (attendanceData && state.attendanceRecords.length === mockAttendanceRecords.length) {
+        if (attendanceData) {
           const attendanceRecords = JSON.parse(attendanceData)
-          attendanceRecords.forEach((record: any) => {
-            // Check if record already exists
-            const existingRecord = state.attendanceRecords.find(r => r.id === record.id)
-            if (!existingRecord) {
-              dispatch({ type: "ADD_ATTENDANCE", payload: record })
-            }
-          })
+          console.log("Loading attendance records from localStorage:", attendanceRecords)
+          // Replace all attendance records with localStorage data to ensure consistency
+          dispatch({ type: "LOAD_ATTENDANCE", payload: attendanceRecords })
         }
 
         // Load upcoming payments
@@ -1000,7 +988,9 @@ export function useAppActions() {
       localStorage.setItem("projects", JSON.stringify(filteredProjects))
       
       // Broadcast realtime update
-      broadcastOrQueue('delete', project, isOnline, setPendingUpdates)
+      if (window.realtimeUpdates) {
+        window.realtimeUpdates.sendProjectUpdate({ action: 'delete', project })
+      }
       
       showSuccessToast("تم حذف المشروع بنجاح", `تم حذف مشروع "${project.name}"`)
     } catch (error) {

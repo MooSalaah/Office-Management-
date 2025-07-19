@@ -1633,6 +1633,13 @@ function DashboardPageContent() {
   ).length;
   const userActiveTasksCount = userTodoTasksCount + userInProgressTasksCount;
 
+  // حساب جميع المهام غير المكتملة في النظام (للمدير)
+  const allIncompleteTasksCount = useMemoizedFilter(
+    tasks,
+    (t) => t.status !== "completed",
+    [tasks]
+  ).length;
+
   // استخدام الإحصائيات المحسنة
   const activeProjectsCount = statistics.activeProjects
   const totalClientsCount = clients.length
@@ -1693,10 +1700,6 @@ function DashboardPageContent() {
     return isIncomplete;
   });
   const allDelayedTasksCount = allDelayedTasks.length;
-
-  // استخرج جميع المهام غير المكتملة في النظام:
-  const allIncompleteTasks = tasks.filter((t) => t.status !== "completed");
-  const allIncompleteTasksCount = allIncompleteTasks.length;
 
   const stats = currentUser?.role === "admin" ? [
     {
@@ -1787,34 +1790,49 @@ function DashboardPageContent() {
     },
   ]
 
-  // مهام اليوم للمستخدم الحالي - عرض أحدث مهمتين فقط
-  // المستخدم يرى جميع المهام المخصصة له (بغض النظر عن من أنشأها)
-  const userTasks = tasks.filter((task) => task.assigneeId === currentUser?.id)
-  const todayTasks = userTasks
-    .filter((task) => {
-      if (!task.dueDate) return task.status === "in-progress"
-      // تشمل المهام المتأخرة أيضاً
-      const taskDate = new Date(task.dueDate)
-      const today = new Date()
-      return task.dueDate === today.toISOString().split("T")[0] || 
-             task.status === "in-progress" ||
-             (taskDate < today && task.status !== "completed")
-    })
-    .sort((a, b) => {
-      // ترتيب المهام: المتأخرة أولاً، ثم المهام اليوم، ثم المهام قيد التنفيذ
-      const aDate = a.dueDate ? new Date(a.dueDate) : new Date()
-      const bDate = b.dueDate ? new Date(b.dueDate) : new Date()
-      const today = new Date()
-      
-      const aIsOverdue = aDate < today && a.status !== "completed"
-      const bIsOverdue = bDate < today && b.status !== "completed"
-      
-      if (aIsOverdue && !bIsOverdue) return -1
-      if (!aIsOverdue && bIsOverdue) return 1
-      
-      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-    })
-    .slice(0, 2)
+  // مهام اليوم - المدير يرى جميع المهام غير المكتملة، المستخدم العادي يرى مهامه فقط
+  const todayTasks = currentUser?.role === "admin" 
+    ? tasks.filter((task) => task.status !== "completed")
+        .sort((a, b) => {
+          // ترتيب المهام: المتأخرة أولاً، ثم المهام اليوم، ثم المهام قيد التنفيذ
+          const aDate = a.dueDate ? new Date(a.dueDate) : new Date()
+          const bDate = b.dueDate ? new Date(b.dueDate) : new Date()
+          const today = new Date()
+          
+          const aIsOverdue = aDate < today && a.status !== "completed"
+          const bIsOverdue = bDate < today && b.status !== "completed"
+          
+          if (aIsOverdue && !bIsOverdue) return -1
+          if (!aIsOverdue && bIsOverdue) return 1
+          
+          return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        })
+        .slice(0, 4) // المدير يرى 4 مهام
+    : tasks.filter((task) => task.assigneeId === currentUser?.id)
+        .filter((task) => {
+          if (!task.dueDate) return task.status === "in-progress"
+          // تشمل المهام المتأخرة أيضاً
+          const taskDate = new Date(task.dueDate)
+          const today = new Date()
+          return task.dueDate === today.toISOString().split("T")[0] || 
+                 task.status === "in-progress" ||
+                 (taskDate < today && task.status !== "completed")
+        })
+        .sort((a, b) => {
+          // ترتيب المهام: المتأخرة أولاً، ثم المهام اليوم، ثم المهام قيد التنفيذ
+          const aDate = a.dueDate ? new Date(a.dueDate) : new Date()
+          const bDate = b.dueDate ? new Date(b.dueDate) : new Date()
+          const today = new Date()
+          
+          const aIsOverdue = aDate < today && a.status !== "completed"
+          const bIsOverdue = bDate < today && b.status !== "completed"
+          
+          if (aIsOverdue && !bIsOverdue) return -1
+          if (!aIsOverdue && bIsOverdue) return 1
+          
+          return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        })
+        .slice(0, 2) // المستخدم العادي يرى مهمتين
 
   // إشعارات المستخدم الحالي - عرض 4 إشعارات فقط
   const userNotifications = notifications
@@ -1988,8 +2006,15 @@ function DashboardPageContent() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle className="text-2xl font-extrabold mb-4">مهام اليوم</CardTitle>
-                <CardDescription>المهام المطلوبة منك اليوم</CardDescription>
+                <CardTitle className="text-2xl font-extrabold mb-4">
+                  {currentUser?.role === "admin" ? "المهام غير المكتملة" : "مهام اليوم"}
+                </CardTitle>
+                <CardDescription>
+                  {currentUser?.role === "admin" 
+                    ? "جميع المهام غير المكتملة في النظام" 
+                    : "المهام المطلوبة منك اليوم"
+                  }
+                </CardDescription>
               </div>
               <div className="flex space-x-2 space-x-reverse">
                 <Button variant="outline" size="sm" onClick={() => router.push("/tasks")}>
@@ -2016,8 +2041,18 @@ function DashboardPageContent() {
               ) : (
                 <div className="text-center py-8 text-gray-500">
                   <CheckCircle className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>لا توجد مهام لهذا اليوم</p>
-                  <p className="text-sm mt-1">أحسنت! لقد أنجزت جميع مهامك</p>
+                  <p>
+                    {currentUser?.role === "admin" 
+                      ? "لا توجد مهام غير مكتملة في النظام" 
+                      : "لا توجد مهام لهذا اليوم"
+                    }
+                  </p>
+                  <p className="text-sm mt-1">
+                    {currentUser?.role === "admin" 
+                      ? "جميع المهام مكتملة بنجاح" 
+                      : "أحسنت! لقد أنجزت جميع مهامك"
+                    }
+                  </p>
                 </div>
               )}
             </CardContent>

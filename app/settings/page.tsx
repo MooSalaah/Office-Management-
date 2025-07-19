@@ -276,7 +276,7 @@ function SettingsPageContent() {
 
   // Remove the toggleDarkMode function and its usages
 
-  const handleProfileUpdate = () => {
+  const handleProfileUpdate = async () => {
     if (profileData.newPassword && profileData.newPassword !== profileData.confirmPassword) {
       setAlert({ type: "error", message: "كلمات المرور الجديدة غير متطابقة" })
       return
@@ -301,30 +301,57 @@ function SettingsPageContent() {
         password: profileData.newPassword ? profileData.newPassword : currentUser.password,
       }
       
-      // Save to localStorage first (like job roles)
-      const existingUsers = JSON.parse(localStorage.getItem("users") || "[]")
-      const updatedUsers = existingUsers.map((u: any) => u.id === currentUser.id ? updatedUser : u)
-      localStorage.setItem("users", JSON.stringify(updatedUsers))
-      localStorage.setItem("currentUser", JSON.stringify(updatedUser))
-      console.log("Profile updated and saved to localStorage:", updatedUser)
-      
-      // Then update state
-      dispatch({ type: "UPDATE_USER", payload: updatedUser })
-      dispatch({ type: "SET_CURRENT_USER", payload: updatedUser })
-    }
+      try {
+        // Save to backend database
+        const response = await fetch(`/api/users?id=${currentUser.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(updatedUser),
+        });
 
-    setAlert(null)
-    setSuccessDialog("تم تحديث الملف الشخصي بنجاح وتم حفظ البيانات في التخزين المحلي")
-    
-    addNotification({
-      userId: "1",
-      title: "تحديث الملف الشخصي",
-      message: "تم تحديث معلومات الملف الشخصي بنجاح",
-      type: "system",
-      actionUrl: `/settings`,
-      triggeredBy: currentUser?.id || "",
-      isRead: false,
-    })
+        if (!response.ok) {
+          throw new Error('Failed to update profile in database');
+        }
+
+        const result = await response.json();
+        console.log('Profile updated in database:', result);
+
+        // Save to localStorage
+        const existingUsers = JSON.parse(localStorage.getItem("users") || "[]")
+        const updatedUsers = existingUsers.map((u: any) => u.id === currentUser.id ? updatedUser : u)
+        localStorage.setItem("users", JSON.stringify(updatedUsers))
+        localStorage.setItem("currentUser", JSON.stringify(updatedUser))
+        console.log("Profile updated and saved to localStorage:", updatedUser)
+        
+        // Update state
+        dispatch({ type: "UPDATE_USER", payload: updatedUser })
+        dispatch({ type: "SET_CURRENT_USER", payload: updatedUser })
+        
+        // إرسال تحديث فوري لجميع المستخدمين
+        realtimeUpdates.sendUserUpdate({ action: 'update', user: updatedUser })
+        
+        setAlert(null)
+        setSuccessDialog("تم تحديث الملف الشخصي بنجاح وتم حفظ البيانات في قاعدة البيانات")
+        
+        // إرسال إشعار للمدير عند تغيير البريد الإلكتروني أو كلمة المرور
+        if (currentUser.role !== "admin" && (profileData.email !== currentUser.email || profileData.newPassword)) {
+          addNotification({
+            userId: "1", // Admin user ID
+            title: "تحديث بيانات المستخدم",
+            message: `تم تحديث بيانات المستخدم "${currentUser.name}" - ${profileData.email !== currentUser.email ? 'البريد الإلكتروني' : ''}${profileData.email !== currentUser.email && profileData.newPassword ? ' و' : ''}${profileData.newPassword ? 'كلمة المرور' : ''}`,
+            type: "system",
+            actionUrl: `/settings`,
+            triggeredBy: currentUser?.id || "",
+            isRead: false,
+          })
+        }
+      } catch (error) {
+        console.error('Error updating profile:', error);
+        setAlert({ type: "error", message: "حدث خطأ أثناء تحديث الملف الشخصي في قاعدة البيانات" });
+      }
+    }
   }
 
   const handleProfileImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -557,7 +584,7 @@ function SettingsPageContent() {
     }
   }
 
-  const handleUpdateUser = () => {
+  const handleUpdateUser = async () => {
     if (!editingUser || !hasPermission(currentUser?.role || "", "edit", "users")) {
       setAlert({ type: "error", message: "ليس لديك صلاحية لتعديل المستخدمين" })
       return
@@ -594,44 +621,68 @@ function SettingsPageContent() {
 
     console.log("Updating user:", updatedUser)
 
-    // Save to localStorage first (like job roles)
-    const existingUsers = JSON.parse(localStorage.getItem("users") || "[]")
-    const updatedUsers = existingUsers.map((u: any) => u.id === editingUser.id ? updatedUser : u)
-    localStorage.setItem("users", JSON.stringify(updatedUsers))
-    
-    if (currentUser && editingUser.id === currentUser.id) {
-      localStorage.setItem("currentUser", JSON.stringify(updatedUser))
-    }
-    
-    console.log("Users saved to localStorage:", updatedUsers)
-    
-    // Then update state
-    dispatch({ type: "UPDATE_USER", payload: updatedUser })
-    
-    // If this is the current user, update currentUser as well
-    if (currentUser && editingUser.id === currentUser.id) {
-      dispatch({ type: "SET_CURRENT_USER", payload: updatedUser })
-      // Also update localStorage
-      localStorage.setItem("currentUser", JSON.stringify(updatedUser))
-      
-      // Update user permissions based on current role
-      const jobRoles = JSON.parse(localStorage.getItem("jobRoles") || "[]")
-      const userRole = jobRoles.find((role: any) => role.id === updatedUser.role)
-      if (userRole) {
-        const updatedUserWithPermissions = { ...updatedUser, permissions: userRole.permissions }
-        dispatch({ type: "SET_CURRENT_USER", payload: updatedUserWithPermissions })
-        localStorage.setItem("currentUser", JSON.stringify(updatedUserWithPermissions))
+    try {
+      // Save to backend database
+      const response = await fetch(`/api/users?id=${editingUser.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatedUser),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update user in database');
       }
+
+      const result = await response.json();
+      console.log('User updated in database:', result);
+
+      // Save to localStorage
+      const existingUsers = JSON.parse(localStorage.getItem("users") || "[]")
+      const updatedUsers = existingUsers.map((u: any) => u.id === editingUser.id ? updatedUser : u)
+      localStorage.setItem("users", JSON.stringify(updatedUsers))
+      
+      if (currentUser && editingUser.id === currentUser.id) {
+        localStorage.setItem("currentUser", JSON.stringify(updatedUser))
+      }
+      
+      console.log("Users saved to localStorage:", updatedUsers)
+      
+      // Update state
+      dispatch({ type: "UPDATE_USER", payload: updatedUser })
+      
+      // If this is the current user, update currentUser as well
+      if (currentUser && editingUser.id === currentUser.id) {
+        dispatch({ type: "SET_CURRENT_USER", payload: updatedUser })
+        // Also update localStorage
+        localStorage.setItem("currentUser", JSON.stringify(updatedUser))
+        
+        // Update user permissions based on current role
+        const jobRoles = JSON.parse(localStorage.getItem("jobRoles") || "[]")
+        const userRole = jobRoles.find((role: any) => role.id === updatedUser.role)
+        if (userRole) {
+          const updatedUserWithPermissions = { ...updatedUser, permissions: userRole.permissions }
+          dispatch({ type: "SET_CURRENT_USER", payload: updatedUserWithPermissions })
+          localStorage.setItem("currentUser", JSON.stringify(updatedUserWithPermissions))
+        }
+      }
+      
+      // إرسال تحديث فوري لجميع المستخدمين
+      realtimeUpdates.sendUserUpdate({ action: 'update', user: updatedUser })
+      
+      // Show success dialog with confirmation
+      showSuccessToast("تم تحديث المستخدم بنجاح", `تم تحديث المستخدم "${updatedUser.name}" بنجاح`)
+      
+      setIsUserDialogOpen(false)
+      setEditingUser(null)
+      resetUserForm()
+      // إعادة تحميل المستخدمين من التخزين بعد التحديث
+      reloadUsersFromStorage()
+    } catch (error) {
+      console.error('Error updating user:', error);
+      setAlert({ type: "error", message: "حدث خطأ أثناء تحديث المستخدم في قاعدة البيانات" });
     }
-    
-    // Show success dialog with confirmation
-    showSuccessToast("تم تحديث المستخدم بنجاح", `تم تحديث المستخدم "${updatedUser.name}" بنجاح`)
-    
-    setIsUserDialogOpen(false)
-    setEditingUser(null)
-    resetUserForm()
-    // إعادة تحميل المستخدمين من التخزين بعد التحديث
-    reloadUsersFromStorage()
   }
 
   const reloadUsersFromStorage = () => {
