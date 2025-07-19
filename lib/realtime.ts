@@ -24,12 +24,15 @@ class RealtimeManager {
 	private maxReconnectDelay = 30000;
 	private isConnected = false;
 	private connectionCheckInterval: NodeJS.Timeout | null = null;
+	private pollingInterval: NodeJS.Timeout | null = null;
+	private lastUpdateTimestamp = 0;
 
 	constructor() {
 		// Only initialize on client side
 		if (typeof window !== "undefined") {
 			this.initializeEventSource();
 			this.startConnectionCheck();
+			this.startPolling(); // Always start polling as backup
 		}
 	}
 
@@ -49,6 +52,7 @@ class RealtimeManager {
 			this.eventSource.onmessage = (event) => {
 				try {
 					const update: RealtimeUpdate = JSON.parse(event.data);
+					this.lastUpdateTimestamp = update.timestamp;
 					this.notifyListeners(update);
 				} catch (error) {
 					console.error("Error parsing realtime update:", error);
@@ -96,25 +100,35 @@ class RealtimeManager {
 
 	private fallbackToPolling() {
 		console.log("🔄 Falling back to polling mode");
-		// Implement polling as fallback
-		this.startPolling();
+		// Polling is already running as backup
 	}
 
 	private startPolling() {
-		// Poll every 30 seconds as fallback
-		setInterval(async () => {
+		// Poll every 5 seconds as backup
+		this.pollingInterval = setInterval(async () => {
 			try {
-				const response = await fetch("/api/realtime/poll");
+				const apiUrl =
+					process.env.NEXT_PUBLIC_API_URL ||
+					"https://engineering-office-backend.onrender.com";
+				const response = await fetch(
+					`${apiUrl}/api/realtime/poll?since=${this.lastUpdateTimestamp}`
+				);
 				if (response.ok) {
-					const updates = await response.json();
-					updates.forEach((update: RealtimeUpdate) => {
-						this.notifyListeners(update);
-					});
+					const data = await response.json();
+					if (data.updates && Array.isArray(data.updates)) {
+						data.updates.forEach((update: RealtimeUpdate) => {
+							this.lastUpdateTimestamp = Math.max(
+								this.lastUpdateTimestamp,
+								update.timestamp
+							);
+							this.notifyListeners(update);
+						});
+					}
 				}
 			} catch (error) {
 				console.error("Polling error:", error);
 			}
-		}, 30000);
+		}, 5000);
 	}
 
 	private startConnectionCheck() {
@@ -188,6 +202,10 @@ class RealtimeManager {
 			clearInterval(this.connectionCheckInterval);
 			this.connectionCheckInterval = null;
 		}
+		if (this.pollingInterval) {
+			clearInterval(this.pollingInterval);
+			this.pollingInterval = null;
+		}
 		this.isConnected = false;
 	}
 }
@@ -248,9 +266,11 @@ export const useRealtime = (
 // Hook for connection status
 export const useRealtimeConnection = () => {
 	const { useState, useEffect } = require("react");
+
 	const [status, setStatus] = useState({
 		isConnected: false,
 		reconnectAttempts: 0,
+		maxReconnectAttempts: 10,
 	});
 
 	useEffect(() => {
@@ -260,10 +280,10 @@ export const useRealtimeConnection = () => {
 			setStatus(realtimeManager.getConnectionStatus());
 		};
 
-		// Update status immediately
+		// Update immediately
 		updateStatus();
 
-		// Update status every 5 seconds
+		// Update every 5 seconds
 		const interval = setInterval(updateStatus, 5000);
 
 		return () => clearInterval(interval);

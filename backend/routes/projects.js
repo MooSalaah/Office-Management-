@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Project = require('../models/Project');
 const jwt = require('jsonwebtoken');
+const fetch = require('node-fetch');
 require('dotenv').config();
 
 // JWT middleware
@@ -43,6 +44,27 @@ router.post('/', async (req, res) => {
   const project = new Project({ name, client, description, startDate, endDate, status, notes });
   try {
     const newProject = await project.save();
+    
+    // Broadcast update to all clients
+    try {
+      const broadcastResponse = await fetch(`${req.protocol}://${req.get('host')}/api/realtime/broadcast`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type: 'project',
+          action: 'create',
+          data: newProject,
+          userId: 'system',
+          timestamp: Date.now()
+        })
+      });
+      console.log('Broadcast response:', await broadcastResponse.json());
+    } catch (broadcastError) {
+      console.error('Broadcast error:', broadcastError);
+    }
+    
     res.status(201).json({ success: true, data: newProject });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
