@@ -28,6 +28,11 @@ app.get('/test', (req, res) => {
   res.json({ success: true, message: 'Server is working' });
 });
 
+// Simple test route without database
+app.get('/api/test', (req, res) => {
+  res.json({ success: true, message: 'API is working', timestamp: new Date() });
+});
+
 // Add routes with error handling
 app.use('/api/tasks', require('./routes/tasks'));
 app.use('/api/clients', require('./routes/clients'));
