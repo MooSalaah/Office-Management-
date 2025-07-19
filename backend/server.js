@@ -10,13 +10,31 @@ const port = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
+// MongoDB Connection with better error handling
+const connectDB = async () => {
+  try {
+    if (!process.env.MONGODB_URI) {
+      console.error('MONGODB_URI is not set in environment variables');
+      return false;
+    }
+    
+    await mongoose.connect(process.env.MONGODB_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 5000, // 5 seconds timeout
+      socketTimeoutMS: 45000, // 45 seconds timeout
+    });
+    
+    console.log('MongoDB connected successfully');
+    return true;
+  } catch (err) {
+    console.error('MongoDB connection error:', err.message);
+    return false;
+  }
+};
+
 // Connect to MongoDB
-mongoose.connect(process.env.MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
-.then(() => console.log('MongoDB connected successfully'))
-.catch((err) => console.error('MongoDB connection error:', err));
+connectDB();
 
 // Example route
 app.get('/', (req, res) => {
@@ -34,7 +52,8 @@ app.get('/ping', (req, res) => {
       port: process.env.PORT,
       mongoUri: process.env.MONGODB_URI ? 'Set' : 'Not set',
       jwtSecret: process.env.JWT_SECRET ? 'Set' : 'Not set'
-    }
+    },
+    mongoStatus: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected'
   });
 });
 
