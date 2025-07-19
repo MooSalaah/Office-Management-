@@ -23,6 +23,21 @@ app.get('/', (req, res) => {
   res.send('Engineering Office Backend Running');
 });
 
+// Simple test route to verify server is working
+app.get('/ping', (req, res) => {
+  res.json({ 
+    success: true, 
+    message: 'Server is responding', 
+    timestamp: new Date(),
+    env: {
+      nodeEnv: process.env.NODE_ENV,
+      port: process.env.PORT,
+      mongoUri: process.env.MONGODB_URI ? 'Set' : 'Not set',
+      jwtSecret: process.env.JWT_SECRET ? 'Set' : 'Not set'
+    }
+  });
+});
+
 // Test route to check if server is working
 app.get('/test', (req, res) => {
   res.json({ success: true, message: 'Server is working' });
