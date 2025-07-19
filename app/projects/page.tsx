@@ -1,0 +1,1540 @@
+"use client"
+
+import { useState, useEffect, useRef, useMemo } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import {
+  Plus,
+  Search,
+  Filter,
+  Calendar,
+  Users,
+  DollarSign,
+  Eye,
+  Edit,
+  Trash2,
+  Building,
+  CheckCircle,
+  AlertCircle,
+  X,
+} from "lucide-react"
+import { useApp, useAppActions } from "@/lib/context/AppContext"
+import { realtimeUpdates, useRealtimeUpdatesByType } from "@/lib/realtime-updates"
+import { hasPermission } from "@/lib/auth"
+import type { Project } from "@/lib/types"
+import { useRouter, useSearchParams } from "next/navigation"
+import { formatCurrency } from "@/lib/utils"
+import { ArabicNumber } from "@/components/ui/ArabicNumber"
+import { SwipeToDelete } from "@/components/ui/swipe-to-delete"
+import { PermissionGuard } from "@/components/ui/permission-guard"
+import { DeleteConfirmationDialog } from "@/components/ui/confirmation-dialog"
+import { LoadingStates } from "@/components/ui/loading-skeleton"
+import { transliterateArabicToEnglish } from "@/lib/utils";
+import { useToast } from "@/components/ui/use-toast"
+
+export default function ProjectsPage() {
+  return (
+    <PermissionGuard requiredPermission="view_projects" requiredAction="view" requiredModule="projects" moduleName="صفحة المشاريع">
+      <ProjectsPageContent />
+    </PermissionGuard>
+  )
+}
+
+function ProjectsPageContent() {
+  const { state, dispatch } = useApp()
+  const { addNotification, createProjectWithDownPayment, updateProjectWithDownPayment, deleteProject } = useAppActions()
+  const { currentUser, projects, clients, users } = state
+  const { toast } = useToast()
+
+  // استقبال التحديثات الحية
+  const projectUpdates = useRealtimeUpdatesByType('project')
+  const userUpdates = useRealtimeUpdatesByType('user')
+
+  const handledProjectUpdateIdsRef = useRef<Set<string>>(new Set());
+
+  // تحديث البيانات عند استقبال تحديثات حية
+  useEffect(() => {
+    if (projectUpdates.length > 0) {
+      const lastUpdate = projectUpdates[projectUpdates.length - 1];
+      if (!lastUpdate.project) return;
+      const updateId = `${lastUpdate.project.id || ''}_${lastUpdate.action}_${lastUpdate.timestamp || ''}`;
+      if (handledProjectUpdateIdsRef.current.has(updateId)) return;
+      handledProjectUpdateIdsRef.current.add(updateId);
+      
+      console.log('=== PROJECT UPDATE RECEIVED ===');
+      console.log('Project update:', lastUpdate);
+      console.log('Current projects count:', state.projects.length);
+      
+      if (lastUpdate.action === 'create') {
+        const exists = state.projects.some(p => p.id === lastUpdate.project.id);
+        console.log('Project exists in state:', exists);
+        if (!exists) {
+          console.log('Adding project to state...');
+          dispatch({ type: "ADD_PROJECT", payload: lastUpdate.project });
+          console.log('Project added to state successfully');
+        }
+      } else if (lastUpdate.action === 'update') {
+        console.log('Updating project in state...');
+        dispatch({ type: "UPDATE_PROJECT", payload: lastUpdate.project });
+        console.log('Project updated in state successfully');
+      } else if (lastUpdate.action === 'delete') {
+        console.log('Deleting project from state...');
+        dispatch({ type: "DELETE_PROJECT", payload: lastUpdate.project.id });
+        console.log('Project deleted from state successfully');
+      }
+      
+      if (lastUpdate.userId && lastUpdate.userId !== currentUser?.id && lastUpdate.userName) {
+        toast({
+          title: "تحديث مشروع جديد",
+          description: `تمت إضافة/تعديل/حذف مشروع بواسطة ${lastUpdate.userName}`
+        });
+      }
+    }
+  }, [projectUpdates, dispatch, state.projects, currentUser, toast]);
+
+  useEffect(() => {
+    if (userUpdates.length > 0) {
+      const lastUpdate = userUpdates[userUpdates.length - 1]
+      if (lastUpdate.action === 'create') {
+        // تحقق إذا كان المستخدم موجود مسبقاً بناءً على id أو email
+        const exists = state.users.some(u => u.id === lastUpdate.user.id || u.email === lastUpdate.user.email)
+        if (!exists) {
+          dispatch({ type: "ADD_USER", payload: lastUpdate.user })
+        }
+      } else if (lastUpdate.action === 'update') {
+        dispatch({ type: "UPDATE_USER", payload: lastUpdate.user })
+      } else if (lastUpdate.action === 'delete') {
+        dispatch({ type: "DELETE_USER", payload: lastUpdate.user.id })
+      }
+    }
+  }, [userUpdates, dispatch, state.users])
+
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const filterParam = searchParams.get("filter")
+  const clientParam = searchParams.get("client")
+  const clientNameParam = searchParams.get("clientName")
+
+  const [filteredProjects, setFilteredProjects] = useState<Project[]>(projects)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [filterStatus, setFilterStatus] = useState(filterParam || "in-progress")
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false)
+  const [editingProject, setEditingProject] = useState<Project | null>(null)
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null)
+  const [alert, setAlert] = useState<{ type: "success" | "error"; message: string } | null>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [projectToDelete, setProjectToDelete] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState<string>("")
+  const [updateSuccessDialogOpen, setUpdateSuccessDialogOpen] = useState(false)
+  
+  // States for inline inputs
+  const [showNewClientInput, setShowNewClientInput] = useState(false)
+  const [showNewTypeInput, setShowNewTypeInput] = useState(false)
+  const [showNewEngineerInput, setShowNewEngineerInput] = useState(false)
+  const [newClientName, setNewClientName] = useState("")
+  const [newProjectType, setNewProjectType] = useState("")
+  const [newEngineerName, setNewEngineerName] = useState("")
+  const [showValidationErrors, setShowValidationErrors] = useState(false)
+  const [missingFields, setMissingFields] = useState<string[]>([])
+  const [newClientInputError, setNewClientInputError] = useState("");
+  const [newTypeInputError, setNewTypeInputError] = useState("");
+  const [newEngineerInputError, setNewEngineerInputError] = useState("");
+
+  const [formData, setFormData] = useState({
+    name: "",
+    clientId: "",
+    type: "",
+    price: "",
+    downPayment: "0",
+    assignedEngineerId: "",
+    importance: "medium" as "low" | "medium" | "high",
+    status: "in-progress" as "draft" | "in-progress" | "completed" | "canceled",
+    description: "",
+    startDate: new Date().toISOString().split("T")[0],
+  })
+
+  // Show loading skeleton if data is loading
+  if (state.isLoading || state.loadingStates.projects) {
+    return LoadingStates.projects(9)
+  }
+
+  const memoizedProjects = useMemo(() => {
+    let filtered = projects
+
+    // Filter by client if specified in URL
+    if (clientParam) {
+      filtered = filtered.filter((project) => project.clientId === clientParam)
+    }
+
+    // Filter by search term
+    if (searchTerm) {
+      filtered = filtered.filter(
+        (project) =>
+          project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          project.client.toLowerCase().includes(searchTerm.toLowerCase()),
+      )
+    }
+
+    // Filter by status
+    if (filterStatus !== "all") {
+      filtered = filtered.filter((project) => project.status === filterStatus)
+    }
+
+    // Filter by user role
+    if (currentUser?.role === "engineer") {
+      filtered = filtered.filter((project) => project.assignedEngineerId === currentUser.id)
+    }
+
+    return filtered
+  }, [projects, searchTerm, filterStatus, currentUser, clientParam])
+
+  useEffect(() => {
+    setFilteredProjects(memoizedProjects)
+  }, [memoizedProjects])
+
+  // تحديث getStatusColor لإرجاع variant أو className مخصص
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "in-progress":
+        return "bg-blue-100 text-blue-800 border-blue-200"
+      case "completed":
+        return "bg-green-100 text-green-800 border-green-200"
+      case "draft":
+        return "bg-gray-100 text-gray-800 border-gray-200"
+      case "canceled":
+        return "bg-red-100 text-red-800 border-red-200"
+      case "new":
+        return "bg-yellow-100 text-yellow-800 border-yellow-200"
+      default:
+        return "bg-gray-100 text-gray-800 border-gray-200"
+    }
+  }
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case "in-progress":
+        return "قيد التنفيذ"
+      case "completed":
+        return "مكتمل"
+      case "draft":
+        return "مسودة"
+      case "canceled":
+        return "ملغي"
+      default:
+        return status
+    }
+  }
+
+  const handleCreateProject = async () => {
+    if (showNewClientInput || showNewTypeInput || showNewEngineerInput) {
+      return;
+    }
+    if (!hasPermission(currentUser?.role || "", "create", "projects")) {
+      setAlert({ type: "error", message: "ليس لديك صلاحية لإنشاء المشاريع" });
+      return;
+    }
+    const missing: string[] = [];
+    if (!formData.name.trim()) missing.push("اسم المشروع");
+    if (!formData.clientId) missing.push("العميل");
+    if (!formData.type) missing.push("نوع المشروع");
+    if (!formData.assignedEngineerId) missing.push("المهندس المسؤول");
+    if (!formData.price) missing.push("السعر الإجمالي");
+    if (missing.length > 0) {
+      setShowValidationErrors(true);
+      setMissingFields(missing);
+      return;
+    }
+    setMissingFields([]);
+
+    const client = clients.find(c => c.id === formData.clientId)
+    const engineer = users.find(u => u.id === formData.assignedEngineerId)
+
+    const newProject: Project = {
+      id: Date.now().toString(),
+      name: formData.name,
+      client: client?.name || "",
+      clientId: formData.clientId,
+      type: formData.type,
+      status: formData.status,
+      team: [formData.assignedEngineerId],
+      startDate: formData.startDate,
+      price: Number.parseFloat(formData.price),
+      downPayment: Number.parseFloat(formData.downPayment),
+      remainingBalance: Number.parseFloat(formData.price) - Number.parseFloat(formData.downPayment),
+      assignedEngineerId: formData.assignedEngineerId,
+      assignedEngineerName: engineer?.name || "",
+      importance: formData.importance,
+      description: formData.description,
+      progress: 0,
+      createdBy: currentUser?.id || "",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+
+    await createProjectWithDownPayment(newProject)
+    
+    setIsDialogOpen(false)
+    resetForm()
+
+    // Add notification to assigned engineer
+    if (engineer && engineer.id !== currentUser?.id) {
+      addNotification({
+        userId: engineer.id,
+        title: "مشروع جديد مُعيّن لك",
+        message: `تم تعيين مشروع "${formData.name}" لك`,
+        type: "project",
+        actionUrl: `/projects/${newProject.id}`,
+        triggeredBy: currentUser?.id || "",
+        isRead: false,
+      })
+    }
+
+    // إرسال تحديث فوري
+    realtimeUpdates.sendProjectUpdate('create', { project: newProject, userId: currentUser?.id, userName: currentUser?.name })
+  }
+
+  const handleUpdateProject = async () => {
+    if (showNewClientInput || showNewTypeInput || showNewEngineerInput) {
+      return;
+    }
+    if (!editingProject || !hasPermission(currentUser?.role || "", "edit", "projects")) {
+      addNotification({
+        userId: currentUser?.id || "",
+        title: "خطأ في تحديث المشروع",
+        message: "ليس لديك صلاحية لتعديل المشاريع",
+        type: "system",
+        isRead: false,
+        triggeredBy: currentUser?.id || "",
+      })
+      return
+    }
+
+    const client = clients.find(c => c.id === formData.clientId)
+    const engineer = users.find(u => u.id === formData.assignedEngineerId)
+
+    const updatedProject: Project = {
+      ...editingProject,
+      name: formData.name,
+      client: client?.name || "",
+      clientId: formData.clientId,
+      type: formData.type,
+      status: formData.status,
+      team: [formData.assignedEngineerId],
+      startDate: formData.startDate,
+      price: Number.parseFloat(formData.price),
+      downPayment: Number.parseFloat(formData.downPayment),
+      remainingBalance: Number.parseFloat(formData.price) - Number.parseFloat(formData.downPayment),
+      assignedEngineerId: formData.assignedEngineerId,
+      assignedEngineerName: engineer?.name || "",
+      importance: formData.importance,
+      description: formData.description,
+      updatedAt: new Date().toISOString(),
+    }
+
+    await updateProjectWithDownPayment(updatedProject)
+    
+    setIsDialogOpen(false)
+    setEditingProject(null)
+    resetForm()
+
+    // Add notification to assigned engineer if changed
+    if (engineer && engineer.id !== currentUser?.id && engineer.id !== editingProject.assignedEngineerId) {
+      addNotification({
+        userId: engineer.id,
+        title: "تم تعيين مشروع لك",
+        message: `تم تعيين مشروع "${formData.name}" لك`,
+        type: "project",
+        actionUrl: `/projects/${updatedProject.id}`,
+        triggeredBy: currentUser?.id || "",
+        isRead: false,
+      })
+    }
+
+    // إرسال تحديث فوري
+    realtimeUpdates.sendProjectUpdate('update', { project: updatedProject, userId: currentUser?.id, userName: currentUser?.name })
+  }
+
+  const handleDeleteProject = (projectId: string) => {
+    if (!hasPermission(currentUser?.role || "", "delete", "projects")) {
+      addNotification({
+        userId: currentUser?.id || "",
+        title: "خطأ في حذف المشروع",
+        message: "ليس لديك صلاحية لحذف المشاريع",
+        type: "system",
+        isRead: false,
+        triggeredBy: currentUser?.id || "",
+      })
+      return
+    }
+
+    setProjectToDelete(projectId)
+    setDeleteDialogOpen(true)
+  }
+
+  const confirmDelete = async () => {
+    if (!projectToDelete) return
+
+    try {
+      const project = projects.find(p => p.id === projectToDelete)
+      if (!project) {
+        setDeleteError("المشروع غير موجود")
+        return
+      }
+
+      await deleteProject(projectToDelete)
+      
+      setDeleteDialogOpen(false)
+      setProjectToDelete(null)
+      setDeleteError("")
+    } catch (error) {
+      setDeleteError("حدث خطأ أثناء حذف المشروع")
+    }
+  }
+
+  const openEditDialog = (project: Project) => {
+    setEditingProject(project)
+    setFormData({
+      name: project.name,
+      clientId: project.clientId,
+      type: project.type,
+      price: project.price.toString(),
+      downPayment: project.downPayment.toString(),
+      assignedEngineerId: project.assignedEngineerId,
+      importance: project.importance,
+      status: project.status,
+      description: project.description,
+      startDate: project.startDate,
+    })
+    setShowValidationErrors(false)
+    setIsDialogOpen(true)
+  }
+
+  const openDetailsDialog = (project: Project) => {
+    setSelectedProject(project)
+    setIsDetailsDialogOpen(true)
+  }
+
+  const resetForm = () => {
+    setFormData({
+      name: "",
+      clientId: "",
+      type: "",
+      price: "",
+      downPayment: "0",
+      assignedEngineerId: currentUser?.id || "",
+      importance: "medium",
+      status: "in-progress",
+      description: "",
+      startDate: new Date().toISOString().split("T")[0],
+    })
+    
+    // Reset all inline inputs
+    setShowNewClientInput(false)
+    setShowNewTypeInput(false)
+    setShowNewEngineerInput(false)
+    setNewClientName("")
+    setNewProjectType("")
+    setNewEngineerName("")
+    setShowValidationErrors(false)
+  }
+
+  const canCreateProject = hasPermission(currentUser?.role || "", "create", "projects")
+  const canEditProject = hasPermission(currentUser?.role || "", "edit", "projects")
+  const canDeleteProject = hasPermission(currentUser?.role || "", "delete", "projects")
+
+  const remainingBalance = Number.parseFloat(formData.price) - (Number.parseFloat(formData.downPayment) || 0)
+
+  // Handle adding new client
+  const handleAddNewClient = () => {
+    if (!newClientName.trim()) {
+      setNewClientInputError("يرجى إدخال اسم العميل الجديد");
+      return;
+    }
+    setNewClientInputError("");
+    const newClient = {
+      id: Date.now().toString(),
+      name: newClientName.trim(),
+      email: "",
+      phone: "",
+      address: "",
+      projectsCount: 0,
+      totalValue: 0,
+      lastContact: new Date().toISOString(),
+      status: "active" as const,
+      createdAt: new Date().toISOString(),
+    }
+    
+    // Add to clients list
+    dispatch({ type: "ADD_CLIENT", payload: newClient })
+    
+    // Update form data
+    setFormData(prev => ({ ...prev, clientId: newClient.id }))
+    
+    // Add notification
+    addNotification({
+      userId: currentUser?.id || "",
+      title: "تم إضافة عميل جديد",
+      message: `تم إضافة العميل "${newClient.name}" بنجاح`,
+      type: "project",
+      isRead: false,
+      triggeredBy: currentUser?.id || "",
+    })
+    
+    // Reset input
+    setShowNewClientInput(false)
+    setNewClientName("")
+  }
+
+  // Handle adding new project type
+  const handleAddNewProjectType = () => {
+    if (!newProjectType.trim()) {
+      setNewTypeInputError("يرجى إدخال نوع المشروع الجديد");
+      return;
+    }
+    setNewTypeInputError("");
+    // Update form data with new type
+    setFormData(prev => ({ ...prev, type: newProjectType.trim() }))
+    
+    // Save project types to localStorage
+    const existingTypes = JSON.parse(localStorage.getItem("projectTypes") || "[]")
+    if (!existingTypes.includes(newProjectType.trim())) {
+      existingTypes.push(newProjectType.trim())
+      localStorage.setItem("projectTypes", JSON.stringify(existingTypes))
+    }
+    
+    // Add notification to admin
+    if (currentUser?.role !== "admin") {
+      addNotification({
+        userId: "1", // Admin user ID
+        title: "تم إضافة نوع مشروع جديد",
+        message: `تم إضافة نوع المشروع "${newProjectType.trim()}" بواسطة ${currentUser?.name}`,
+        type: "project",
+        isRead: false,
+        triggeredBy: currentUser?.id || "",
+      })
+    }
+    
+    // Reset input
+    setShowNewTypeInput(false)
+    setNewProjectType("")
+  }
+
+  // Handle deleting project type
+  const handleDeleteProjectType = (typeToDelete: string) => {
+    // Check if type is being used in any project
+    const isTypeInUse = projects.some(project => project.type === typeToDelete)
+    
+    if (isTypeInUse) {
+      setAlert({ type: "error", message: "لا يمكن حذف هذا النوع لأنه مستخدم في مشاريع حالية" })
+      return
+    }
+    
+    // Remove from localStorage
+    const existingTypes = JSON.parse(localStorage.getItem("projectTypes") || "[]")
+    const updatedTypes = existingTypes.filter((type: string) => type !== typeToDelete)
+    localStorage.setItem("projectTypes", JSON.stringify(updatedTypes))
+    
+    setAlert({ type: "success", message: "تم حذف نوع المشروع بنجاح" })
+  }
+
+  // Handle adding new engineer
+  const handleAddNewEngineer = () => {
+    if (!newEngineerName.trim()) {
+      setNewEngineerInputError("يرجى إدخال اسم المهندس الجديد");
+      return;
+    }
+    setNewEngineerInputError("");
+    // Check if user has permission to add engineers (only engineers and managers can add engineers)
+    if (!hasPermission(currentUser?.role || "", "create", "users") && currentUser?.role !== "engineer") {
+      setAlert({ type: "error", message: "فقط المهندسون والمديرون يمكنهم إضافة مهندسين جدد" })
+      return
+    }
+
+    if (newEngineerName.trim()) {
+      // Generate email and password based on name
+      const nameParts = newEngineerName.trim().split(' ')
+      const firstName = nameParts[0] || ''
+      const lastName = nameParts[nameParts.length - 1] || ''
+      
+      // Create email: first letter of first name + last name + @newcorner.sa
+      const emailPrefix = transliterateArabicToEnglish(firstName.charAt(0) + lastName).toLowerCase();
+      let email = `${emailPrefix}@newcorner.sa`
+      
+      // Check if email already exists and add number if needed
+      const existingUsers = JSON.parse(localStorage.getItem("users") || "[]")
+      let emailCounter = 1
+      let finalEmail = email
+      while (existingUsers.some((user: any) => user.email === finalEmail)) {
+        finalEmail = `${emailPrefix}${emailCounter}@newcorner.sa`
+        emailCounter++
+      }
+      
+      // Create default password: first letter of first name + last name + 123
+      const defaultPassword = transliterateArabicToEnglish(`${firstName.charAt(0)}${lastName}123`).toLowerCase();
+
+      const newEngineer = {
+        id: Date.now().toString(),
+        name: newEngineerName.trim(),
+        email: finalEmail,
+        password: defaultPassword,
+        role: "engineer" as const,
+        avatar: "",
+        phone: "",
+        isActive: true,
+        monthlySalary: 5000, // مرتب مبدئي 5000 ريال
+        createdAt: new Date().toISOString(),
+      }
+      
+      // Add to users list
+      dispatch({ type: "ADD_USER", payload: newEngineer })
+      
+      // Save to localStorage
+      existingUsers.push(newEngineer)
+      localStorage.setItem("users", JSON.stringify(existingUsers))
+      
+      // إرسال تحديث فوري
+      realtimeUpdates.sendUserUpdate({ action: 'create', user: newEngineer })
+      
+      // Update form data
+      setFormData(prev => ({ ...prev, assignedEngineerId: newEngineer.id }))
+      
+      // Add notification
+      addNotification({
+        userId: currentUser?.id || "",
+        title: "تم إضافة مهندس جديد",
+        message: `تم إضافة المهندس "${newEngineer.name}" بنجاح. الإيميل: ${finalEmail}، كلمة المرور: ${defaultPassword}`,
+        type: "project",
+        isRead: false,
+        triggeredBy: currentUser?.id || "",
+      })
+      
+      // Reset input
+      setShowNewEngineerInput(false)
+      setNewEngineerName("")
+    }
+  }
+
+  return (
+    <div className="max-w-screen-xl mx-auto space-y-6">
+      <style jsx global>{`
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+          -webkit-appearance: none !important;
+          margin: 0 !important;
+        }
+        input[type="number"] {
+          -moz-appearance: textfield !important;
+        }
+        input[type="number"]::-ms-clear,
+        input[type="number"]::-ms-expand {
+          display: none !important;
+        }
+      `}</style>
+      {alert && (
+        <Alert variant={alert.type === "error" ? "destructive" : "default"}>
+          {alert.type === "error" ? <AlertCircle className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
+          <AlertDescription>{alert.message}</AlertDescription>
+        </Alert>
+      )}
+
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground mb-1">
+            {clientParam && clientNameParam 
+              ? `مشاريع ${decodeURIComponent(clientNameParam)}`
+              : "إدارة المشاريع"
+            }
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            {clientParam && clientNameParam 
+              ? `مشاريع العميل ${decodeURIComponent(clientNameParam)}`
+              : "إدارة ومتابعة المشاريع الحالية والسابقة"
+            }
+          </p>
+          {clientParam && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push("/projects")}
+              className="mt-2"
+            >
+              <X className="w-4 h-4 mr-2" />
+              إلغاء الفلترة
+            </Button>
+          )}
+        </div>
+        {canCreateProject && (
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button
+                className="self-end"
+                onClick={() => {
+                  setEditingProject(null)
+                  setShowValidationErrors(false)
+                  resetForm()
+                }}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                مشروع جديد
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>{editingProject ? "تعديل المشروع" : "إضافة مشروع جديد"}</DialogTitle>
+                <DialogDescription>
+                  {editingProject ? "قم بتعديل تفاصيل المشروع" : "قم بإدخال تفاصيل المشروع الجديد"}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="project-name" className="flex items-center">
+                    اسم المشروع
+                    <span className="text-red-500 mr-1">*</span>
+                  </Label>
+                  <Input
+                    id="project-name"
+                    placeholder="اسم المشروع"
+                    value={formData.name}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
+                    className={showValidationErrors && !formData.name.trim() ? "border-red-500" : ""}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="client" className="flex items-center">
+                    العميل
+                    <span className="text-red-500 mr-1">*</span>
+                  </Label>
+                  {!showNewClientInput ? (
+                    <div className="flex space-x-2 space-x-reverse">
+                      <Select
+                        value={formData.clientId}
+                        onValueChange={(value) => setFormData((prev) => ({ ...prev, clientId: value }))}
+                      >
+                        <SelectTrigger className={`flex-1 ${showValidationErrors && !formData.clientId ? "border-red-500" : ""}`}>
+                          <SelectValue placeholder="اختر العميل" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {clients.map((client) => (
+                            <SelectItem key={client.id} value={client.id}>
+                              <div className="flex items-center space-x-2 space-x-reverse">
+                                <span>{client.name}</span>
+                                <Badge variant="outline" className="text-xs">
+                                  عميل
+                                </Badge>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setShowNewClientInput(true)}
+                        className="shrink-0"
+                        title="إضافة عميل جديد"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex space-x-2 space-x-reverse">
+                        <Input
+                          placeholder="اسم العميل الجديد"
+                          value={newClientName}
+                          onChange={(e) => setNewClientName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && newClientName.trim()) {
+                              handleAddNewClient()
+                            }
+                          }}
+                          className={newClientInputError ? "border-red-500" : ""}
+                        />
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={handleAddNewClient}
+                          disabled={!newClientName.trim()}
+                          className="shrink-0"
+                          title="حفظ العميل"
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => {
+                            setShowNewClientInput(false)
+                            setNewClientName("")
+                          }}
+                          className="shrink-0"
+                          title="إلغاء"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      {newClientInputError && (
+                        <p className="text-xs text-red-500 mt-1">{newClientInputError}</p>
+                      )}
+                    </div>
+                  )}
+
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="type" className="flex items-center">
+                    نوع المشروع
+                    <span className="text-red-500 mr-1">*</span>
+                  </Label>
+                  {!showNewTypeInput ? (
+                    <div className="flex space-x-2 space-x-reverse">
+                      <Select
+                        value={formData.type}
+                        onValueChange={(value) => setFormData((prev) => ({ ...prev, type: value }))}
+                      >
+                        <SelectTrigger className={`flex-1 ${showValidationErrors && !formData.type.trim() ? "border-red-500" : ""}`}>
+                          <SelectValue placeholder="اختر النوع" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {/* Default types */}
+                          <SelectItem value="سكني">سكني</SelectItem>
+                          <SelectItem value="تجاري">تجاري</SelectItem>
+                          <SelectItem value="صناعي">صناعي</SelectItem>
+                          <SelectItem value="حكومي">حكومي</SelectItem>
+                          
+                          {/* Custom types from localStorage */}
+                          {(() => {
+                            const customTypes = JSON.parse(localStorage.getItem("projectTypes") || "[]")
+                            return customTypes.map((type: string) => (
+                              <div key={type} className="flex items-center justify-between px-2 py-1.5">
+                                <SelectItem value={type} className="flex-1">{type}</SelectItem>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 w-6 p-0 text-red-600 hover:text-red-700"
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    handleDeleteProjectType(type)
+                                  }}
+                                  title="حذف نوع المشروع"
+                                >
+                                  <X className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            ))
+                          })()}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setShowNewTypeInput(true)}
+                        className="shrink-0"
+                        title="إضافة نوع مشروع جديد"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex space-x-2 space-x-reverse">
+                        <Input
+                          placeholder="نوع المشروع الجديد"
+                          value={newProjectType}
+                          onChange={(e) => setNewProjectType(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && newProjectType.trim()) {
+                              handleAddNewProjectType()
+                            }
+                          }}
+                          className={newTypeInputError ? "border-red-500" : ""}
+                        />
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={handleAddNewProjectType}
+                          disabled={!newProjectType.trim()}
+                          className="shrink-0"
+                          title="حفظ نوع المشروع"
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => {
+                            setShowNewTypeInput(false)
+                            setNewProjectType("")
+                          }}
+                          className="shrink-0"
+                          title="إلغاء"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      {newTypeInputError && (
+                        <p className="text-xs text-red-500 mt-1">{newTypeInputError}</p>
+                      )}
+                    </div>
+                  )}
+
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="assigned-engineer" className="flex items-center">
+                    المهندس المسؤول
+                    <span className="text-red-500 mr-1">*</span>
+                  </Label>
+                  {!showNewEngineerInput ? (
+                    <div className="flex space-x-2 space-x-reverse">
+                      <Select
+                        value={formData.assignedEngineerId}
+                        onValueChange={(value) => setFormData((prev) => ({ ...prev, assignedEngineerId: value }))}
+                      >
+                        <SelectTrigger className={`flex-1 ${showValidationErrors && !formData.assignedEngineerId ? "border-red-500" : ""}`}>
+                          <SelectValue placeholder="اختر المهندس" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {users
+                            .filter((u) => u.role === "engineer" || u.role === "admin")
+                            .map((engineer) => (
+                              <SelectItem key={engineer.id} value={engineer.id}>
+                                <div className="flex items-center space-x-2 space-x-reverse">
+                                  <span>{engineer.name}</span>
+                                  <Badge variant="outline" className="text-xs">
+                                    {engineer.role === "admin" ? "مدير" : "مهندس"}
+                                  </Badge>
+                                </div>
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                      {(hasPermission(currentUser?.role || "", "create", "users") || currentUser?.role === "engineer") && (
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => setShowNewEngineerInput(true)}
+                          className="shrink-0"
+                          title="إضافة مهندس جديد"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex space-x-2 space-x-reverse">
+                        <Input
+                          placeholder="اسم المهندس الجديد"
+                          value={newEngineerName}
+                          onChange={(e) => setNewEngineerName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && newEngineerName.trim()) {
+                              handleAddNewEngineer()
+                            }
+                          }}
+                          className={newEngineerInputError ? "border-red-500" : ""}
+                        />
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={handleAddNewEngineer}
+                          disabled={!newEngineerName.trim()}
+                          className="shrink-0"
+                          title="حفظ المهندس"
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => {
+                            setShowNewEngineerInput(false)
+                            setNewEngineerName("")
+                          }}
+                          className="shrink-0"
+                          title="إلغاء"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      {newEngineerInputError && (
+                        <p className="text-xs text-red-500 mt-1">{newEngineerInputError}</p>
+                      )}
+                    </div>
+                  )}
+
+                </div>
+                {/* استبدل حقلي السعر الإجمالي والدفعة المقدمة ليكونا بمحاذاة علوية (top) بدلاً من bottom في نموذج إضافة مشروع جديد، وذلك بتغيير md:items-end إلى md:items-start في div الذي يحتوي الحقلين. */}
+                <div className="md:col-span-2 flex flex-col md:flex-row md:items-start gap-4">
+                  {/* السعر الإجمالي */}
+                  <div className="flex-1 flex flex-col justify-stretch">
+                    <Label htmlFor="price" className="flex items-center mb-2">
+                      السعر الإجمالي
+                      <span className="text-red-500 mr-1">*</span>
+                    </Label>
+                    <div className="relative flex-1 flex flex-col justify-end">
+                      <Input
+                        id="price"
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={formData.price}
+                        onChange={(e) => {
+                          const value = e.target.value
+                          if (value === "" || Number.parseFloat(value) >= 0) {
+                            setFormData((prev) => ({ ...prev, price: value }))
+                          }
+                        }}
+                        className={`pr-4 pl-16 mt-1 ${showValidationErrors && (!formData.price || Number.parseFloat(formData.price) <= 0) ? "border-red-500" : ""}`}
+                        style={{ WebkitAppearance: 'none', MozAppearance: 'textfield' }}
+                      />
+                      {showValidationErrors && (!formData.price || Number.parseFloat(formData.price) <= 0) && (
+                        <p className="text-xs text-red-500">السعر الإجمالي مطلوب ويجب أن يكون أكبر من صفر</p>
+                      )}
+                      <div className="absolute top-0 bottom-0 left-3 flex items-center space-x-1 space-x-reverse pointer-events-none">
+                        <span className="text-sm text-muted-foreground">ر.س</span>
+                        <img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-4 h-4 opacity-80 mr-1 block dark:hidden" loading="lazy" />
+                        <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline w-4 h-4 opacity-80 hidden dark:block" loading="lazy" />
+                      </div>
+                    </div>
+                  </div>
+                  {/* الدفعة المقدمة */}
+                  <div className="flex-1 flex flex-col justify-stretch">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="down-payment" className="mb-2">الدفعة المقدمة</Label>
+                      {Number.parseFloat(formData.price) > 0 && (
+                        <span className="text-xs text-muted-foreground ml-2">
+                          الحد الأقصى: {Number.parseFloat(formData.price).toLocaleString()} ريال
+                        </span>
+                      )}
+                    </div>
+                    <div className="relative flex-1 flex flex-col justify-end">
+                      <Input
+                        id="down-payment"
+                        type="number"
+                        min="0"
+                        max={Number.parseFloat(formData.price) || 0}
+                        step="0.01"
+                        placeholder="0.00"
+                        value={formData.downPayment}
+                        onChange={(e) => {
+                          const value = e.target.value
+                          const price = Number.parseFloat(formData.price) || 0
+                          const downPayment = Number.parseFloat(value) || 0
+                          if (value === "" || (downPayment >= 0 && downPayment <= price)) {
+                            setFormData((prev) => ({ ...prev, downPayment: value }))
+                          }
+                        }}
+                        className={`pr-4 pl-16 mt-1 ${Number.parseFloat(formData.downPayment) > Number.parseFloat(formData.price) ? "border-red-500" : ""}`}
+                        style={{ WebkitAppearance: 'none', MozAppearance: 'textfield' }}
+                      />
+                      <div className="absolute top-0 bottom-0 left-3 flex items-center space-x-1 space-x-reverse pointer-events-none">
+                        <span className="text-sm text-muted-foreground">ر.س</span>
+                        <img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-4 h-4 opacity-80 mr-1 block dark:hidden" loading="lazy" />
+                        <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline w-4 h-4 opacity-80 hidden dark:block" loading="lazy" />
+                      </div>
+                    </div>
+                    {Number.parseFloat(formData.downPayment) > Number.parseFloat(formData.price) && (
+                      <p className="text-xs text-red-500">الدفعة المقدمة لا يمكن أن تتجاوز السعر الإجمالي</p>
+                    )}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="remaining-balance" className="mb-2">المبلغ المتبقي</Label>
+                  <div className="relative">
+                    <Input
+                      id="remaining-balance"
+                      type="number"
+                      value={remainingBalance.toFixed(2)}
+                      disabled
+                      className="bg-gray-100 pr-12"
+                      style={{ WebkitAppearance: 'none', MozAppearance: 'textfield' }}
+                    />
+                    <div className="absolute left-3 top-1/2 transform -translate-y-1/2 flex items-center space-x-1 space-x-reverse">
+                      <span className="text-sm text-muted-foreground">ر.س</span>
+                      <img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-4 h-4 opacity-80 mr-1 block dark:hidden" loading="lazy" />
+                      <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline w-4 h-4 opacity-80 hidden dark:block" loading="lazy" />
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="importance">الأهمية</Label>
+                  <Select
+                    value={formData.importance}
+                    onValueChange={(value: "low" | "medium" | "high") =>
+                      setFormData((prev) => ({ ...prev, importance: value }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="اختر الأهمية" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">منخفضة</SelectItem>
+                      <SelectItem value="medium">متوسطة</SelectItem>
+                      <SelectItem value="high">عالية</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="status">حالة المشروع</Label>
+                  <Select
+                    value={formData.status}
+                    onValueChange={(value: "draft" | "in-progress" | "completed" | "canceled") =>
+                      setFormData((prev) => ({ ...prev, status: value }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="اختر الحالة" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="draft">مسودة</SelectItem>
+                      <SelectItem value="in-progress">قيد التنفيذ</SelectItem>
+                      <SelectItem value="completed">مكتمل</SelectItem>
+                      <SelectItem value="canceled">ملغي</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="start-date">تاريخ البداية</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      type="date"
+                      value={formData.startDate || new Date().toISOString().split("T")[0]}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, startDate: e.target.value }))}
+                      placeholder="ميلادي"
+                    />
+                    <Input
+                      value={formData.startDate ? new Intl.DateTimeFormat("ar-SA-u-ca-islamic", {
+                        year: "numeric",
+                        month: "2-digit",
+                        day: "2-digit",
+                      }).format(new Date(formData.startDate)) : new Intl.DateTimeFormat("ar-SA-u-ca-islamic", {
+                        year: "numeric",
+                        month: "2-digit",
+                        day: "2-digit",
+                      }).format(new Date())}
+                      disabled
+                      className="bg-gray-100"
+                      placeholder="هجري"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="description">وصف المشروع</Label>
+                  <Textarea
+                    id="description"
+                    placeholder="وصف تفصيلي للمشروع"
+                    value={formData.description}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end space-x-2 space-x-reverse">
+                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                  إلغاء
+                </Button>
+                <Button onClick={editingProject ? handleUpdateProject : handleCreateProject}>
+                  {editingProject ? "تحديث المشروع" : "حفظ المشروع"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
+      </div>
+
+      {/* Filters and Search */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Input
+                  placeholder="البحث في المشاريع..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pr-10"
+                />
+              </div>
+            </div>
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <SelectTrigger className="w-full sm:w-48">
+                <Filter className="w-4 h-4 mr-2" />
+                <SelectValue placeholder="فلترة حسب الحالة" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">جميع الحالات</SelectItem>
+                <SelectItem value="draft">مسودة</SelectItem>
+                <SelectItem value="in-progress">قيد التنفيذ</SelectItem>
+                <SelectItem value="completed">مكتمل</SelectItem>
+                <SelectItem value="canceled">ملغي</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Projects Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredProjects.map((project) => (
+          <SwipeToDelete
+            key={project.id}
+            onDelete={() => handleDeleteProject(project.id)}
+          >
+            <Card
+              className="hover:shadow-lg transition-shadow bg-card text-card-foreground border border-border relative group"
+            >
+              <CardHeader className="pb-3">
+                <div className="flex items-start space-x-3 space-x-reverse">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <CardTitle className="text-lg leading-tight truncate text-foreground">{project.name}</CardTitle>
+                      <Badge variant="secondary" className="text-xs">{project.type}</Badge>
+                      <Badge className={`text-xs ${getStatusColor(project.status)}`}>{getStatusText(project.status)}</Badge>
+                    </div>
+                    <CardDescription className="truncate text-muted-foreground">{project.client}</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">التقدم</span>
+                  <span className="text-muted-foreground">{project.progress}%</span>
+                </div>
+                <Progress value={project.progress} className="h-2" />
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span className="flex items-center">
+                    <Calendar className="w-3 h-3 mr-1" />
+                    {project.startDate}
+                  </span>
+                  <span className="flex items-center">
+                    <span className="text-xs text-muted-foreground ml-1">ر.س</span>
+                    <span>{project.price.toLocaleString()}</span>
+                    <img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-4 h-4 opacity-80 mr-1 block dark:hidden" loading="lazy" />
+                    <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline w-4 h-4 opacity-80 hidden dark:block" loading="lazy" />
+                  </span>
+                </div>
+                {/* Click to view details */}
+                <div 
+                  className="absolute inset-0 cursor-pointer"
+                  onClick={() => openDetailsDialog(project)}
+                  title="عرض التفاصيل"
+                />
+              </CardContent>
+            </Card>
+          </SwipeToDelete>
+        ))}
+      </div>
+
+      {/* Empty State */}
+      {filteredProjects.length === 0 && (
+        <Card>
+          <CardContent className="text-center py-12">
+            <Building className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">لا توجد مشاريع</h3>
+            <p className="text-gray-600 mb-4">لم يتم العثور على مشاريع تطابق معايير البحث</p>
+            {canCreateProject && (
+              <Button
+                onClick={() => {
+                  setEditingProject(null)
+                  resetForm()
+                  setIsDialogOpen(true)
+                }}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                إضافة مشروع جديد
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Project Details Dialog */}
+      <Dialog open={isDetailsDialogOpen} onOpenChange={setIsDetailsDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <DialogTitle>تفاصيل المشروع</DialogTitle>
+                <DialogDescription>معلومات شاملة عن المشروع</DialogDescription>
+              </div>
+              <div className="flex items-center space-x-2 space-x-reverse">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setIsDetailsDialogOpen(false)
+                    openEditDialog(selectedProject!)
+                  }}
+                  className="flex items-center space-x-1 space-x-reverse hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                >
+                  <Edit className="w-4 h-4 text-blue-600" />
+                  <span>تعديل</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setIsDetailsDialogOpen(false)
+                    handleDeleteProject(selectedProject!.id)
+                  }}
+                  className="flex items-center space-x-1 space-x-reverse text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 border-red-200 dark:border-red-800"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>حذف</span>
+                </Button>
+              </div>
+            </div>
+          </DialogHeader>
+          {selectedProject && (
+            <div className="space-y-6">
+              {/* Project Header */}
+              <div className="flex items-start justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold">{selectedProject.name}</h2>
+                  <p className="text-gray-600 mt-1">{selectedProject.client}</p>
+                  <Badge className={`mt-2 ${getStatusColor(selectedProject.status)}`}>{getStatusText(selectedProject.status)}</Badge>
+                </div>
+                <div className="text-right">
+                  <div className="flex items-center justify-end">
+                    <span className="text-sm text-muted-foreground ml-1">ر.س</span>
+                    <span className="text-2xl font-bold text-green-600">{selectedProject.price.toLocaleString()}</span>
+                    <img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-5 h-5 opacity-80 mr-1 block dark:hidden" loading="lazy" />
+                    <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline w-5 h-5 opacity-80 mr-1 hidden dark:block" loading="lazy" />
+                  </div>
+                  <p className="text-sm text-gray-600">السعر الإجمالي</p>
+                </div>
+              </div>
+
+              {/* Project Details Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <Card>
+                  <CardContent className="p-4">
+                    <h4 className="font-medium mb-2">معلومات المشروع</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">النوع:</span>
+                        <span>{selectedProject.type}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">الأهمية:</span>
+                        <Badge
+                          variant={
+                            selectedProject.importance === "high"
+                              ? "destructive"
+                              : selectedProject.importance === "medium"
+                                ? "default"
+                                : "secondary"
+                          }
+                          className="text-xs"
+                        >
+                          {selectedProject.importance === "high"
+                            ? "عالية"
+                            : selectedProject.importance === "medium"
+                              ? "متوسطة"
+                              : "منخفضة"}
+                        </Badge>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">تاريخ البداية:</span>
+                        <span>{selectedProject.startDate}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">التاريخ الهجري:</span>
+                        <span>{selectedProject.startDateHijri}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="p-4">
+                    <h4 className="font-medium mb-2">المعلومات المالية</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">السعر الإجمالي:</span>
+                        <div className="flex items-center">
+                          <span className="text-xs text-muted-foreground ml-1">ر.س</span>
+                          <span className="font-medium">{selectedProject.price.toLocaleString()}</span>
+                          <img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-4 h-4 opacity-80 mr-1 block dark:hidden" loading="lazy" />
+                          <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline w-4 h-4 opacity-80 mr-1 hidden dark:block" loading="lazy" />
+                        </div>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">الدفعة المقدمة:</span>
+                        <div className="flex items-center">
+                          <span className="text-xs text-muted-foreground ml-1">ر.س</span>
+                          <span className="text-green-600">{selectedProject.downPayment.toLocaleString()}</span>
+                          <img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-4 h-4 opacity-80 mr-1 block dark:hidden" loading="lazy" />
+                          <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline w-4 h-4 opacity-80 mr-1 hidden dark:block" loading="lazy" />
+                        </div>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">المبلغ المتبقي:</span>
+                        <div className="flex items-center">
+                          <span className="text-xs text-muted-foreground ml-1">ر.س</span>
+                          <span className="text-red-600">{selectedProject.remainingBalance.toLocaleString()}</span>
+                          <img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-4 h-4 opacity-80 mr-1 block dark:hidden" loading="lazy" />
+                          <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline w-4 h-4 opacity-80 mr-1 hidden dark:block" loading="lazy" />
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="p-4">
+                    <h4 className="font-medium mb-2">فريق العمل</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">المهندس المسؤول:</span>
+                        <span>{selectedProject.assignedEngineerName}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">عدد أعضاء الفريق:</span>
+                        <span>{selectedProject.team.length}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Progress */}
+              <Card>
+                <CardContent className="p-4">
+                  <h4 className="font-medium mb-4">تقدم المشروع</h4>
+                  <div className="space-y-4">
+                    <div className="flex flex-col md:flex-row md:items-center gap-4">
+                      <div className="flex items-center space-x-2 space-x-reverse">
+                        <Input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={selectedProject.progress}
+                          onChange={(e) => {
+                            const newProgress = Math.min(100, Math.max(0, parseInt(e.target.value) || 0))
+                            let newStatus = selectedProject.status
+                            if (newProgress === 100 && selectedProject.status !== "completed") {
+                              newStatus = "completed"
+                            } else if (newProgress < 100 && selectedProject.status === "completed") {
+                              newStatus = "in-progress"
+                            }
+                            const updatedProject = { ...selectedProject, progress: newProgress, status: newStatus }
+                            setSelectedProject(updatedProject)
+                            dispatch({ type: "UPDATE_PROJECT", payload: updatedProject })
+                          }}
+                          className="w-20 text-center"
+                        />
+                        <span className="text-sm text-gray-500">%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={selectedProject.progress}
+                        onChange={e => {
+                          const newProgress = Math.min(100, Math.max(0, parseInt(e.target.value) || 0))
+                          let newStatus = selectedProject.status
+                          if (newProgress === 100 && selectedProject.status !== "completed") {
+                            newStatus = "completed"
+                          } else if (newProgress < 100 && selectedProject.status === "completed") {
+                            newStatus = "in-progress"
+                          }
+                          const updatedProject = { ...selectedProject, progress: newProgress, status: newStatus }
+                          setSelectedProject(updatedProject)
+                          dispatch({ type: "UPDATE_PROJECT", payload: updatedProject })
+                        }}
+                        className="w-full md:w-64 accent-blue-600"
+                        dir={typeof document !== 'undefined' ? document.dir : 'rtl'}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">يمكنك تحريك الشريط لتغيير نسبة الإنجاز</p>
+                    
+                    {/* Progress Bar */}
+                    <div className="relative">
+                      <div className="relative h-6 bg-gray-200 rounded-full">
+                        <div 
+                          className="h-full bg-blue-600 rounded-full transition-all duration-200 relative"
+                          style={{ width: `${selectedProject.progress}%` }}
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                          <span className="text-xs font-medium text-white drop-shadow-sm">
+                            {selectedProject.progress}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Progress Labels */}
+                    <div className="flex justify-between text-xs text-gray-500">
+                      <span>0%</span>
+                      <span>25%</span>
+                      <span>50%</span>
+                      <span>75%</span>
+                      <span>100%</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Description */}
+              <Card>
+                <CardContent className="p-4">
+                  <h4 className="font-medium mb-2">وصف المشروع</h4>
+                  <p className="text-gray-700">{selectedProject.description}</p>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={confirmDelete}
+        itemName={projects.find(p => p.id === projectToDelete)?.name || "المشروع"}
+        itemType="المشروع"
+        error={deleteError}
+      />
+
+      {/* Update Success Dialog */}
+      <Dialog open={updateSuccessDialogOpen} onOpenChange={setUpdateSuccessDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-right">تم التحديث بنجاح</DialogTitle>
+            <DialogDescription className="text-right">
+              تم تحديث المشروع بنجاح
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end mt-4">
+            <Button
+              onClick={() => setUpdateSuccessDialogOpen(false)}
+            >
+              موافق
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
