@@ -188,7 +188,7 @@ function ClientsPageContent() {
     }
   }
 
-  const handleCreateClient = () => {
+  const handleCreateClient = async () => {
     if (!hasPermission(currentUser?.role || "", "create", "clients")) {
       setAlert({ type: "error", message: "ليس لديك صلاحية لإنشاء عملاء جدد" })
       return
@@ -227,31 +227,53 @@ function ClientsPageContent() {
       avatar: formData.avatar,
     }
 
-    dispatch({ type: "ADD_CLIENT", payload: newClient })
-    
-    // Save to localStorage
-    const existingClients = JSON.parse(localStorage.getItem("clients") || "[]")
-    existingClients.push(newClient)
-    localStorage.setItem("clients", JSON.stringify(existingClients))
-    
-    // Broadcast realtime update
-    broadcastClientUpdate('create', { client: newClient, userId: currentUser?.id, userName: currentUser?.name })
-    
-    showSuccessToast("تم إنشاء العميل بنجاح", `تم إنشاء العميل "${newClient.name}" بنجاح`)
-    setIsDialogOpen(false)
-    resetForm()
+    try {
+      // Save to backend database
+      const response = await fetch('/api/clients', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newClient),
+      });
 
-    // Add notification to admin when client is created
-    if (currentUser?.role !== "admin") {
-      addNotification({
-        userId: "1", // Admin user ID
-        title: "عميل جديد تم إضافته",
-        message: `تم إضافة عميل جديد "${formData.name}" بواسطة ${currentUser?.name}`,
-        type: "project",
-        actionUrl: `/clients/${newClient.id}`,
-        triggeredBy: currentUser?.id || "",
-        isRead: false,
-      })
+      if (!response.ok) {
+        throw new Error('Failed to save client to database');
+      }
+
+      const result = await response.json();
+      console.log('Client saved to database:', result);
+
+      // Update local state
+      dispatch({ type: "ADD_CLIENT", payload: newClient })
+      
+      // Save to localStorage as backup
+      const existingClients = JSON.parse(localStorage.getItem("clients") || "[]")
+      existingClients.push(newClient)
+      localStorage.setItem("clients", JSON.stringify(existingClients))
+      
+      // Broadcast realtime update
+      broadcastClientUpdate('create', { client: newClient, userId: currentUser?.id, userName: currentUser?.name })
+      
+      showSuccessToast("تم إنشاء العميل بنجاح", `تم إنشاء العميل "${newClient.name}" بنجاح`)
+      setIsDialogOpen(false)
+      resetForm()
+
+      // Add notification to admin when client is created
+      if (currentUser?.role !== "admin") {
+        addNotification({
+          userId: "1", // Admin user ID
+          title: "عميل جديد تم إضافته",
+          message: `تم إضافة عميل جديد "${formData.name}" بواسطة ${currentUser?.name}`,
+          type: "project",
+          actionUrl: `/clients/${newClient.id}`,
+          triggeredBy: currentUser?.id || "",
+          isRead: false,
+        })
+      }
+    } catch (error) {
+      console.error('Error creating client:', error);
+      setAlert({ type: "error", message: "حدث خطأ أثناء حفظ العميل في قاعدة البيانات" });
     }
   }
 

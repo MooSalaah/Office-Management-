@@ -450,7 +450,7 @@ function SettingsPageContent() {
     role: "",
   })
 
-  const handleCreateUser = () => {
+  const handleCreateUser = async () => {
     let errors = { name: "", email: "", password: "", role: "" }
     let hasError = false
     if (!userFormData.name.trim()) {
@@ -518,22 +518,43 @@ function SettingsPageContent() {
 
     console.log("Creating new user:", newUser)
 
-    // Save to localStorage first
-    existingUsers.push(newUser)
-    localStorage.setItem("users", JSON.stringify(existingUsers))
-    console.log("Users saved to localStorage:", existingUsers)
-    
-    // Update global state
-    dispatch({ type: "ADD_USER", payload: newUser })
-    
-    // إرسال تحديث فوري لجميع المستخدمين
-    realtimeUpdates.sendUserUpdate({ action: 'create', user: newUser })
-    
-    // Show success dialog with confirmation
-    showSuccessToast("تم إنشاء المستخدم بنجاح", `تم إنشاء المستخدم "${newUser.name}" بنجاح`)
-    
-    setIsUserDialogOpen(false)
-    resetUserForm()
+    try {
+      // Save to backend database
+      const response = await fetch('/api/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newUser),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save user to database');
+      }
+
+      const result = await response.json();
+      console.log('User saved to database:', result);
+
+      // Save to localStorage as backup
+      existingUsers.push(newUser)
+      localStorage.setItem("users", JSON.stringify(existingUsers))
+      console.log("Users saved to localStorage:", existingUsers)
+      
+      // Update global state
+      dispatch({ type: "ADD_USER", payload: newUser })
+      
+      // إرسال تحديث فوري لجميع المستخدمين
+      realtimeUpdates.sendUserUpdate({ action: 'create', user: newUser })
+      
+      // Show success dialog with confirmation
+      showSuccessToast("تم إنشاء المستخدم بنجاح", `تم إنشاء المستخدم "${newUser.name}" بنجاح`)
+      
+      setIsUserDialogOpen(false)
+      resetUserForm()
+    } catch (error) {
+      console.error('Error creating user:', error);
+      setAlert({ type: "error", message: "حدث خطأ أثناء حفظ المستخدم في قاعدة البيانات" });
+    }
   }
 
   const handleUpdateUser = () => {

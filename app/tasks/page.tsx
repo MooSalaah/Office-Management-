@@ -263,7 +263,7 @@ function TasksPageContent() {
 
   }
 
-  const handleCreateTask = () => {
+  const handleCreateTask = async () => {
     if (!hasPermission(currentUser?.role || "", "create", "tasks")) {
       setAlert({ type: "error", message: "ليس لديك صلاحية لإنشاء مهام جديدة" })
       return
@@ -302,47 +302,69 @@ function TasksPageContent() {
       updatedAt: new Date().toISOString(),
     }
 
-    dispatch({ type: "ADD_TASK", payload: newTask })
-    
-    // Save to localStorage
-    const existingTasks = JSON.parse(localStorage.getItem("tasks") || "[]")
-    existingTasks.push(newTask)
-    localStorage.setItem("tasks", JSON.stringify(existingTasks))
-    
-    // Broadcast realtime update
-    broadcastTaskUpdate('create', { task: newTask, userId: currentUser?.id, userName: currentUser?.name })
-    
-    // إرسال تحديث فوري لجميع المستخدمين
-    realtimeUpdates.sendTaskUpdate({ action: 'create', task: newTask, userId: currentUser?.id, userName: currentUser?.name })
-    
-    showSuccessToast("تم إنشاء المهمة بنجاح", `تم إنشاء المهمة "${newTask.title}" بنجاح`)
-    setIsDialogOpen(false)
-    resetForm()
+    try {
+      // Save to backend database
+      const response = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newTask),
+      });
 
-    // Add notification to assignee when task is assigned
-    if (assignee && assignee.id !== currentUser?.id) {
-      addNotification({
-        userId: assignee.id,
-        title: "مهمة جديدة مُعيّنة لك",
-        message: `تم تعيين مهمة "${formData.title}" لك بواسطة ${currentUser?.name}`,
-        type: "task",
-        actionUrl: `/tasks/${newTask.id}`,
-        triggeredBy: currentUser?.id || "",
-        isRead: false,
-      })
-    }
+      if (!response.ok) {
+        throw new Error('Failed to save task to database');
+      }
 
-    // Add notification to admin when task is created by non-admin
-    if (currentUser?.role !== "admin") {
-      addNotification({
-        userId: "1", // Admin user ID
-        title: "مهمة جديدة تم إنشاؤها",
-        message: `تم إنشاء مهمة جديدة "${formData.title}" بواسطة ${currentUser?.name}`,
-        type: "task",
-        actionUrl: `/tasks/${newTask.id}`,
-        triggeredBy: currentUser?.id || "",
-        isRead: false,
-      })
+      const result = await response.json();
+      console.log('Task saved to database:', result);
+
+      // Update local state
+      dispatch({ type: "ADD_TASK", payload: newTask })
+      
+      // Save to localStorage as backup
+      const existingTasks = JSON.parse(localStorage.getItem("tasks") || "[]")
+      existingTasks.push(newTask)
+      localStorage.setItem("tasks", JSON.stringify(existingTasks))
+      
+      // Broadcast realtime update
+      broadcastTaskUpdate('create', { task: newTask, userId: currentUser?.id, userName: currentUser?.name })
+      
+      // إرسال تحديث فوري لجميع المستخدمين
+      realtimeUpdates.sendTaskUpdate({ action: 'create', task: newTask, userId: currentUser?.id, userName: currentUser?.name })
+      
+      showSuccessToast("تم إنشاء المهمة بنجاح", `تم إنشاء المهمة "${newTask.title}" بنجاح`)
+      setIsDialogOpen(false)
+      resetForm()
+
+      // Add notification to assignee when task is assigned
+      if (assignee && assignee.id !== currentUser?.id) {
+        addNotification({
+          userId: assignee.id,
+          title: "مهمة جديدة مُعيّنة لك",
+          message: `تم تعيين مهمة "${formData.title}" لك بواسطة ${currentUser?.name}`,
+          type: "task",
+          actionUrl: `/tasks/${newTask.id}`,
+          triggeredBy: currentUser?.id || "",
+          isRead: false,
+        })
+      }
+
+      // Add notification to admin when task is created by non-admin
+      if (currentUser?.role !== "admin") {
+        addNotification({
+          userId: "1", // Admin user ID
+          title: "مهمة جديدة تم إنشاؤها",
+          message: `تم إنشاء مهمة جديدة "${formData.title}" بواسطة ${currentUser?.name}`,
+          type: "task",
+          actionUrl: `/tasks/${newTask.id}`,
+          triggeredBy: currentUser?.id || "",
+          isRead: false,
+        })
+      }
+    } catch (error) {
+      console.error('Error creating task:', error);
+      setAlert({ type: "error", message: "حدث خطأ أثناء حفظ المهمة في قاعدة البيانات" });
     }
   }
 

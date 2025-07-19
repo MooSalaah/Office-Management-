@@ -287,10 +287,32 @@ function ProjectsPageContent() {
       updatedAt: new Date().toISOString(),
     }
 
-    await createProjectWithDownPayment(newProject)
-    
-    setIsDialogOpen(false)
-    resetForm()
+    try {
+      // Save to backend database
+      const response = await fetch('/api/projects', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newProject),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save project to database');
+      }
+
+      const result = await response.json();
+      console.log('Project saved to database:', result);
+
+      // Update local state and localStorage
+      await createProjectWithDownPayment(newProject)
+      
+      setIsDialogOpen(false)
+      resetForm()
+    } catch (error) {
+      console.error('Error creating project:', error);
+      setAlert({ type: "error", message: "حدث خطأ أثناء حفظ المشروع في قاعدة البيانات" });
+    }
 
     // Add notification to assigned engineer
     if (engineer && engineer.id !== currentUser?.id) {
@@ -367,7 +389,7 @@ function ProjectsPageContent() {
     }
 
     // إرسال تحديث فوري
-    realtimeUpdates.sendProjectUpdate('update', { project: updatedProject, userId: currentUser?.id, userName: currentUser?.name })
+    realtimeUpdates.sendProjectUpdate({ action: 'update', project: updatedProject, userId: currentUser?.id, userName: currentUser?.name })
   }
 
   const handleDeleteProject = (projectId: string) => {
