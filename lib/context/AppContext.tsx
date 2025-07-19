@@ -59,11 +59,6 @@ interface AppState {
     users: boolean
     notifications: boolean
   }
-  editingLocks: {
-    projects: { [key: string]: { userId: string; userName: string; timestamp: number } }
-    clients: { [key: string]: { userId: string; userName: string; timestamp: number } }
-    tasks: { [key: string]: { userId: string; userName: string; timestamp: number } }
-  }
 }
 
 type AppAction =
@@ -108,9 +103,6 @@ type AppAction =
   | { type: "SET_LOADING"; payload: boolean }
   | { type: "SET_LOADING_STATE"; payload: { key: keyof AppState['loadingStates']; value: boolean } }
   | { type: "SET_USERS"; payload: User[] }
-  | { type: "ACQUIRE_EDITING_LOCK"; payload: { type: 'projects' | 'clients' | 'tasks'; id: string; userId: string; userName: string } }
-  | { type: "RELEASE_EDITING_LOCK"; payload: { type: 'projects' | 'clients' | 'tasks'; id: string; userId: string } }
-  | { type: "CLEAR_EXPIRED_LOCKS"; payload: { type: 'projects' | 'clients' | 'tasks' } }
 
 const initialState: AppState = {
   currentUser: null,
@@ -132,11 +124,6 @@ const initialState: AppState = {
     transactions: false,
     users: false,
     notifications: false,
-  },
-  editingLocks: {
-    projects: {},
-    clients: {},
-    tasks: {},
   },
 }
 
@@ -344,53 +331,6 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, users: uniqueUsers };
     }
 
-    case "ACQUIRE_EDITING_LOCK":
-      return {
-        ...state,
-        editingLocks: {
-          ...state.editingLocks,
-          [action.payload.type]: {
-            ...state.editingLocks[action.payload.type],
-            [action.payload.id]: {
-              userId: action.payload.userId,
-              userName: action.payload.userName,
-              timestamp: Date.now(),
-            },
-          },
-        },
-      }
-
-    case "RELEASE_EDITING_LOCK":
-      return {
-        ...state,
-        editingLocks: {
-          ...state.editingLocks,
-          [action.payload.type]: {
-            ...state.editingLocks[action.payload.type],
-            [action.payload.id]: undefined,
-          },
-        },
-      }
-
-    case "CLEAR_EXPIRED_LOCKS":
-      return {
-        ...state,
-        editingLocks: {
-          ...state.editingLocks,
-          [action.payload.type]: Object.fromEntries(
-            Object.entries(state.editingLocks[action.payload.type] || {})
-              .filter(([id, lock]) => {
-                const isExpired = Date.now() - lock.timestamp > 10000;
-                if (isExpired) {
-                  console.log(`Cleared expired lock: ${action.payload.type} - ${id}`);
-                }
-                return !isExpired;
-              })
-              .map(([id, lock]) => [id, { ...lock, timestamp: Date.now() }])
-          ),
-        },
-      }
-
     default:
       return state
   }
@@ -457,70 +397,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // Initialize realtime updates
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      // تهيئة realtime updates
-      const { realtimeUpdates } = require('../realtime-updates');
-      
-      // استمع لتحديثات الإشعارات
-      realtimeUpdates.subscribe('notification', (data: any) => {
-        if (data.data && !state.notifications.some(n => n.id === data.data.id)) {
-          dispatch({ type: 'ADD_NOTIFICATION', payload: data.data });
+    // Realtime functionality temporarily disabled for SSR compatibility
+    // استمع لتحديثات الإشعارات الفورية (عند تفعيلها)
+    if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
+      (window as any).realtimeUpdates.on('notification', (notification: any) => {
+        // تحقق إذا كان الإشعار موجود مسبقاً
+        if (!state.notifications.some(n => n.id === notification.id)) {
+          dispatch({ type: 'ADD_NOTIFICATION', payload: notification })
         }
-      });
-      
-      // استمع لتحديثات المشاريع
-      realtimeUpdates.subscribe('project', (data: any) => {
-        if (data.data) {
-          if (data.action === 'create') {
-            dispatch({ type: 'ADD_PROJECT', payload: data.data });
-          } else if (data.action === 'update') {
-            dispatch({ type: 'UPDATE_PROJECT', payload: data.data });
-          } else if (data.action === 'delete') {
-            dispatch({ type: 'DELETE_PROJECT', payload: data.data.id });
-          }
-        }
-      });
-      
-      // استمع لتحديثات المهام
-      realtimeUpdates.subscribe('task', (data: any) => {
-        if (data.data) {
-          if (data.action === 'create') {
-            dispatch({ type: 'ADD_TASK', payload: data.data });
-          } else if (data.action === 'update') {
-            dispatch({ type: 'UPDATE_TASK', payload: data.data });
-          } else if (data.action === 'delete') {
-            dispatch({ type: 'DELETE_TASK', payload: data.data.id });
-          }
-        }
-      });
-      
-      // استمع لتحديثات العملاء
-      realtimeUpdates.subscribe('client', (data: any) => {
-        if (data.data) {
-          if (data.action === 'create') {
-            dispatch({ type: 'ADD_CLIENT', payload: data.data });
-          } else if (data.action === 'update') {
-            dispatch({ type: 'UPDATE_CLIENT', payload: data.data });
-          } else if (data.action === 'delete') {
-            dispatch({ type: 'DELETE_CLIENT', payload: data.data.id });
-          }
-        }
-      });
-      
-      // استمع لتحديثات المستخدمين
-      realtimeUpdates.subscribe('user', (data: any) => {
-        if (data.data) {
-          if (data.action === 'create') {
-            dispatch({ type: 'ADD_USER', payload: data.data });
-          } else if (data.action === 'update') {
-            dispatch({ type: 'UPDATE_USER', payload: data.data });
-          } else if (data.action === 'delete') {
-            dispatch({ type: 'DELETE_USER', payload: data.data.id });
-          }
-        }
-      });
+      })
     }
-  }, []);
+    console.log('Realtime updates disabled for SSR compatibility');
+  }, [state.currentUser?.id, state.notifications])
 
   // Load all data from localStorage on mount
   useEffect(() => {
@@ -542,11 +430,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (usersData) {
           const users = JSON.parse(usersData)
           console.log("Loading users from localStorage:", users)
-          dispatch({ type: "LOAD_USERS", payload: users })
-        } else {
-          // If no users exist, initialize with default users
-          console.log("No users found, initializing with default users")
-          dispatch({ type: "LOAD_USERS", payload: mockUsers })
+          // Replace all users with localStorage data
+          users.forEach((user: any) => {
+            // Update user permissions based on current role
+            const updatedUser = updateUserPermissionsByRole(user)
+            const existingUser = state.users.find(u => u.id === user.id)
+            if (existingUser) {
+              // Update existing user
+              dispatch({ type: "UPDATE_USER", payload: updatedUser })
+            } else {
+              // Add new user
+              dispatch({ type: "ADD_USER", payload: updatedUser })
+            }
+          })
         }
 
         // Load projects (only if not already loaded)
@@ -1010,10 +906,7 @@ export function useAppActions() {
     localStorage.setItem("notifications", JSON.stringify(existingNotifications))
     
     // إرسال إشعار فوري لجميع المستخدمين
-    if (typeof window !== 'undefined') {
-      const { realtimeUpdates } = require('../realtime-updates');
-      realtimeUpdates.sendNotification(newNotification);
-    }
+    realtimeUpdates.sendNotification(newNotification)
     
     // Show browser notification if it's for the current user
     if (newNotification.userId === currentUser?.id && 'Notification' in window && Notification.permission === 'granted') {
@@ -1053,10 +946,7 @@ export function useAppActions() {
     await createProjectWithFinancialTransaction(project)
     
     // إرسال تحديث فوري
-    if (typeof window !== 'undefined') {
-      const { realtimeUpdates } = require('../realtime-updates');
-      realtimeUpdates.sendProjectUpdate({ action: 'create', project });
-    }
+    realtimeUpdates.sendProjectUpdate({ action: 'create', project })
     
     // إضافة إشعار للمهندس المسؤول
     if (project.assignedEngineerId && project.assignedEngineerId !== currentUser?.id) {
@@ -1076,10 +966,7 @@ export function useAppActions() {
     await updateProjectWithFinancialTransaction(project)
     
     // إرسال تحديث فوري
-    if (typeof window !== 'undefined') {
-      const { realtimeUpdates } = require('../realtime-updates');
-      realtimeUpdates.sendProjectUpdate({ action: 'update', project });
-    }
+    realtimeUpdates.sendProjectUpdate({ action: 'update', project })
     
     // إضافة إشعار للمهندس المسؤول إذا تم تغيير المهندس
     if (project.assignedEngineerId && project.assignedEngineerId !== currentUser?.id) {
@@ -1113,7 +1000,7 @@ export function useAppActions() {
       localStorage.setItem("projects", JSON.stringify(filteredProjects))
       
       // Broadcast realtime update
-      realtimeUpdates.sendProjectUpdate({ action: 'delete', project, userId: currentUser?.id, userName: currentUser?.name })
+      broadcastOrQueue('delete', project, isOnline, setPendingUpdates)
       
       showSuccessToast("تم حذف المشروع بنجاح", `تم حذف مشروع "${project.name}"`)
     } catch (error) {
@@ -1192,10 +1079,7 @@ export function useAppActions() {
       saveDataToStorage()
       
       // إرسال تحديث فوري
-      if (typeof window !== 'undefined') {
-        const { realtimeUpdates } = require('../realtime-updates');
-        realtimeUpdates.sendTaskUpdate({ action: 'create', task });
-      }
+      realtimeUpdates.sendTaskUpdate({ action: 'create', task })
       
       showSuccessToast("تم إنشاء المهمة بنجاح", `تم إنشاء مهمة "${task.title}"`)
     } catch (error) {
@@ -1212,10 +1096,7 @@ export function useAppActions() {
       saveDataToStorage()
       
       // إرسال تحديث فوري
-      if (typeof window !== 'undefined') {
-        const { realtimeUpdates } = require('../realtime-updates');
-        realtimeUpdates.sendTaskUpdate({ action: 'update', task });
-      }
+      realtimeUpdates.sendTaskUpdate({ action: 'update', task })
       
       showSuccessToast("تم تحديث المهمة بنجاح", `تم تحديث مهمة "${task.title}"`)
     } catch (error) {
@@ -1238,10 +1119,7 @@ export function useAppActions() {
       saveDataToStorage()
       
       // إرسال تحديث فوري
-      if (typeof window !== 'undefined') {
-        const { realtimeUpdates } = require('../realtime-updates');
-        realtimeUpdates.sendTaskUpdate({ action: 'delete', task });
-      }
+      realtimeUpdates.sendTaskUpdate({ action: 'delete', task })
       
       showSuccessToast("تم حذف المهمة بنجاح", `تم حذف مهمة "${task.title}"`)
     } catch (error) {
@@ -1256,13 +1134,6 @@ export function useAppActions() {
       setLoadingState('clients', true)
       dispatch({ type: "ADD_CLIENT", payload: client })
       saveDataToStorage()
-      
-      // إرسال تحديث فوري
-      if (typeof window !== 'undefined') {
-        const { realtimeUpdates } = require('../realtime-updates');
-        realtimeUpdates.sendClientUpdate({ action: 'create', client });
-      }
-      
       showSuccessToast("تم إنشاء العميل بنجاح", `تم إنشاء عميل "${client.name}"`)
     } catch (error) {
       showErrorToast("خطأ في إنشاء العميل", "حدث خطأ أثناء إنشاء العميل")
@@ -1276,13 +1147,6 @@ export function useAppActions() {
       setLoadingState('clients', true)
       dispatch({ type: "UPDATE_CLIENT", payload: client })
       saveDataToStorage()
-      
-      // إرسال تحديث فوري
-      if (typeof window !== 'undefined') {
-        const { realtimeUpdates } = require('../realtime-updates');
-        realtimeUpdates.sendClientUpdate({ action: 'update', client });
-      }
-      
       showSuccessToast("تم تحديث العميل بنجاح", `تم تحديث عميل "${client.name}"`)
     } catch (error) {
       showErrorToast("خطأ في تحديث العميل", "حدث خطأ أثناء تحديث العميل")
@@ -1300,15 +1164,15 @@ export function useAppActions() {
         return
       }
 
+      // Check if client has projects
+      const clientProjects = state.projects.filter(p => p.clientId === clientId)
+      if (clientProjects.length > 0) {
+        showErrorToast("لا يمكن حذف العميل", "العميل مرتبط بمشاريع")
+        return
+      }
+
       dispatch({ type: "DELETE_CLIENT", payload: clientId })
       saveDataToStorage()
-      
-      // إرسال تحديث فوري
-      if (typeof window !== 'undefined') {
-        const { realtimeUpdates } = require('../realtime-updates');
-        realtimeUpdates.sendClientUpdate({ action: 'delete', client });
-      }
-      
       showSuccessToast("تم حذف العميل بنجاح", `تم حذف عميل "${client.name}"`)
     } catch (error) {
       showErrorToast("خطأ في حذف العميل", "حدث خطأ أثناء حذف العميل")
@@ -1435,80 +1299,6 @@ export function useAppActions() {
     }
   }
 
-  // دوال إدارة قفل التعديل
-  const acquireEditingLock = (type: 'projects' | 'clients' | 'tasks', id: string) => {
-    if (!currentUser) return false;
-    
-    const lock = state.editingLocks[type][id];
-    const now = Date.now();
-    
-    // إذا كان هناك قفل منتهي الصلاحية، امسحه
-    if (lock && now - lock.timestamp > 10000) {
-      dispatch({ type: "CLEAR_EXPIRED_LOCKS", payload: { type } });
-    }
-    
-    // إذا كان هناك قفل نشط لشخص آخر
-    if (lock && lock.userId !== currentUser.id && now - lock.timestamp < 10000) {
-      return false;
-    }
-    
-    // احصل على القفل
-    dispatch({
-      type: "ACQUIRE_EDITING_LOCK",
-      payload: {
-        type,
-        id,
-        userId: currentUser.id,
-        userName: currentUser.name,
-      },
-    });
-    
-    return true;
-  }
-
-  const releaseEditingLock = (type: 'projects' | 'clients' | 'tasks', id: string) => {
-    if (!currentUser) return;
-    
-    const lock = state.editingLocks[type][id];
-    if (lock && lock.userId === currentUser.id) {
-      dispatch({
-        type: "RELEASE_EDITING_LOCK",
-        payload: { type, id, userId: currentUser.id },
-      });
-    }
-  }
-
-  const canEditItem = (type: 'projects' | 'clients' | 'tasks', id: string) => {
-    if (!currentUser) return false;
-    
-    const lock = state.editingLocks[type][id];
-    const now = Date.now();
-    
-    // إذا كان هناك قفل منتهي الصلاحية، امسحه
-    if (lock && now - lock.timestamp > 10000) {
-      dispatch({ type: "CLEAR_EXPIRED_LOCKS", payload: { type } });
-      return true;
-    }
-    
-    // إذا كان هناك قفل نشط لشخص آخر
-    if (lock && lock.userId !== currentUser.id && now - lock.timestamp < 10000) {
-      return false;
-    }
-    
-    return true;
-  }
-
-  const getEditingLockInfo = (type: 'projects' | 'clients' | 'tasks', id: string) => {
-    const lock = state.editingLocks[type][id];
-    const now = Date.now();
-    
-    if (lock && now - lock.timestamp < 10000) {
-      return lock;
-    }
-    
-    return null;
-  }
-
   return {
     // Loading state management
     setLoading,
@@ -1556,11 +1346,5 @@ export function useAppActions() {
     broadcastNotificationUpdate,
     broadcastUserUpdate,
     broadcastAttendanceUpdate,
-    
-    // Editing lock management
-    acquireEditingLock,
-    releaseEditingLock,
-    canEditItem,
-    getEditingLockInfo,
   }
 }

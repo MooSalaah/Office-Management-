@@ -57,7 +57,7 @@ export default function ProjectsPage() {
 
 function ProjectsPageContent() {
   const { state, dispatch } = useApp()
-  const { addNotification, createProjectWithDownPayment, updateProjectWithDownPayment, deleteProject, acquireEditingLock, releaseEditingLock, canEditItem, getEditingLockInfo } = useAppActions()
+  const { addNotification, createProjectWithDownPayment, updateProjectWithDownPayment, deleteProject } = useAppActions()
   const { currentUser, projects, clients, users } = state
   const { toast } = useToast()
 
@@ -303,28 +303,6 @@ function ProjectsPageContent() {
         triggeredBy: currentUser?.id || "",
         isRead: false,
       })
-      
-      // إرسال إشعار فوري للمهندس عبر SSE
-      if (typeof window !== 'undefined') {
-        const { realtimeUpdates } = require('../../lib/realtime-updates');
-        realtimeUpdates.broadcastUpdate("notification", {
-          action: 'create',
-          notification: {
-            id: Date.now().toString(),
-            userId: engineer.id,
-            title: "تم تعيين مشروع لك",
-            message: `تم تعيين مشروع "${formData.name}" لك`,
-            type: "project",
-            actionUrl: `/projects/${newProject.id}`,
-            triggeredBy: currentUser?.id || "",
-            isRead: false,
-            createdAt: new Date().toISOString(),
-          },
-          userId: currentUser?.id,
-          userName: currentUser?.name,
-          targetUserId: engineer.id
-        });
-      }
     }
 
     // إرسال تحديث فوري لجميع المستخدمين
@@ -371,9 +349,6 @@ function ProjectsPageContent() {
 
     await updateProjectWithDownPayment(updatedProject)
     
-    // تحديث المشروع في state مباشرة
-    dispatch({ type: "UPDATE_PROJECT", payload: updatedProject })
-    
     setIsDialogOpen(false)
     setEditingProject(null)
     resetForm()
@@ -389,35 +364,10 @@ function ProjectsPageContent() {
         triggeredBy: currentUser?.id || "",
         isRead: false,
       })
-      
-      // إرسال إشعار فوري للمهندس عبر SSE
-      if (typeof window !== 'undefined') {
-        const { realtimeUpdates } = require('../../lib/realtime-updates');
-        realtimeUpdates.broadcastUpdate("notification", {
-          action: 'create',
-          notification: {
-            id: Date.now().toString(),
-            userId: engineer.id,
-            title: "تم تعيين مشروع لك",
-            message: `تم تعيين مشروع "${formData.name}" لك`,
-            type: "project",
-            actionUrl: `/projects/${updatedProject.id}`,
-            triggeredBy: currentUser?.id || "",
-            isRead: false,
-            createdAt: new Date().toISOString(),
-          },
-          userId: currentUser?.id,
-          userName: currentUser?.name,
-          targetUserId: engineer.id
-        });
-      }
     }
 
     // إرسال تحديث فوري
-    if (typeof window !== 'undefined') {
-      const { realtimeUpdates } = require('../../lib/realtime-updates');
-      realtimeUpdates.sendProjectUpdate({ action: 'update', project: updatedProject, userId: currentUser?.id, userName: currentUser?.name });
-    }
+    realtimeUpdates.sendProjectUpdate('update', { project: updatedProject, userId: currentUser?.id, userName: currentUser?.name })
   }
 
   const handleDeleteProject = (projectId: string) => {
@@ -458,29 +408,6 @@ function ProjectsPageContent() {
   }
 
   const openEditDialog = (project: Project) => {
-    // التحقق من إمكانية التعديل
-    if (!canEditItem('projects', project.id)) {
-      const lockInfo = getEditingLockInfo('projects', project.id);
-      if (lockInfo) {
-        toast({
-          title: "لا يمكن التعديل",
-          description: `هذا المشروع قيد التعديل بواسطة ${lockInfo.userName}`,
-          variant: "destructive",
-        });
-        return;
-      }
-    }
-    
-    // محاولة الحصول على قفل التعديل
-    if (!acquireEditingLock('projects', project.id)) {
-      toast({
-        title: "لا يمكن التعديل",
-        description: "هذا المشروع قيد التعديل بواسطة مستخدم آخر",
-        variant: "destructive",
-      });
-      return;
-    }
-    
     setEditingProject(project)
     setFormData({
       name: project.name,
@@ -504,35 +431,27 @@ function ProjectsPageContent() {
   }
 
   const resetForm = () => {
-    // إطلاق قفل التعديل إذا كان هناك مشروع قيد التعديل
-    if (editingProject) {
-      releaseEditingLock('projects', editingProject.id);
-    }
-    
     setFormData({
       name: "",
       clientId: "",
       type: "",
       price: "",
-      downPayment: "",
-      assignedEngineerId: "",
+      downPayment: "0",
+      assignedEngineerId: currentUser?.id || "",
       importance: "medium",
       status: "in-progress",
       description: "",
       startDate: new Date().toISOString().split("T")[0],
     })
-    setEditingProject(null)
+    
+    // Reset all inline inputs
     setShowNewClientInput(false)
-    setNewClientName("")
     setShowNewTypeInput(false)
-    setNewProjectType("")
     setShowNewEngineerInput(false)
+    setNewClientName("")
+    setNewProjectType("")
     setNewEngineerName("")
     setShowValidationErrors(false)
-    setMissingFields([])
-    setNewClientInputError("")
-    setNewTypeInputError("")
-    setNewEngineerInputError("")
   }
 
   const canCreateProject = hasPermission(currentUser?.role || "", "create", "projects")

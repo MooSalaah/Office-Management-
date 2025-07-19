@@ -43,7 +43,7 @@ export default function TasksPage() {
 
 function TasksPageContent() {
   const { state, dispatch } = useApp()
-  const { addNotification, broadcastTaskUpdate, showSuccessToast, acquireEditingLock, releaseEditingLock, canEditItem, getEditingLockInfo } = useAppActions()
+  const { addNotification, broadcastTaskUpdate, showSuccessToast } = useAppActions()
   const { currentUser, tasks, projects, users } = state
   const { toast } = useToast()
 
@@ -77,40 +77,11 @@ function TasksPageContent() {
           console.log('Adding task to state...');
           dispatch({ type: "ADD_TASK", payload: lastUpdate.task });
           console.log('Task added to state successfully');
-          
-          // إضافة إشعار للمدير إذا لم يكن هو منشئ المهمة
-          if (lastUpdate.userId && lastUpdate.userId !== "1" && currentUser?.role === "admin") {
-            addNotification({
-              userId: "1",
-              title: "مهمة جديدة تم إضافتها",
-              message: `تم إضافة مهمة جديدة "${lastUpdate.task.title}" بواسطة ${lastUpdate.userName}`,
-              type: "task",
-              actionUrl: `/tasks/${lastUpdate.task.id}`,
-              triggeredBy: lastUpdate.userId,
-              isRead: false,
-            })
-          }
         }
       } else if (lastUpdate.action === 'update') {
         console.log('Updating task in state...');
         dispatch({ type: "UPDATE_TASK", payload: lastUpdate.task });
         console.log('Task updated in state successfully');
-        
-        // إضافة إشعار عند تغيير حالة المهمة
-        if (lastUpdate.task.status && lastUpdate.userId && lastUpdate.userId !== currentUser?.id) {
-          const statusText = lastUpdate.task.status === "todo" ? "جديدة" : 
-                           lastUpdate.task.status === "in-progress" ? "قيد التنفيذ" : "مكتملة";
-          
-          addNotification({
-            userId: currentUser?.id || "",
-            title: "تحديث حالة مهمة",
-            message: `تم تغيير حالة مهمة "${lastUpdate.task.title}" إلى ${statusText} بواسطة ${lastUpdate.userName}`,
-            type: "task",
-            actionUrl: `/tasks/${lastUpdate.task.id}`,
-            triggeredBy: lastUpdate.userId,
-            isRead: false,
-          })
-        }
       } else if (lastUpdate.action === 'delete') {
         console.log('Deleting task from state...');
         dispatch({ type: "DELETE_TASK", payload: lastUpdate.task.id });
@@ -121,7 +92,7 @@ function TasksPageContent() {
         showSuccessToast && showSuccessToast(`تمت إضافة/تعديل/حذف مهمة بواسطة ${lastUpdate.userName}`);
       }
     }
-  }, [taskUpdates, dispatch, state.tasks, currentUser, showSuccessToast, addNotification]);
+  }, [taskUpdates, dispatch, state.tasks, currentUser, showSuccessToast]);
 
   useEffect(() => {
     if (userUpdates.length > 0) {
@@ -261,10 +232,7 @@ function TasksPageContent() {
     broadcastTaskUpdate('update', { task: updatedTask, userId: currentUser?.id, userName: currentUser?.name })
     
     // إرسال تحديث فوري لجميع المستخدمين
-    if (typeof window !== 'undefined') {
-      const { realtimeUpdates } = require('../../lib/realtime-updates');
-      realtimeUpdates.sendTaskUpdate({ action: 'update', task: updatedTask, userId: currentUser?.id, userName: currentUser?.name });
-    }
+    realtimeUpdates.sendTaskUpdate({ action: 'update', task: updatedTask, userId: currentUser?.id, userName: currentUser?.name })
 
     // Add notification to admin when task is completed
     if (destinationStatus === "completed" && currentUser?.role !== "admin") {
@@ -277,51 +245,22 @@ function TasksPageContent() {
         triggeredBy: currentUser?.id || "",
         isRead: false,
       })
-      
-      // إرسال إشعار فوري للمدير عبر SSE
-      if (typeof window !== 'undefined') {
-        const { realtimeUpdates } = require('../../lib/realtime-updates');
-        realtimeUpdates.broadcastUpdate("notification", {
-          action: 'create',
-          notification: {
-            id: Date.now().toString(),
-            userId: "1",
-            title: "مهمة مكتملة",
-            message: `تم إنجاز مهمة "${task.title}" بواسطة ${currentUser?.name}`,
-            type: "task",
-            actionUrl: `/tasks/${task.id}`,
-            triggeredBy: currentUser?.id || "",
-            isRead: false,
-            createdAt: new Date().toISOString(),
-          },
-          userId: currentUser?.id,
-          userName: currentUser?.name,
-          targetUserId: "1"
-        });
-      }
     }
 
-    // إرسال إشعار فوري للمسؤول عبر SSE
-    if (typeof window !== 'undefined') {
-      const { realtimeUpdates } = require('../../lib/realtime-updates');
-      realtimeUpdates.broadcastUpdate("notification", {
-        action: 'create',
-        notification: {
-          id: Date.now().toString(),
-          userId: task.assigneeId,
-          title: "مهمة جديدة مُعيّنة لك",
-          message: `تم تعيين مهمة "${task.title}" لك`,
-          type: "task",
-          actionUrl: `/tasks/${task.id}`,
-          triggeredBy: currentUser?.id || "",
-          isRead: false,
-          createdAt: new Date().toISOString(),
-        },
-        userId: currentUser?.id,
-        userName: currentUser?.name,
-        targetUserId: task.assigneeId
-      });
+    // Add notification to assignee when task is assigned
+    if (task.assigneeId && task.assigneeId !== currentUser?.id) {
+      addNotification({
+        userId: task.assigneeId,
+        title: "مهمة جديدة مُعيّنة لك",
+        message: `تم تعيين مهمة "${task.title}" لك`,
+        type: "task",
+        actionUrl: `/tasks/${task.id}`,
+        triggeredBy: currentUser?.id || "",
+        isRead: false,
+      })
     }
+
+
   }
 
   const handleCreateTask = () => {
@@ -374,10 +313,7 @@ function TasksPageContent() {
     broadcastTaskUpdate('create', { task: newTask, userId: currentUser?.id, userName: currentUser?.name })
     
     // إرسال تحديث فوري لجميع المستخدمين
-    if (typeof window !== 'undefined') {
-      const { realtimeUpdates } = require('../../lib/realtime-updates');
-      realtimeUpdates.sendTaskUpdate({ action: 'create', task: newTask, userId: currentUser?.id, userName: currentUser?.name });
-    }
+    realtimeUpdates.sendTaskUpdate({ action: 'create', task: newTask, userId: currentUser?.id, userName: currentUser?.name })
     
     showSuccessToast("تم إنشاء المهمة بنجاح", `تم إنشاء المهمة "${newTask.title}" بنجاح`)
     setIsDialogOpen(false)
@@ -446,10 +382,7 @@ function TasksPageContent() {
     broadcastTaskUpdate('update', { task: updatedTask, userId: currentUser?.id, userName: currentUser?.name })
     
     // إرسال تحديث فوري لجميع المستخدمين
-    if (typeof window !== 'undefined') {
-      const { realtimeUpdates } = require('../../lib/realtime-updates');
-      realtimeUpdates.sendTaskUpdate({ action: 'update', task: updatedTask, userId: currentUser?.id, userName: currentUser?.name });
-    }
+    realtimeUpdates.sendTaskUpdate({ action: 'update', task: updatedTask, userId: currentUser?.id, userName: currentUser?.name })
     
     showSuccessToast("تم تحديث المهمة بنجاح", `تم تحديث المهمة "${updatedTask.title}" بنجاح`)
     setIsEditDialogOpen(false)
@@ -530,21 +463,12 @@ function TasksPageContent() {
   }
 
   const openEditDialog = (task: Task) => {
-    // التحقق من إمكانية التعديل
-    if (!canEditItem('tasks', task.id)) {
-      const lockInfo = getEditingLockInfo('tasks', task.id);
-      if (lockInfo) {
-        setAlert({ type: "error", message: `هذه المهمة قيد التعديل بواسطة ${lockInfo.userName}` });
-        return;
-      }
+    // Check if user can edit tasks
+    if (!hasPermission(currentUser?.role || "", "edit", "tasks")) {
+      setAlert({ type: "error", message: "ليس لديك صلاحية لتعديل المهام" })
+      return
     }
-    
-    // محاولة الحصول على قفل التعديل
-    if (!acquireEditingLock('tasks', task.id)) {
-      setAlert({ type: "error", message: "هذه المهمة قيد التعديل بواسطة مستخدم آخر" });
-      return;
-    }
-    
+
     setEditingTask(task)
     setFormData({
       title: task.title,
@@ -558,24 +482,18 @@ function TasksPageContent() {
   }
 
   const resetForm = () => {
-    // إطلاق قفل التعديل إذا كان هناك مهمة قيد التعديل
-    if (editingTask) {
-      releaseEditingLock('tasks', editingTask.id);
-    }
-    
     setFormData({
       title: "",
       description: "",
-      assigneeId: "",
+      assigneeId: currentUser?.id || "",
       projectId: "",
       priority: "medium",
-      dueDate: "",
+      dueDate: new Date().toISOString().split("T")[0],
     })
-    setEditingTask(null)
-    setRequiredFields({ title: false, assigneeId: false, dueDate: false })
+    // Reset all inline inputs
     setShowNewAssigneeInput(false)
-    setNewAssigneeName("")
     setShowNewProjectInput(false)
+    setNewAssigneeName("")
     setNewProjectName("")
   }
 

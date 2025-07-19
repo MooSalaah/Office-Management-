@@ -9,10 +9,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Building2, Lock, User, AlertCircle, RefreshCw } from "lucide-react"
+import { Building2, Lock, User, AlertCircle } from "lucide-react"
 import { login, updateUserPermissionsByRole } from "@/lib/auth"
 import { useAppActions } from "@/lib/context/AppContext"
-import { resetToDefaultData, showCurrentData } from "@/lib/init-default-data"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -27,42 +26,26 @@ export default function LoginPage() {
     setIsLoading(true)
     setError("")
 
-    console.log("Login form submitted with:", { email, password })
-
     try {
       const user = login(email, password)
-      console.log("Login result:", user)
-      
       if (user) {
         // Update user permissions based on current role
         const updatedUser = updateUserPermissionsByRole(user)
-        console.log("Updated user:", updatedUser)
-        
         localStorage.setItem("currentUser", JSON.stringify(updatedUser))
         setCurrentUser(updatedUser)
-        
-        console.log("User set in context, redirecting...")
         
         // Force redirect to dashboard
         setTimeout(() => {
           router.push("/dashboard")
         }, 100)
       } else {
-        console.log("Login failed - no user returned")
         setError("البريد الإلكتروني أو كلمة المرور غير صحيحة")
       }
     } catch (err) {
-      console.error("Login error:", err)
       setError("حدث خطأ أثناء تسجيل الدخول")
     } finally {
       setIsLoading(false)
     }
-  }
-
-  const handleResetData = () => {
-    resetToDefaultData()
-    showCurrentData()
-    alert("تم إعادة تعيين البيانات الافتراضية بنجاح!")
   }
 
   return (
@@ -78,16 +61,6 @@ export default function LoginPage() {
           <CardDescription className="text-gray-600 dark:text-gray-400">
             سجل دخولك للوصول إلى النظام
           </CardDescription>
-          
-          <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-sm">
-            <p className="font-semibold mb-2">بيانات تسجيل الدخول الافتراضية:</p>
-            <div className="space-y-1 text-xs">
-              <p><strong>مدير:</strong> admin@newcorner.sa / admin123</p>
-              <p><strong>مهندس:</strong> engineer@newcorner.sa / engineer123</p>
-              <p><strong>محاسب:</strong> accountant@newcorner.sa / accountant123</p>
-              <p><strong>موارد بشرية:</strong> hr@newcorner.sa / hr123</p>
-            </div>
-          </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
@@ -134,17 +107,6 @@ export default function LoginPage() {
 
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? "جاري تسجيل الدخول..." : "تسجيل الدخول"}
-            </Button>
-
-            <Button 
-              type="button" 
-              variant="outline" 
-              className="w-full" 
-              onClick={handleResetData}
-              disabled={isLoading}
-            >
-              <RefreshCw className="w-4 h-4 mr-2" />
-              إعادة تعيين البيانات الافتراضية
             </Button>
           </form>
         </CardContent>

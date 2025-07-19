@@ -13,64 +13,6 @@ export const mockUsers: User[] = [
 		phone: "+966501234567",
 		isActive: true,
 		createdAt: "2024-01-01",
-		monthlySalary: 8000,
-		workingHours: {
-			morningStart: "08:00",
-			morningEnd: "12:00",
-			eveningStart: "16:00",
-			eveningEnd: "21:00",
-		},
-	},
-	{
-		id: "2",
-		name: "أحمد محمد",
-		email: "engineer@newcorner.sa",
-		password: "engineer123",
-		role: "engineer",
-		phone: "+966502345678",
-		isActive: true,
-		createdAt: "2024-01-01",
-		monthlySalary: 3000,
-		workingHours: {
-			morningStart: "08:00",
-			morningEnd: "12:00",
-			eveningStart: "16:00",
-			eveningEnd: "21:00",
-		},
-	},
-	{
-		id: "3",
-		name: "فاطمة علي",
-		email: "accountant@newcorner.sa",
-		password: "accountant123",
-		role: "accountant",
-		phone: "+966503456789",
-		isActive: true,
-		createdAt: "2024-01-01",
-		monthlySalary: 2500,
-		workingHours: {
-			morningStart: "08:00",
-			morningEnd: "12:00",
-			eveningStart: "16:00",
-			eveningEnd: "21:00",
-		},
-	},
-	{
-		id: "4",
-		name: "خالد أحمد",
-		email: "hr@newcorner.sa",
-		password: "hr123",
-		role: "hr",
-		phone: "+966504567890",
-		isActive: true,
-		createdAt: "2024-01-01",
-		monthlySalary: 2000,
-		workingHours: {
-			morningStart: "08:00",
-			morningEnd: "12:00",
-			eveningStart: "16:00",
-			eveningEnd: "21:00",
-		},
 	},
 ];
 
@@ -181,12 +123,6 @@ export const initializeDefaultRoles = () => {
 
 	// Also save rolePermissions for backward compatibility
 	localStorage.setItem("rolePermissions", JSON.stringify(rolePermissions));
-
-	// Initialize default users if not exists
-	const existingUsers = localStorage.getItem("users");
-	if (!existingUsers) {
-		localStorage.setItem("users", JSON.stringify(mockUsers));
-	}
 };
 
 // Update current user permissions based on their role
@@ -225,49 +161,35 @@ export const updateUserPermissionsByRole = (user: User): User => {
 };
 
 export const login = (email: string, password: string): User | null => {
-	console.log("Attempting login with:", { email, password });
-
 	// Initialize default roles first
 	initializeDefaultRoles();
 
 	// First check localStorage for users (dynamic users)
 	const savedUsers = localStorage.getItem("users");
-	console.log("Saved users from localStorage:", savedUsers);
-
 	if (savedUsers) {
 		const users = JSON.parse(savedUsers);
-		console.log("Parsed users:", users);
-
 		const user = users.find(
 			(u: any) => u.email === email && u.password === password && u.isActive
 		);
-		console.log("Found user:", user);
-
 		if (user) {
 			// Update user permissions based on current role
 			const updatedUser = updateUserPermissionsByRole(user);
-			console.log("Updated user with permissions:", updatedUser);
 			localStorage.setItem("currentUser", JSON.stringify(updatedUser));
 			return updatedUser;
 		}
 	}
 
 	// Fallback to mock users
-	console.log("Checking mock users...");
 	const user = mockUsers.find(
 		(u) => u.email === email && u.password === password && u.isActive
 	);
-	console.log("Found user in mock users:", user);
-
 	if (user) {
 		// Update user permissions based on current role
 		const updatedUser = updateUserPermissionsByRole(user);
-		console.log("Updated user with permissions:", updatedUser);
 		localStorage.setItem("currentUser", JSON.stringify(updatedUser));
 		return updatedUser;
 	}
 
-	console.log("No user found, login failed");
 	return null;
 };
 
