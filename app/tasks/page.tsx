@@ -261,7 +261,10 @@ function TasksPageContent() {
     broadcastTaskUpdate('update', { task: updatedTask, userId: currentUser?.id, userName: currentUser?.name })
     
     // إرسال تحديث فوري لجميع المستخدمين
-    realtimeUpdates.sendTaskUpdate({ action: 'update', task: updatedTask, userId: currentUser?.id, userName: currentUser?.name })
+    if (typeof window !== 'undefined') {
+      const { realtimeUpdates } = require('../../lib/realtime-updates');
+      realtimeUpdates.sendTaskUpdate({ action: 'update', task: updatedTask, userId: currentUser?.id, userName: currentUser?.name });
+    }
 
     // Add notification to admin when task is completed
     if (destinationStatus === "completed" && currentUser?.role !== "admin") {
@@ -276,38 +279,31 @@ function TasksPageContent() {
       })
       
       // إرسال إشعار فوري للمدير عبر SSE
-      realtimeUpdates.broadcastUpdate("notification", {
-        action: 'create',
-        notification: {
-          id: Date.now().toString(),
-          userId: "1",
-          title: "مهمة مكتملة",
-          message: `تم إنجاز مهمة "${task.title}" بواسطة ${currentUser?.name}`,
-          type: "task",
-          actionUrl: `/tasks/${task.id}`,
-          triggeredBy: currentUser?.id || "",
-          isRead: false,
-          createdAt: new Date().toISOString(),
-        },
-        userId: currentUser?.id,
-        userName: currentUser?.name,
-        targetUserId: "1"
-      })
+      if (typeof window !== 'undefined') {
+        const { realtimeUpdates } = require('../../lib/realtime-updates');
+        realtimeUpdates.broadcastUpdate("notification", {
+          action: 'create',
+          notification: {
+            id: Date.now().toString(),
+            userId: "1",
+            title: "مهمة مكتملة",
+            message: `تم إنجاز مهمة "${task.title}" بواسطة ${currentUser?.name}`,
+            type: "task",
+            actionUrl: `/tasks/${task.id}`,
+            triggeredBy: currentUser?.id || "",
+            isRead: false,
+            createdAt: new Date().toISOString(),
+          },
+          userId: currentUser?.id,
+          userName: currentUser?.name,
+          targetUserId: "1"
+        });
+      }
     }
 
-    // Add notification to assignee when task is assigned
-    if (task.assigneeId && task.assigneeId !== currentUser?.id) {
-      addNotification({
-        userId: task.assigneeId,
-        title: "مهمة جديدة مُعيّنة لك",
-        message: `تم تعيين مهمة "${task.title}" لك`,
-        type: "task",
-        actionUrl: `/tasks/${task.id}`,
-        triggeredBy: currentUser?.id || "",
-        isRead: false,
-      })
-      
-      // إرسال إشعار فوري للمسؤول عبر SSE
+    // إرسال إشعار فوري للمسؤول عبر SSE
+    if (typeof window !== 'undefined') {
+      const { realtimeUpdates } = require('../../lib/realtime-updates');
       realtimeUpdates.broadcastUpdate("notification", {
         action: 'create',
         notification: {
@@ -324,7 +320,7 @@ function TasksPageContent() {
         userId: currentUser?.id,
         userName: currentUser?.name,
         targetUserId: task.assigneeId
-      })
+      });
     }
   }
 
@@ -378,7 +374,10 @@ function TasksPageContent() {
     broadcastTaskUpdate('create', { task: newTask, userId: currentUser?.id, userName: currentUser?.name })
     
     // إرسال تحديث فوري لجميع المستخدمين
-    realtimeUpdates.sendTaskUpdate({ action: 'create', task: newTask, userId: currentUser?.id, userName: currentUser?.name })
+    if (typeof window !== 'undefined') {
+      const { realtimeUpdates } = require('../../lib/realtime-updates');
+      realtimeUpdates.sendTaskUpdate({ action: 'create', task: newTask, userId: currentUser?.id, userName: currentUser?.name });
+    }
     
     showSuccessToast("تم إنشاء المهمة بنجاح", `تم إنشاء المهمة "${newTask.title}" بنجاح`)
     setIsDialogOpen(false)
@@ -447,7 +446,10 @@ function TasksPageContent() {
     broadcastTaskUpdate('update', { task: updatedTask, userId: currentUser?.id, userName: currentUser?.name })
     
     // إرسال تحديث فوري لجميع المستخدمين
-    realtimeUpdates.sendTaskUpdate({ action: 'update', task: updatedTask, userId: currentUser?.id, userName: currentUser?.name })
+    if (typeof window !== 'undefined') {
+      const { realtimeUpdates } = require('../../lib/realtime-updates');
+      realtimeUpdates.sendTaskUpdate({ action: 'update', task: updatedTask, userId: currentUser?.id, userName: currentUser?.name });
+    }
     
     showSuccessToast("تم تحديث المهمة بنجاح", `تم تحديث المهمة "${updatedTask.title}" بنجاح`)
     setIsEditDialogOpen(false)

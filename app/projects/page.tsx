@@ -305,23 +305,26 @@ function ProjectsPageContent() {
       })
       
       // إرسال إشعار فوري للمهندس عبر SSE
-      realtimeUpdates.broadcastUpdate("notification", {
-        action: 'create',
-        notification: {
-          id: Date.now().toString(),
-          userId: engineer.id,
-          title: "مشروع جديد مُعيّن لك",
-          message: `تم تعيين مشروع "${formData.name}" لك`,
-          type: "project",
-          actionUrl: `/projects/${newProject.id}`,
-          triggeredBy: currentUser?.id || "",
-          isRead: false,
-          createdAt: new Date().toISOString(),
-        },
-        userId: currentUser?.id,
-        userName: currentUser?.name,
-        targetUserId: engineer.id
-      })
+      if (typeof window !== 'undefined') {
+        const { realtimeUpdates } = require('../../lib/realtime-updates');
+        realtimeUpdates.broadcastUpdate("notification", {
+          action: 'create',
+          notification: {
+            id: Date.now().toString(),
+            userId: engineer.id,
+            title: "تم تعيين مشروع لك",
+            message: `تم تعيين مشروع "${formData.name}" لك`,
+            type: "project",
+            actionUrl: `/projects/${newProject.id}`,
+            triggeredBy: currentUser?.id || "",
+            isRead: false,
+            createdAt: new Date().toISOString(),
+          },
+          userId: currentUser?.id,
+          userName: currentUser?.name,
+          targetUserId: engineer.id
+        });
+      }
     }
 
     // إرسال تحديث فوري لجميع المستخدمين
@@ -388,27 +391,33 @@ function ProjectsPageContent() {
       })
       
       // إرسال إشعار فوري للمهندس عبر SSE
-      realtimeUpdates.broadcastUpdate("notification", {
-        action: 'create',
-        notification: {
-          id: Date.now().toString(),
-          userId: engineer.id,
-          title: "تم تعيين مشروع لك",
-          message: `تم تعيين مشروع "${formData.name}" لك`,
-          type: "project",
-          actionUrl: `/projects/${updatedProject.id}`,
-          triggeredBy: currentUser?.id || "",
-          isRead: false,
-          createdAt: new Date().toISOString(),
-        },
-        userId: currentUser?.id,
-        userName: currentUser?.name,
-        targetUserId: engineer.id
-      })
+      if (typeof window !== 'undefined') {
+        const { realtimeUpdates } = require('../../lib/realtime-updates');
+        realtimeUpdates.broadcastUpdate("notification", {
+          action: 'create',
+          notification: {
+            id: Date.now().toString(),
+            userId: engineer.id,
+            title: "تم تعيين مشروع لك",
+            message: `تم تعيين مشروع "${formData.name}" لك`,
+            type: "project",
+            actionUrl: `/projects/${updatedProject.id}`,
+            triggeredBy: currentUser?.id || "",
+            isRead: false,
+            createdAt: new Date().toISOString(),
+          },
+          userId: currentUser?.id,
+          userName: currentUser?.name,
+          targetUserId: engineer.id
+        });
+      }
     }
 
     // إرسال تحديث فوري
-    realtimeUpdates.sendProjectUpdate({ action: 'update', project: updatedProject, userId: currentUser?.id, userName: currentUser?.name })
+    if (typeof window !== 'undefined') {
+      const { realtimeUpdates } = require('../../lib/realtime-updates');
+      realtimeUpdates.sendProjectUpdate({ action: 'update', project: updatedProject, userId: currentUser?.id, userName: currentUser?.name });
+    }
   }
 
   const handleDeleteProject = (projectId: string) => {

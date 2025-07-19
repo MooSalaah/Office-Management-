@@ -457,18 +457,70 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // Initialize realtime updates
   useEffect(() => {
-    // Realtime functionality temporarily disabled for SSR compatibility
-    // استمع لتحديثات الإشعارات الفورية (عند تفعيلها)
-    if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
-      (window as any).realtimeUpdates.on('notification', (notification: any) => {
-        // تحقق إذا كان الإشعار موجود مسبقاً
-        if (!state.notifications.some(n => n.id === notification.id)) {
-          dispatch({ type: 'ADD_NOTIFICATION', payload: notification })
+    if (typeof window !== 'undefined') {
+      // تهيئة realtime updates
+      const { realtimeUpdates } = require('../realtime-updates');
+      
+      // استمع لتحديثات الإشعارات
+      realtimeUpdates.subscribe('notification', (data: any) => {
+        if (data.data && !state.notifications.some(n => n.id === data.data.id)) {
+          dispatch({ type: 'ADD_NOTIFICATION', payload: data.data });
         }
-      })
+      });
+      
+      // استمع لتحديثات المشاريع
+      realtimeUpdates.subscribe('project', (data: any) => {
+        if (data.data) {
+          if (data.action === 'create') {
+            dispatch({ type: 'ADD_PROJECT', payload: data.data });
+          } else if (data.action === 'update') {
+            dispatch({ type: 'UPDATE_PROJECT', payload: data.data });
+          } else if (data.action === 'delete') {
+            dispatch({ type: 'DELETE_PROJECT', payload: data.data.id });
+          }
+        }
+      });
+      
+      // استمع لتحديثات المهام
+      realtimeUpdates.subscribe('task', (data: any) => {
+        if (data.data) {
+          if (data.action === 'create') {
+            dispatch({ type: 'ADD_TASK', payload: data.data });
+          } else if (data.action === 'update') {
+            dispatch({ type: 'UPDATE_TASK', payload: data.data });
+          } else if (data.action === 'delete') {
+            dispatch({ type: 'DELETE_TASK', payload: data.data.id });
+          }
+        }
+      });
+      
+      // استمع لتحديثات العملاء
+      realtimeUpdates.subscribe('client', (data: any) => {
+        if (data.data) {
+          if (data.action === 'create') {
+            dispatch({ type: 'ADD_CLIENT', payload: data.data });
+          } else if (data.action === 'update') {
+            dispatch({ type: 'UPDATE_CLIENT', payload: data.data });
+          } else if (data.action === 'delete') {
+            dispatch({ type: 'DELETE_CLIENT', payload: data.data.id });
+          }
+        }
+      });
+      
+      // استمع لتحديثات المستخدمين
+      realtimeUpdates.subscribe('user', (data: any) => {
+        if (data.data) {
+          if (data.action === 'create') {
+            dispatch({ type: 'ADD_USER', payload: data.data });
+          } else if (data.action === 'update') {
+            dispatch({ type: 'UPDATE_USER', payload: data.data });
+          } else if (data.action === 'delete') {
+            dispatch({ type: 'DELETE_USER', payload: data.data.id });
+          }
+        }
+      });
     }
-    console.log('Realtime updates disabled for SSR compatibility');
-  }, [state.currentUser?.id, state.notifications])
+  }, []);
 
   // Load all data from localStorage on mount
   useEffect(() => {
@@ -966,17 +1018,9 @@ export function useAppActions() {
     localStorage.setItem("notifications", JSON.stringify(existingNotifications))
     
     // إرسال إشعار فوري لجميع المستخدمين
-    realtimeUpdates.sendNotification(newNotification)
-    
-    // إرسال إشعار فوري للمستخدم المعني عبر SSE
-    if (notification.userId && notification.userId !== currentUser?.id) {
-      realtimeUpdates.broadcastUpdate("notification", {
-        action: 'create',
-        notification: newNotification,
-        userId: currentUser?.id,
-        userName: currentUser?.name,
-        targetUserId: notification.userId
-      })
+    if (typeof window !== 'undefined') {
+      const { realtimeUpdates } = require('../realtime-updates');
+      realtimeUpdates.sendNotification(newNotification);
     }
     
     // Show browser notification if it's for the current user
@@ -1017,7 +1061,10 @@ export function useAppActions() {
     await createProjectWithFinancialTransaction(project)
     
     // إرسال تحديث فوري
-    realtimeUpdates.sendProjectUpdate({ action: 'create', project })
+    if (typeof window !== 'undefined') {
+      const { realtimeUpdates } = require('../realtime-updates');
+      realtimeUpdates.sendProjectUpdate({ action: 'create', project });
+    }
     
     // إضافة إشعار للمهندس المسؤول
     if (project.assignedEngineerId && project.assignedEngineerId !== currentUser?.id) {
@@ -1037,7 +1084,10 @@ export function useAppActions() {
     await updateProjectWithFinancialTransaction(project)
     
     // إرسال تحديث فوري
-    realtimeUpdates.sendProjectUpdate({ action: 'update', project })
+    if (typeof window !== 'undefined') {
+      const { realtimeUpdates } = require('../realtime-updates');
+      realtimeUpdates.sendProjectUpdate({ action: 'update', project });
+    }
     
     // إضافة إشعار للمهندس المسؤول إذا تم تغيير المهندس
     if (project.assignedEngineerId && project.assignedEngineerId !== currentUser?.id) {
@@ -1150,7 +1200,10 @@ export function useAppActions() {
       saveDataToStorage()
       
       // إرسال تحديث فوري
-      realtimeUpdates.sendTaskUpdate({ action: 'create', task })
+      if (typeof window !== 'undefined') {
+        const { realtimeUpdates } = require('../realtime-updates');
+        realtimeUpdates.sendTaskUpdate({ action: 'create', task });
+      }
       
       showSuccessToast("تم إنشاء المهمة بنجاح", `تم إنشاء مهمة "${task.title}"`)
     } catch (error) {
@@ -1167,7 +1220,10 @@ export function useAppActions() {
       saveDataToStorage()
       
       // إرسال تحديث فوري
-      realtimeUpdates.sendTaskUpdate({ action: 'update', task })
+      if (typeof window !== 'undefined') {
+        const { realtimeUpdates } = require('../realtime-updates');
+        realtimeUpdates.sendTaskUpdate({ action: 'update', task });
+      }
       
       showSuccessToast("تم تحديث المهمة بنجاح", `تم تحديث مهمة "${task.title}"`)
     } catch (error) {
@@ -1190,7 +1246,10 @@ export function useAppActions() {
       saveDataToStorage()
       
       // إرسال تحديث فوري
-      realtimeUpdates.sendTaskUpdate({ action: 'delete', task })
+      if (typeof window !== 'undefined') {
+        const { realtimeUpdates } = require('../realtime-updates');
+        realtimeUpdates.sendTaskUpdate({ action: 'delete', task });
+      }
       
       showSuccessToast("تم حذف المهمة بنجاح", `تم حذف مهمة "${task.title}"`)
     } catch (error) {
@@ -1205,6 +1264,13 @@ export function useAppActions() {
       setLoadingState('clients', true)
       dispatch({ type: "ADD_CLIENT", payload: client })
       saveDataToStorage()
+      
+      // إرسال تحديث فوري
+      if (typeof window !== 'undefined') {
+        const { realtimeUpdates } = require('../realtime-updates');
+        realtimeUpdates.sendClientUpdate({ action: 'create', client });
+      }
+      
       showSuccessToast("تم إنشاء العميل بنجاح", `تم إنشاء عميل "${client.name}"`)
     } catch (error) {
       showErrorToast("خطأ في إنشاء العميل", "حدث خطأ أثناء إنشاء العميل")
@@ -1218,6 +1284,13 @@ export function useAppActions() {
       setLoadingState('clients', true)
       dispatch({ type: "UPDATE_CLIENT", payload: client })
       saveDataToStorage()
+      
+      // إرسال تحديث فوري
+      if (typeof window !== 'undefined') {
+        const { realtimeUpdates } = require('../realtime-updates');
+        realtimeUpdates.sendClientUpdate({ action: 'update', client });
+      }
+      
       showSuccessToast("تم تحديث العميل بنجاح", `تم تحديث عميل "${client.name}"`)
     } catch (error) {
       showErrorToast("خطأ في تحديث العميل", "حدث خطأ أثناء تحديث العميل")
@@ -1235,15 +1308,15 @@ export function useAppActions() {
         return
       }
 
-      // Check if client has projects
-      const clientProjects = state.projects.filter(p => p.clientId === clientId)
-      if (clientProjects.length > 0) {
-        showErrorToast("لا يمكن حذف العميل", "العميل مرتبط بمشاريع")
-        return
-      }
-
       dispatch({ type: "DELETE_CLIENT", payload: clientId })
       saveDataToStorage()
+      
+      // إرسال تحديث فوري
+      if (typeof window !== 'undefined') {
+        const { realtimeUpdates } = require('../realtime-updates');
+        realtimeUpdates.sendClientUpdate({ action: 'delete', client });
+      }
+      
       showSuccessToast("تم حذف العميل بنجاح", `تم حذف عميل "${client.name}"`)
     } catch (error) {
       showErrorToast("خطأ في حذف العميل", "حدث خطأ أثناء حذف العميل")

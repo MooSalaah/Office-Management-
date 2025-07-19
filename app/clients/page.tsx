@@ -249,6 +249,12 @@ function ClientsPageContent() {
     // Broadcast realtime update
     broadcastClientUpdate('create', { client: newClient, userId: currentUser?.id, userName: currentUser?.name })
     
+    // إرسال تحديث فوري
+    if (typeof window !== 'undefined') {
+      const { realtimeUpdates } = require('../../lib/realtime-updates');
+      realtimeUpdates.sendClientUpdate({ action: 'create', client: newClient, userId: currentUser?.id, userName: currentUser?.name });
+    }
+    
     showSuccessToast("تم إنشاء العميل بنجاح", `تم إنشاء العميل "${newClient.name}" بنجاح`)
     setIsDialogOpen(false)
     resetForm()

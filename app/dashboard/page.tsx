@@ -335,7 +335,10 @@ function ProjectDialog({ open, onClose }: { open: boolean; onClose: () => void }
     dispatch({ type: "ADD_PROJECT", payload: newProject })
     
     // إرسال تحديث فوري لجميع المستخدمين
-    realtimeUpdates.sendProjectUpdate({ action: 'create', project: newProject, userId: state.currentUser?.id, userName: state.currentUser?.name })
+    if (typeof window !== 'undefined') {
+      const { realtimeUpdates } = require('../../lib/realtime-updates');
+      realtimeUpdates.sendProjectUpdate({ action: 'create', project: newProject, userId: state.currentUser?.id, userName: state.currentUser?.name });
+    }
     
     // إضافة إشعار للمدير إذا لم يكن هو منشئ المشروع
     if (state.currentUser?.role !== "admin") {
@@ -350,23 +353,26 @@ function ProjectDialog({ open, onClose }: { open: boolean; onClose: () => void }
       })
       
       // إرسال إشعار فوري للمدير عبر SSE
-      realtimeUpdates.broadcastUpdate("notification", {
-        action: 'create',
-        notification: {
-          id: Date.now().toString(),
-          userId: "1",
-          title: "مشروع جديد تم إضافته",
-          message: `تم إضافة مشروع جديد "${newProject.name}" بواسطة ${state.currentUser?.name}`,
-          type: "project",
-          actionUrl: `/projects/${newProject.id}`,
-          triggeredBy: state.currentUser?.id || "",
-          isRead: false,
-          createdAt: new Date().toISOString(),
-        },
-        userId: state.currentUser?.id,
-        userName: state.currentUser?.name,
-        targetUserId: "1"
-      })
+      if (typeof window !== 'undefined') {
+        const { realtimeUpdates } = require('../../lib/realtime-updates');
+        realtimeUpdates.broadcastUpdate("notification", {
+          action: 'create',
+          notification: {
+            id: Date.now().toString(),
+            userId: "1",
+            title: "مشروع جديد تم إضافته",
+            message: `تم إضافة مشروع جديد "${newProject.name}" بواسطة ${state.currentUser?.name}`,
+            type: "project",
+            actionUrl: `/projects/${newProject.id}`,
+            triggeredBy: state.currentUser?.id || "",
+            isRead: false,
+            createdAt: new Date().toISOString(),
+          },
+          userId: state.currentUser?.id,
+          userName: state.currentUser?.name,
+          targetUserId: "1"
+        });
+      }
     }
     
     resetForm()

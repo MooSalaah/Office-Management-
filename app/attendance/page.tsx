@@ -240,22 +240,15 @@ function AttendancePageContent() {
     }
     setAttendanceRecords(prev => [...prev, newRecord])
     // بث تحديث فوري لجميع المستخدمين
-    realtimeUpdates.sendAttendanceUpdate({ action: 'create', attendance: newRecord, userId: currentUser?.id, userName: currentUser?.name })
+    if (typeof window !== 'undefined') {
+      const { realtimeUpdates } = require('../../lib/realtime-updates');
+      realtimeUpdates.sendAttendanceUpdate({ action: 'create', attendance: newRecord, userId: currentUser?.id, userName: currentUser?.name });
+    }
     showAlertDialogMessage("success", `تم تسجيل الحضور (${session === "morning" ? "صباحية" : "مسائية"}) بنجاح${status === "overtime" ? " (خارج أوقات الدوام - ساعات إضافية)" : ""}`)
     
-    // Add notification to admin when attendance is recorded
-    if (currentUser.role !== "admin") {
-      addNotification({
-        userId: "1", // Admin user ID
-        title: "تسجيل حضور جديد",
-        message: `تم تسجيل حضور ${currentUser.name} للفترة ${session === "morning" ? "الصباحية" : "المسائية"}`,
-        type: "attendance",
-        actionUrl: `/attendance`,
-        triggeredBy: currentUser.id,
-        isRead: false,
-      })
-      
-      // إرسال إشعار فوري للمدير عبر SSE
+    // إرسال إشعار فوري للمدير عبر SSE
+    if (typeof window !== 'undefined') {
+      const { realtimeUpdates } = require('../../lib/realtime-updates');
       realtimeUpdates.broadcastUpdate("notification", {
         action: 'create',
         notification: {
@@ -272,7 +265,7 @@ function AttendancePageContent() {
         userId: currentUser.id,
         userName: currentUser.name,
         targetUserId: "1"
-      })
+      });
     }
   }
 
@@ -336,21 +329,33 @@ function AttendancePageContent() {
 
     setAttendanceRecords(prev => prev.map((r, i) => i === recordIndex ? updatedRecord : r))
     // بث تحديث فوري لجميع المستخدمين
-    realtimeUpdates.sendAttendanceUpdate({ action: 'update', attendance: updatedRecord, userId: currentUser?.id, userName: currentUser?.name })
+    if (typeof window !== 'undefined') {
+      const { realtimeUpdates } = require('../../lib/realtime-updates');
+      realtimeUpdates.sendAttendanceUpdate({ action: 'update', attendance: updatedRecord, userId: currentUser?.id, userName: currentUser?.name });
+    }
     
     showAlertDialogMessage("success", `تم تسجيل الانصراف (${session === "morning" ? "صباحية" : "مسائية"}) بنجاح`)
     
-    // Add notification to admin when checkout is recorded
-    if (currentUser.role !== "admin") {
-      addNotification({
-        userId: "1", // Admin user ID
-        title: "تسجيل انصراف",
-        message: `تم تسجيل انصراف ${currentUser.name} (${session === "morning" ? "صباحية" : "مسائية"}) في ${now.toLocaleTimeString("ar-SA")}`,
-        type: "attendance",
-        actionUrl: `/attendance`,
-        triggeredBy: currentUser.id,
-        isRead: false,
-      })
+    // إرسال إشعار فوري للمدير عبر SSE
+    if (typeof window !== 'undefined') {
+      const { realtimeUpdates } = require('../../lib/realtime-updates');
+      realtimeUpdates.broadcastUpdate("notification", {
+        action: 'create',
+        notification: {
+          id: Date.now().toString(),
+          userId: "1",
+          title: "تسجيل انصراف",
+          message: `تم تسجيل انصراف ${currentUser.name} (${session === "morning" ? "صباحية" : "مسائية"}) في ${now.toLocaleTimeString("ar-SA")}`,
+          type: "attendance",
+          actionUrl: `/attendance`,
+          triggeredBy: currentUser.id,
+          isRead: false,
+          createdAt: new Date().toISOString(),
+        },
+        userId: currentUser.id,
+        userName: currentUser.name,
+        targetUserId: "1"
+      });
     }
   }
 
@@ -387,7 +392,10 @@ function AttendancePageContent() {
       setAttendanceRecords((prev) => [...prev, newRecord])
       
       // بث تحديث فوري لجميع المستخدمين
-      realtimeUpdates.sendAttendanceUpdate({ action: 'create', attendance: newRecord, userId: employee.id, userName: employee.name })
+      if (typeof window !== 'undefined') {
+        const { realtimeUpdates } = require('../../lib/realtime-updates');
+        realtimeUpdates.sendAttendanceUpdate({ action: 'create', attendance: newRecord, userId: employee.id, userName: employee.name });
+      }
     } else {
       // Find existing record for checkout
       const existingRecord = attendanceRecords.find(r => r.userId === employee.id && r.date === today)
@@ -408,7 +416,10 @@ function AttendancePageContent() {
       setAttendanceRecords((prev) => prev.map((record) => (record.id === existingRecord.id ? updatedRecord : record)))
       
       // بث تحديث فوري لجميع المستخدمين
-      realtimeUpdates.sendAttendanceUpdate({ action: 'update', attendance: updatedRecord, userId: employee.id, userName: employee.name })
+      if (typeof window !== 'undefined') {
+        const { realtimeUpdates } = require('../../lib/realtime-updates');
+        realtimeUpdates.sendAttendanceUpdate({ action: 'update', attendance: updatedRecord, userId: employee.id, userName: employee.name });
+      }
     }
 
     setAlert({ type: "success", message: `تم تسجيل ${manualFormData.action === "checkin" ? "الحضور" : "الانصراف"} بنجاح` })
