@@ -1,12 +1,10 @@
 import { useState, useEffect, useRef } from "react";
+import { broadcastUpdate, useRealtime as useSSERealtime } from "./realtime";
 
-// نظام التحديثات الحية باستخدام localStorage events
+// نظام التحديثات الحية باستخدام SSE (Server-Sent Events)
 export class RealtimeUpdates {
 	private static instance: RealtimeUpdates;
 	private listeners: Map<string, Set<(data: any) => void>> = new Map();
-	private storageKey = "realtime_updates";
-	private lastUpdateTime = 0;
-	private lastProcessedUpdateId: string | null = null;
 
 	static getInstance(): RealtimeUpdates {
 		if (!RealtimeUpdates.instance) {
@@ -16,47 +14,26 @@ export class RealtimeUpdates {
 	}
 
 	constructor() {
-		this.initializeStorageListener();
+		// لا نحتاج initializeStorageListener لأننا نستخدم SSE
 	}
 
-	private initializeStorageListener() {
-		if (typeof window === "undefined") return;
+	// إرسال تحديث لجميع المستخدمين عبر SSE
+	async broadcastUpdate(type: string, data: any) {
+		try {
+			await broadcastUpdate({
+				type: type as any,
+				action: data.action || "update",
+				data: data,
+				userId: this.getCurrentUserId(),
+			});
 
-		window.addEventListener("storage", (event) => {
-			if (event.key === this.storageKey && event.newValue) {
-				try {
-					const update = JSON.parse(event.newValue);
-					// منع إعادة معالجة نفس التحديث
-					const updateId = `${update.type}_${update.data?.id || ""}_${
-						update.timestamp
-					}_${update.userId}`;
-					if (this.lastProcessedUpdateId === updateId) return;
-					this.lastProcessedUpdateId = updateId;
-
-					// إرسال التحديث للمستمعين المحليين فقط (بدون إعادة broadcast)
-					this.notifyListeners(update.type, update.data);
-				} catch (error) {
-					console.error("Error parsing realtime update:", error);
-				}
-			}
-		});
-	}
-
-	// إرسال تحديث لجميع المستخدمين
-	broadcastUpdate(type: string, data: any) {
-		const update = {
-			type,
-			data,
-			timestamp: Date.now(),
-			userId: this.getCurrentUserId(),
-			userName: this.getCurrentUserName(),
-		};
-
-		// حفظ التحديث في localStorage
-		localStorage.setItem(this.storageKey, JSON.stringify(update));
-
-		// إرسال التحديث للمستمعين المحليين
-		this.notifyListeners(type, data);
+			// إرسال التحديث للمستمعين المحليين أيضاً
+			this.notifyListeners(type, data);
+		} catch (error) {
+			console.error("Failed to broadcast update:", error);
+			// Fallback: إرسال للمستمعين المحليين فقط
+			this.notifyListeners(type, data);
+		}
 	}
 
 	// إضافة مستمع للتحديثات
@@ -65,6 +42,11 @@ export class RealtimeUpdates {
 			this.listeners.set(type, new Set());
 		}
 		this.listeners.get(type)!.add(callback);
+
+		// إضافة SSE listener إذا كان هذا أول مستمع لهذا النوع
+		if (this.listeners.get(type)!.size === 1) {
+			this.setupSSEListener(type);
+		}
 
 		// إرجاع دالة لإلغاء الاشتراك
 		return () => {
@@ -76,6 +58,20 @@ export class RealtimeUpdates {
 				}
 			}
 		};
+	}
+
+	// إعداد SSE listener
+	private setupSSEListener(type: string) {
+		if (typeof window === "undefined") return;
+
+		// استخدام SSE من realtime.ts
+		const { realtimeManager } = require("./realtime");
+		if (realtimeManager) {
+			realtimeManager.subscribe(type, (update: any) => {
+				// إرسال التحديث لجميع المستمعين المحليين
+				this.notifyListeners(type, update.data);
+			});
+		}
 	}
 
 	// إشعار المستمعين
