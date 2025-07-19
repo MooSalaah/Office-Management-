@@ -197,7 +197,7 @@ function TasksPageContent() {
     }
   }
 
-  const handleDragEnd = (result: DropResult) => {
+  const handleDragEnd = async (result: DropResult) => {
     if (!result.destination) return
 
     const { source, destination, draggableId } = result
@@ -221,46 +221,66 @@ function TasksPageContent() {
       updatedAt: new Date().toISOString(),
     }
 
-    dispatch({ type: "UPDATE_TASK", payload: updatedTask })
+    try {
+      // Save to backend database
+      const response = await fetch(`/api/tasks?id=${task.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatedTask),
+      });
 
-    // Update in localStorage
-    const existingTasks = JSON.parse(localStorage.getItem("tasks") || "[]")
-    const updatedTasks = existingTasks.map((t: any) => t.id === task.id ? updatedTask : t)
-    localStorage.setItem("tasks", JSON.stringify(updatedTasks))
+      if (!response.ok) {
+        throw new Error('Failed to update task in database');
+      }
 
-    // Broadcast realtime update
-    broadcastTaskUpdate('update', { task: updatedTask, userId: currentUser?.id, userName: currentUser?.name })
-    
-    // إرسال تحديث فوري لجميع المستخدمين
-    realtimeUpdates.sendTaskUpdate({ action: 'update', task: updatedTask, userId: currentUser?.id, userName: currentUser?.name })
+      const result = await response.json();
+      console.log('Task updated in database:', result);
 
-    // Add notification to admin when task is completed
-    if (destinationStatus === "completed" && currentUser?.role !== "admin") {
-      addNotification({
-        userId: "1", // Admin user ID
-        title: "مهمة مكتملة",
-        message: `تم إنجاز مهمة "${task.title}" بواسطة ${currentUser?.name}`,
-        type: "task",
-        actionUrl: `/tasks/${task.id}`,
-        triggeredBy: currentUser?.id || "",
-        isRead: false,
-      })
+      // Update local state
+      dispatch({ type: "UPDATE_TASK", payload: updatedTask })
+
+      // Update in localStorage
+      const existingTasks = JSON.parse(localStorage.getItem("tasks") || "[]")
+      const updatedTasks = existingTasks.map((t: any) => t.id === task.id ? updatedTask : t)
+      localStorage.setItem("tasks", JSON.stringify(updatedTasks))
+
+      // Broadcast realtime update
+      broadcastTaskUpdate('update', { task: updatedTask, userId: currentUser?.id, userName: currentUser?.name })
+      
+      // إرسال تحديث فوري لجميع المستخدمين
+      realtimeUpdates.sendTaskUpdate({ action: 'update', task: updatedTask, userId: currentUser?.id, userName: currentUser?.name })
+
+      // Add notification to admin when task is completed
+      if (destinationStatus === "completed" && currentUser?.role !== "admin") {
+        addNotification({
+          userId: "1", // Admin user ID
+          title: "مهمة مكتملة",
+          message: `تم إنجاز مهمة "${task.title}" بواسطة ${currentUser?.name}`,
+          type: "task",
+          actionUrl: `/tasks/${task.id}`,
+          triggeredBy: currentUser?.id || "",
+          isRead: false,
+        })
+      }
+
+      // Add notification to assignee when task is assigned
+      if (task.assigneeId && task.assigneeId !== currentUser?.id) {
+        addNotification({
+          userId: task.assigneeId,
+          title: "مهمة جديدة مُعيّنة لك",
+          message: `تم تعيين مهمة "${task.title}" لك`,
+          type: "task",
+          actionUrl: `/tasks/${task.id}`,
+          triggeredBy: currentUser?.id || "",
+          isRead: false,
+        })
+      }
+    } catch (error) {
+      console.error('Error updating task status:', error);
+      setAlert({ type: "error", message: "حدث خطأ أثناء تحديث حالة المهمة في قاعدة البيانات" });
     }
-
-    // Add notification to assignee when task is assigned
-    if (task.assigneeId && task.assigneeId !== currentUser?.id) {
-      addNotification({
-        userId: task.assigneeId,
-        title: "مهمة جديدة مُعيّنة لك",
-        message: `تم تعيين مهمة "${task.title}" لك`,
-        type: "task",
-        actionUrl: `/tasks/${task.id}`,
-        triggeredBy: currentUser?.id || "",
-        isRead: false,
-      })
-    }
-
-
   }
 
   const handleCreateTask = async () => {
@@ -368,7 +388,7 @@ function TasksPageContent() {
     }
   }
 
-  const handleUpdateTask = () => {
+  const handleUpdateTask = async () => {
     if (!editingTask) return
 
     // Check if user can edit tasks
@@ -393,48 +413,70 @@ function TasksPageContent() {
       updatedAt: new Date().toISOString(),
     }
 
-    dispatch({ type: "UPDATE_TASK", payload: updatedTask })
-    
-    // Update in localStorage
-    const existingTasks = JSON.parse(localStorage.getItem("tasks") || "[]")
-    const updatedTasks = existingTasks.map((t: any) => t.id === editingTask.id ? updatedTask : t)
-    localStorage.setItem("tasks", JSON.stringify(updatedTasks))
-    
-    // Broadcast realtime update
-    broadcastTaskUpdate('update', { task: updatedTask, userId: currentUser?.id, userName: currentUser?.name })
-    
-    // إرسال تحديث فوري لجميع المستخدمين
-    realtimeUpdates.sendTaskUpdate({ action: 'update', task: updatedTask, userId: currentUser?.id, userName: currentUser?.name })
-    
-    showSuccessToast("تم تحديث المهمة بنجاح", `تم تحديث المهمة "${updatedTask.title}" بنجاح`)
-    setIsEditDialogOpen(false)
-    setEditingTask(null)
-    resetForm()
+    try {
+      // Save to backend database
+      const response = await fetch(`/api/tasks?id=${editingTask.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatedTask),
+      });
 
-    // Add notification to assignee when task is updated
-    if (assignee && assignee.id !== currentUser?.id) {
-      addNotification({
-        userId: assignee.id,
-        title: "مهمة تم تحديثها",
-        message: `تم تحديث مهمة "${formData.title}" بواسطة ${currentUser?.name}`,
-        type: "task",
-        actionUrl: `/tasks/${editingTask?.id}`,
-        triggeredBy: currentUser?.id || "",
-        isRead: false,
-      })
-    }
+      if (!response.ok) {
+        throw new Error('Failed to update task in database');
+      }
 
-    // Add notification to admin when task is updated by non-admin
-    if (currentUser?.role !== "admin") {
-      addNotification({
-        userId: "1", // Admin user ID
-        title: "مهمة تم تحديثها",
-        message: `تم تحديث مهمة "${formData.title}" بواسطة ${currentUser?.name}`,
-        type: "task",
-        actionUrl: `/tasks/${editingTask?.id}`,
-        triggeredBy: currentUser?.id || "",
-        isRead: false,
-      })
+      const result = await response.json();
+      console.log('Task updated in database:', result);
+
+      // Update local state
+      dispatch({ type: "UPDATE_TASK", payload: updatedTask })
+      
+      // Update in localStorage
+      const existingTasks = JSON.parse(localStorage.getItem("tasks") || "[]")
+      const updatedTasks = existingTasks.map((t: any) => t.id === editingTask.id ? updatedTask : t)
+      localStorage.setItem("tasks", JSON.stringify(updatedTasks))
+      
+      // Broadcast realtime update
+      broadcastTaskUpdate('update', { task: updatedTask, userId: currentUser?.id, userName: currentUser?.name })
+      
+      // إرسال تحديث فوري لجميع المستخدمين
+      realtimeUpdates.sendTaskUpdate({ action: 'update', task: updatedTask, userId: currentUser?.id, userName: currentUser?.name })
+      
+      showSuccessToast("تم تحديث المهمة بنجاح", `تم تحديث المهمة "${updatedTask.title}" بنجاح`)
+      setIsEditDialogOpen(false)
+      setEditingTask(null)
+      resetForm()
+
+      // Add notification to assignee when task is updated
+      if (assignee && assignee.id !== currentUser?.id) {
+        addNotification({
+          userId: assignee.id,
+          title: "مهمة تم تحديثها",
+          message: `تم تحديث مهمة "${formData.title}" بواسطة ${currentUser?.name}`,
+          type: "task",
+          actionUrl: `/tasks/${editingTask?.id}`,
+          triggeredBy: currentUser?.id || "",
+          isRead: false,
+        })
+      }
+
+      // Add notification to admin when task is updated by non-admin
+      if (currentUser?.role !== "admin") {
+        addNotification({
+          userId: "1", // Admin user ID
+          title: "مهمة تم تحديثها",
+          message: `تم تحديث مهمة "${formData.title}" بواسطة ${currentUser?.name}`,
+          type: "task",
+          actionUrl: `/tasks/${editingTask?.id}`,
+          triggeredBy: currentUser?.id || "",
+          isRead: false,
+        })
+      }
+    } catch (error) {
+      console.error('Error updating task:', error);
+      setAlert({ type: "error", message: "حدث خطأ أثناء تحديث المهمة في قاعدة البيانات" });
     }
   }
 
@@ -460,6 +502,19 @@ function TasksPageContent() {
         return
       }
 
+      // Delete from backend database
+      const response = await fetch(`/api/tasks?id=${taskToDelete}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete task from database');
+      }
+
+      const result = await response.json();
+      console.log('Task deleted from database:', result);
+
+      // Update local state
       dispatch({ type: "DELETE_TASK", payload: taskToDelete })
 
       // Remove from localStorage
@@ -469,13 +524,17 @@ function TasksPageContent() {
 
       // Broadcast realtime update
       broadcastTaskUpdate('delete', { ...task })
+      
+      // إرسال تحديث فوري لجميع المستخدمين
+      realtimeUpdates.sendTaskUpdate({ action: 'delete', task: task, userId: currentUser?.id, userName: currentUser?.name })
 
       showSuccessToast("تم حذف المهمة بنجاح", `تم حذف المهمة "${task.title}" بنجاح`)
       setDeleteDialogOpen(false)
       setTaskToDelete(null)
       setDeleteError("")
     } catch (error) {
-      setDeleteError("حدث خطأ أثناء حذف المهمة")
+      console.error('Error deleting task:', error);
+      setDeleteError("حدث خطأ أثناء حذف المهمة من قاعدة البيانات")
     }
   }
 
@@ -553,7 +612,7 @@ function TasksPageContent() {
   }
 
   // Handle adding new assignee
-  const handleAddNewAssignee = () => {
+  const handleAddNewAssignee = async () => {
     // Check if user has permission to add users (only engineers and managers can add engineers)
     if (!hasPermission(currentUser?.role || "", "create", "users") && currentUser?.role !== "engineer") {
       setAlert({ type: "error", message: "فقط المهندسون والمديرون يمكنهم إضافة مهندسين جدد" })
@@ -587,7 +646,7 @@ function TasksPageContent() {
         name: newAssigneeName.trim(),
         email: finalEmail,
         password: defaultPassword,
-        role: "", // تعديل هنا: اترك الدور فارغاً
+        role: "engineer", // تعيين دور المهندس
         avatar: "",
         phone: "",
         isActive: true,
@@ -595,37 +654,58 @@ function TasksPageContent() {
         createdAt: new Date().toISOString(),
       }
       
-      // Add to users list
-      dispatch({ type: "ADD_USER", payload: newAssignee })
-      
-      // Save to localStorage
-      existingUsers.push(newAssignee)
-      localStorage.setItem("users", JSON.stringify(existingUsers))
-      
-      // إرسال تحديث فوري
-      realtimeUpdates.sendUserUpdate({ action: 'create', user: newAssignee })
-      
-      // Update form data
-      setFormData(prev => ({ ...prev, assigneeId: newAssignee.id }))
-      
-      // Add notification
-      addNotification({
-        userId: currentUser?.id || "",
-        title: "تم إضافة مسؤول جديد",
-        message: `تم إضافة المسؤول "${newAssignee.name}" بنجاح. الإيميل: ${finalEmail}، كلمة المرور: ${defaultPassword}`,
-        type: "task",
-        isRead: false,
-        triggeredBy: currentUser?.id || "",
-      })
-      
-      // Reset input
-      setShowNewAssigneeInput(false)
-      setNewAssigneeName("")
+      try {
+        // Save to backend database
+        const response = await fetch('/api/users', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(newAssignee),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to save user to database');
+        }
+
+        const result = await response.json();
+        console.log('User saved to database:', result);
+
+        // Add to users list
+        dispatch({ type: "ADD_USER", payload: newAssignee })
+        
+        // Save to localStorage
+        existingUsers.push(newAssignee)
+        localStorage.setItem("users", JSON.stringify(existingUsers))
+        
+        // إرسال تحديث فوري
+        realtimeUpdates.sendUserUpdate({ action: 'create', user: newAssignee })
+        
+        // Update form data
+        setFormData(prev => ({ ...prev, assigneeId: newAssignee.id }))
+        
+        // Add notification
+        addNotification({
+          userId: currentUser?.id || "",
+          title: "تم إضافة مسؤول جديد",
+          message: `تم إضافة المسؤول "${newAssignee.name}" بنجاح. الإيميل: ${finalEmail}، كلمة المرور: ${defaultPassword}`,
+          type: "task",
+          isRead: false,
+          triggeredBy: currentUser?.id || "",
+        })
+        
+        // Reset input
+        setShowNewAssigneeInput(false)
+        setNewAssigneeName("")
+      } catch (error) {
+        console.error('Error creating user:', error);
+        setAlert({ type: "error", message: "حدث خطأ أثناء حفظ المستخدم في قاعدة البيانات" });
+      }
     }
   }
 
   // Handle adding new project
-  const handleAddNewProject = () => {
+  const handleAddNewProject = async () => {
     if (newProjectName.trim()) {
       const newProject = {
         id: Date.now().toString(),
@@ -633,14 +713,14 @@ function TasksPageContent() {
         client: "عميل جديد",
         clientId: "",
         type: "مشروع جديد",
-        status: "in-progress" as const, // تعديل هنا ليكون قيد التنفيذ دائماً
+        status: "in-progress" as const,
         team: [],
         startDate: new Date().toISOString().split("T")[0],
         price: 0,
         downPayment: 0,
         remainingBalance: 0,
-        assignedEngineerId: "",
-        assignedEngineerName: "",
+        assignedEngineerId: currentUser?.id || "",
+        assignedEngineerName: currentUser?.name || "",
         importance: "medium" as const,
         description: "",
         progress: 0,
@@ -649,25 +729,54 @@ function TasksPageContent() {
         updatedAt: new Date().toISOString(),
       }
       
-      // Add to projects list
-      dispatch({ type: "ADD_PROJECT", payload: newProject })
-      
-      // Update form data
-      setFormData(prev => ({ ...prev, projectId: newProject.id }))
-      
-      // Add notification
-      addNotification({
-        userId: currentUser?.id || "",
-        title: "تم إضافة مشروع جديد",
-        message: `تم إضافة المشروع "${newProject.name}" بنجاح`,
-        type: "project",
-        isRead: false,
-        triggeredBy: currentUser?.id || "",
-      })
-      
-      // Reset input
-      setShowNewProjectInput(false)
-      setNewProjectName("")
+      try {
+        // Save to backend database
+        const response = await fetch('/api/projects', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(newProject),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to save project to database');
+        }
+
+        const result = await response.json();
+        console.log('Project saved to database:', result);
+
+        // Add to projects list
+        dispatch({ type: "ADD_PROJECT", payload: newProject })
+        
+        // Save to localStorage
+        const existingProjects = JSON.parse(localStorage.getItem("projects") || "[]")
+        existingProjects.push(newProject)
+        localStorage.setItem("projects", JSON.stringify(existingProjects))
+        
+        // إرسال تحديث فوري لجميع المستخدمين
+        realtimeUpdates.sendProjectUpdate({ action: 'create', project: newProject, userId: currentUser?.id, userName: currentUser?.name })
+        
+        // Update form data
+        setFormData(prev => ({ ...prev, projectId: newProject.id }))
+        
+        // Add notification
+        addNotification({
+          userId: currentUser?.id || "",
+          title: "تم إضافة مشروع جديد",
+          message: `تم إضافة المشروع "${newProject.name}" بنجاح`,
+          type: "project",
+          isRead: false,
+          triggeredBy: currentUser?.id || "",
+        })
+        
+        // Reset input
+        setShowNewProjectInput(false)
+        setNewProjectName("")
+      } catch (error) {
+        console.error('Error creating project:', error);
+        setAlert({ type: "error", message: "حدث خطأ أثناء حفظ المشروع في قاعدة البيانات" });
+      }
     }
   }
 

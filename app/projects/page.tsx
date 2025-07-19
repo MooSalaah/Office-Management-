@@ -304,8 +304,16 @@ function ProjectsPageContent() {
       const result = await response.json();
       console.log('Project saved to database:', result);
 
-      // Update local state and localStorage
-      await createProjectWithDownPayment(newProject)
+      // Update local state
+      dispatch({ type: "ADD_PROJECT", payload: newProject })
+      
+      // Save to localStorage
+      const existingProjects = JSON.parse(localStorage.getItem("projects") || "[]")
+      existingProjects.push(newProject)
+      localStorage.setItem("projects", JSON.stringify(existingProjects))
+      
+      // إرسال تحديث فوري لجميع المستخدمين
+      realtimeUpdates.sendProjectUpdate({ action: 'create', project: newProject, userId: currentUser?.id, userName: currentUser?.name })
       
       setIsDialogOpen(false)
       resetForm()
@@ -369,27 +377,54 @@ function ProjectsPageContent() {
       updatedAt: new Date().toISOString(),
     }
 
-    await updateProjectWithDownPayment(updatedProject)
-    
-    setIsDialogOpen(false)
-    setEditingProject(null)
-    resetForm()
+    try {
+      // Save to backend database
+      const response = await fetch(`/api/projects?id=${editingProject.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatedProject),
+      });
 
-    // Add notification to assigned engineer if changed
-    if (engineer && engineer.id !== currentUser?.id && engineer.id !== editingProject.assignedEngineerId) {
-      addNotification({
-        userId: engineer.id,
-        title: "تم تعيين مشروع لك",
-        message: `تم تعيين مشروع "${formData.name}" لك`,
-        type: "project",
-        actionUrl: `/projects/${updatedProject.id}`,
-        triggeredBy: currentUser?.id || "",
-        isRead: false,
-      })
+      if (!response.ok) {
+        throw new Error('Failed to update project in database');
+      }
+
+      const result = await response.json();
+      console.log('Project updated in database:', result);
+
+      // Update local state
+      dispatch({ type: "UPDATE_PROJECT", payload: updatedProject })
+      
+      // Update in localStorage
+      const existingProjects = JSON.parse(localStorage.getItem("projects") || "[]")
+      const updatedProjects = existingProjects.map((p: any) => p.id === editingProject.id ? updatedProject : p)
+      localStorage.setItem("projects", JSON.stringify(updatedProjects))
+      
+      // إرسال تحديث فوري لجميع المستخدمين
+      realtimeUpdates.sendProjectUpdate({ action: 'update', project: updatedProject, userId: currentUser?.id, userName: currentUser?.name })
+      
+      setIsDialogOpen(false)
+      setEditingProject(null)
+      resetForm()
+
+      // Add notification to assigned engineer if changed
+      if (engineer && engineer.id !== currentUser?.id && engineer.id !== editingProject.assignedEngineerId) {
+        addNotification({
+          userId: engineer.id,
+          title: "تم تعيين مشروع لك",
+          message: `تم تعيين مشروع "${formData.name}" لك`,
+          type: "project",
+          actionUrl: `/projects/${updatedProject.id}`,
+          triggeredBy: currentUser?.id || "",
+          isRead: false,
+        })
+      }
+    } catch (error) {
+      console.error('Error updating project:', error);
+      setAlert({ type: "error", message: "حدث خطأ أثناء تحديث المشروع في قاعدة البيانات" });
     }
-
-    // إرسال تحديث فوري
-    realtimeUpdates.sendProjectUpdate({ action: 'update', project: updatedProject, userId: currentUser?.id, userName: currentUser?.name })
   }
 
   const handleDeleteProject = (projectId: string) => {
@@ -419,13 +454,35 @@ function ProjectsPageContent() {
         return
       }
 
-      await deleteProject(projectToDelete)
+      // Delete from backend database
+      const response = await fetch(`/api/projects?id=${projectToDelete}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete project from database');
+      }
+
+      const result = await response.json();
+      console.log('Project deleted from database:', result);
+
+      // Update local state
+      dispatch({ type: "DELETE_PROJECT", payload: projectToDelete })
+      
+      // Remove from localStorage
+      const existingProjects = JSON.parse(localStorage.getItem("projects") || "[]")
+      const filteredProjects = existingProjects.filter((p: any) => p.id !== projectToDelete)
+      localStorage.setItem("projects", JSON.stringify(filteredProjects))
+      
+      // إرسال تحديث فوري لجميع المستخدمين
+      realtimeUpdates.sendProjectUpdate({ action: 'delete', project: project, userId: currentUser?.id, userName: currentUser?.name })
       
       setDeleteDialogOpen(false)
       setProjectToDelete(null)
       setDeleteError("")
     } catch (error) {
-      setDeleteError("حدث خطأ أثناء حذف المشروع")
+      console.error('Error deleting project:', error);
+      setDeleteError("حدث خطأ أثناء حذف المشروع من قاعدة البيانات")
     }
   }
 
@@ -483,12 +540,13 @@ function ProjectsPageContent() {
   const remainingBalance = Number.parseFloat(formData.price) - (Number.parseFloat(formData.downPayment) || 0)
 
   // Handle adding new client
-  const handleAddNewClient = () => {
+  const handleAddNewClient = async () => {
     if (!newClientName.trim()) {
       setNewClientInputError("يرجى إدخال اسم العميل الجديد");
       return;
     }
     setNewClientInputError("");
+    
     const newClient = {
       id: Date.now().toString(),
       name: newClientName.trim(),
@@ -502,28 +560,54 @@ function ProjectsPageContent() {
       createdAt: new Date().toISOString(),
     }
     
-    // Add to clients list
-    dispatch({ type: "ADD_CLIENT", payload: newClient })
-    
-    // بث تحديث فوري لجميع المستخدمين
-    realtimeUpdates.sendClientUpdate({ action: 'create', client: newClient, userId: currentUser?.id, userName: currentUser?.name })
-    
-    // Update form data
-    setFormData(prev => ({ ...prev, clientId: newClient.id }))
-    
-    // Add notification
-    addNotification({
-      userId: currentUser?.id || "",
-      title: "تم إضافة عميل جديد",
-      message: `تم إضافة العميل "${newClient.name}" بنجاح`,
-      type: "project",
-      isRead: false,
-      triggeredBy: currentUser?.id || "",
-    })
-    
-    // Reset input
-    setShowNewClientInput(false)
-    setNewClientName("")
+    try {
+      // Save to backend database
+      const response = await fetch('/api/clients', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newClient),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save client to database');
+      }
+
+      const result = await response.json();
+      console.log('Client saved to database:', result);
+
+      // Add to clients list
+      dispatch({ type: "ADD_CLIENT", payload: newClient })
+      
+      // Save to localStorage
+      const existingClients = JSON.parse(localStorage.getItem("clients") || "[]")
+      existingClients.push(newClient)
+      localStorage.setItem("clients", JSON.stringify(existingClients))
+      
+      // بث تحديث فوري لجميع المستخدمين
+      realtimeUpdates.sendClientUpdate({ action: 'create', client: newClient, userId: currentUser?.id, userName: currentUser?.name })
+      
+      // Update form data
+      setFormData(prev => ({ ...prev, clientId: newClient.id }))
+      
+      // Add notification
+      addNotification({
+        userId: currentUser?.id || "",
+        title: "تم إضافة عميل جديد",
+        message: `تم إضافة العميل "${newClient.name}" بنجاح`,
+        type: "project",
+        isRead: false,
+        triggeredBy: currentUser?.id || "",
+      })
+      
+      // Reset input
+      setShowNewClientInput(false)
+      setNewClientName("")
+    } catch (error) {
+      console.error('Error creating client:', error);
+      setNewClientInputError("حدث خطأ أثناء حفظ العميل في قاعدة البيانات");
+    }
   }
 
   // Handle adding new project type
@@ -579,7 +663,7 @@ function ProjectsPageContent() {
   }
 
   // Handle adding new engineer
-  const handleAddNewEngineer = () => {
+  const handleAddNewEngineer = async () => {
     if (!newEngineerName.trim()) {
       setNewEngineerInputError("يرجى إدخال اسم المهندس الجديد");
       return;
@@ -626,15 +710,37 @@ function ProjectsPageContent() {
         createdAt: new Date().toISOString(),
       }
       
-      // Add to users list
-      dispatch({ type: "ADD_USER", payload: newEngineer })
-      
-      // Save to localStorage
-      existingUsers.push(newEngineer)
-      localStorage.setItem("users", JSON.stringify(existingUsers))
-      
-      // إرسال تحديث فوري
-      realtimeUpdates.sendUserUpdate({ action: 'create', user: newEngineer })
+      try {
+        // Save to backend database
+        const response = await fetch('/api/users', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(newEngineer),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to save engineer to database');
+        }
+
+        const result = await response.json();
+        console.log('Engineer saved to database:', result);
+
+        // Add to users list
+        dispatch({ type: "ADD_USER", payload: newEngineer })
+        
+        // Save to localStorage
+        existingUsers.push(newEngineer)
+        localStorage.setItem("users", JSON.stringify(existingUsers))
+        
+        // إرسال تحديث فوري
+        realtimeUpdates.sendUserUpdate({ action: 'create', user: newEngineer })
+      } catch (error) {
+        console.error('Error creating engineer:', error);
+        setNewEngineerInputError("حدث خطأ أثناء حفظ المهندس في قاعدة البيانات");
+        return;
+      }
       
       // Update form data
       setFormData(prev => ({ ...prev, assignedEngineerId: newEngineer.id }))
