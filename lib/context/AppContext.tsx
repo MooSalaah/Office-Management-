@@ -542,19 +542,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (usersData) {
           const users = JSON.parse(usersData)
           console.log("Loading users from localStorage:", users)
-          // Replace all users with localStorage data
-          users.forEach((user: any) => {
-            // Update user permissions based on current role
-            const updatedUser = updateUserPermissionsByRole(user)
-            const existingUser = state.users.find(u => u.id === user.id)
-            if (existingUser) {
-              // Update existing user
-              dispatch({ type: "UPDATE_USER", payload: updatedUser })
-            } else {
-              // Add new user
-              dispatch({ type: "ADD_USER", payload: updatedUser })
-            }
-          })
+          dispatch({ type: "LOAD_USERS", payload: users })
+        } else {
+          // If no users exist, initialize with default users
+          console.log("No users found, initializing with default users")
+          dispatch({ type: "LOAD_USERS", payload: mockUsers })
         }
 
         // Load projects (only if not already loaded)
