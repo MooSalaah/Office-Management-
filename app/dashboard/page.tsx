@@ -106,16 +106,25 @@ function ProjectDialog({ open, onClose }: { open: boolean; onClose: () => void }
   })
 
   const [showValidationErrors, setShowValidationErrors] = useState(false)
+  const [missingFields, setMissingFields] = useState<string[]>([])
   const [showNewClientInput, setShowNewClientInput] = useState(false)
   const [newClientName, setNewClientName] = useState("")
   const [showNewTypeInput, setShowNewTypeInput] = useState(false)
   const [newProjectType, setNewProjectType] = useState("")
   const [showNewEngineerInput, setShowNewEngineerInput] = useState(false)
   const [newEngineerName, setNewEngineerName] = useState("")
+  const [newClientInputError, setNewClientInputError] = useState("")
+  const [newTypeInputError, setNewTypeInputError] = useState("")
+  const [newEngineerInputError, setNewEngineerInputError] = useState("")
 
   const remainingBalance = Number(formData.price) - Number(formData.downPayment)
 
   const handleAddNewClient = () => {
+    if (!newClientName.trim()) {
+      setNewClientInputError("يرجى إدخال اسم العميل الجديد");
+      return;
+    }
+    setNewClientInputError("");
     if (newClientName.trim()) {
       const newClient = {
         id: Date.now().toString(),
@@ -143,12 +152,28 @@ function ProjectDialog({ open, onClose }: { open: boolean; onClose: () => void }
         actionUrl: `/clients`,
         triggeredBy: state.currentUser?.id || "",
       })
+
+      // بث تحديث فوري لجميع المستخدمين
+      realtimeUpdates.sendClientUpdate({ action: 'create', client: newClient, userId: state.currentUser?.id, userName: state.currentUser?.name })
     }
   }
 
   const handleAddNewProjectType = () => {
+    if (!newProjectType.trim()) {
+      setNewTypeInputError("يرجى إدخال نوع المشروع الجديد");
+      return;
+    }
+    setNewTypeInputError("");
     if (newProjectType.trim()) {
       setFormData(prev => ({ ...prev, type: newProjectType }))
+      
+      // Save project types to localStorage
+      const existingTypes = JSON.parse(localStorage.getItem("projectTypes") || "[]")
+      if (!existingTypes.includes(newProjectType.trim())) {
+        existingTypes.push(newProjectType.trim())
+        localStorage.setItem("projectTypes", JSON.stringify(existingTypes))
+      }
+      
       setShowNewTypeInput(false)
       setNewProjectType("")
       addNotification({
@@ -164,6 +189,11 @@ function ProjectDialog({ open, onClose }: { open: boolean; onClose: () => void }
   }
 
   const handleAddNewEngineer = () => {
+    if (!newEngineerName.trim()) {
+      setNewEngineerInputError("يرجى إدخال اسم المهندس الجديد");
+      return;
+    }
+    setNewEngineerInputError("");
     // Check if user has permission to add engineers (only engineers and managers can add engineers)
     if (!hasPermission(state.currentUser?.role || "", "create", "users") && state.currentUser?.role !== "engineer") {
       addNotification({
@@ -237,12 +267,32 @@ function ProjectDialog({ open, onClose }: { open: boolean; onClose: () => void }
   }
 
   const handleSubmit = () => {
-    // التحقق من الحقول المطلوبة
-    if (!formData.name.trim() || !formData.clientId || !formData.type.trim() || 
-        !formData.assignedEngineerId || !formData.price || Number.parseFloat(formData.price) <= 0) {
-      setShowValidationErrors(true)
-      return
+    if (showNewClientInput || showNewTypeInput || showNewEngineerInput) {
+      return;
     }
+    if (!hasPermission(state.currentUser?.role || "", "create", "projects")) {
+      addNotification({
+        userId: state.currentUser?.id || "",
+        title: "خطأ في إنشاء المشروع",
+        message: "ليس لديك صلاحية لإنشاء المشاريع",
+        type: "system",
+        isRead: false,
+        triggeredBy: state.currentUser?.id || "",
+      })
+      return;
+    }
+    const missing: string[] = [];
+    if (!formData.name.trim()) missing.push("اسم المشروع");
+    if (!formData.clientId) missing.push("العميل");
+    if (!formData.type) missing.push("نوع المشروع");
+    if (!formData.assignedEngineerId) missing.push("المهندس المسؤول");
+    if (!formData.price) missing.push("السعر الإجمالي");
+    if (missing.length > 0) {
+      setShowValidationErrors(true);
+      setMissingFields(missing);
+      return;
+    }
+    setMissingFields([]);
 
     const client = state.clients.find((c) => c.id === formData.clientId)
     const engineer = state.users.find((u) => u.id === formData.assignedEngineerId)
@@ -280,6 +330,11 @@ function ProjectDialog({ open, onClose }: { open: boolean; onClose: () => void }
     }
 
     createProjectWithDownPayment(newProject)
+    
+    // إرسال تحديث فوري لجميع المستخدمين
+    realtimeUpdates.sendProjectUpdate({ action: 'create', project: newProject, userId: state.currentUser?.id, userName: state.currentUser?.name })
+    
+    resetForm()
     onClose()
   }
 
@@ -297,12 +352,16 @@ function ProjectDialog({ open, onClose }: { open: boolean; onClose: () => void }
       startDate: new Date().toISOString().split("T")[0],
     })
     setShowValidationErrors(false)
+    setMissingFields([])
     setShowNewClientInput(false)
     setNewClientName("")
     setShowNewTypeInput(false)
     setNewProjectType("")
     setShowNewEngineerInput(false)
     setNewEngineerName("")
+    setNewClientInputError("")
+    setNewTypeInputError("")
+    setNewEngineerInputError("")
   }
 
   return (
@@ -373,6 +432,7 @@ function ProjectDialog({ open, onClose }: { open: boolean; onClose: () => void }
                         handleAddNewClient()
                       }
                     }}
+                    className={newClientInputError ? "border-red-500" : ""}
                   />
                   <Button
                     variant="outline"
@@ -397,6 +457,9 @@ function ProjectDialog({ open, onClose }: { open: boolean; onClose: () => void }
                     <X className="w-4 h-4" />
                   </Button>
                 </div>
+                {newClientInputError && (
+                  <p className="text-xs text-red-500 mt-1">{newClientInputError}</p>
+                )}
               </div>
             )}
           </div>
@@ -415,10 +478,37 @@ function ProjectDialog({ open, onClose }: { open: boolean; onClose: () => void }
                     <SelectValue placeholder="اختر النوع" />
                   </SelectTrigger>
                   <SelectContent>
+                    {/* Default types */}
                     <SelectItem value="سكني">سكني</SelectItem>
                     <SelectItem value="تجاري">تجاري</SelectItem>
                     <SelectItem value="صناعي">صناعي</SelectItem>
                     <SelectItem value="حكومي">حكومي</SelectItem>
+                    
+                    {/* Custom types from localStorage */}
+                    {(() => {
+                      const customTypes = JSON.parse(localStorage.getItem("projectTypes") || "[]")
+                      return customTypes.map((type: string) => (
+                        <div key={type} className="flex items-center justify-between px-2 py-1.5">
+                          <SelectItem value={type} className="flex-1">{type}</SelectItem>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0 text-red-600 hover:text-red-700"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              // Remove from localStorage
+                              const existingTypes = JSON.parse(localStorage.getItem("projectTypes") || "[]")
+                              const updatedTypes = existingTypes.filter((t: string) => t !== type)
+                              localStorage.setItem("projectTypes", JSON.stringify(updatedTypes))
+                            }}
+                            title="حذف نوع المشروع"
+                          >
+                            <X className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      ))
+                    })()}
                   </SelectContent>
                 </Select>
                 <Button
@@ -443,6 +533,7 @@ function ProjectDialog({ open, onClose }: { open: boolean; onClose: () => void }
                         handleAddNewProjectType()
                       }
                     }}
+                    className={newTypeInputError ? "border-red-500" : ""}
                   />
                   <Button
                     variant="outline"
@@ -467,6 +558,9 @@ function ProjectDialog({ open, onClose }: { open: boolean; onClose: () => void }
                     <X className="w-4 h-4" />
                   </Button>
                 </div>
+                {newTypeInputError && (
+                  <p className="text-xs text-red-500 mt-1">{newTypeInputError}</p>
+                )}
               </div>
             )}
           </div>
@@ -523,6 +617,7 @@ function ProjectDialog({ open, onClose }: { open: boolean; onClose: () => void }
                         handleAddNewEngineer()
                       }
                     }}
+                    className={newEngineerInputError ? "border-red-500" : ""}
                   />
                   <Button
                     variant="outline"
@@ -547,69 +642,90 @@ function ProjectDialog({ open, onClose }: { open: boolean; onClose: () => void }
                     <X className="w-4 h-4" />
                   </Button>
                 </div>
+                {newEngineerInputError && (
+                  <p className="text-xs text-red-500 mt-1">{newEngineerInputError}</p>
+                )}
               </div>
             )}
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="price" className="flex items-center">
-              السعر الإجمالي
-              <span className="text-red-500 mr-1">*</span>
-            </Label>
-            <div className="relative">
-              <Input
-                id="price"
-                type="number"
-                min="0.01"
-                step="0.01"
-                placeholder="0.00"
-                value={formData.price}
-                onChange={(e) => {
-                  const value = e.target.value
-                  if (value === "" || Number.parseFloat(value) >= 0) {
-                    setFormData((prev) => ({ ...prev, price: value }))
-                  }
-                }}
-                className={`pr-12 ${showValidationErrors && (!formData.price || Number.parseFloat(formData.price) <= 0) ? "border-red-500" : ""}`}
-                style={{ WebkitAppearance: 'none', MozAppearance: 'textfield' }}
-              />
-              {showValidationErrors && (!formData.price || Number.parseFloat(formData.price) <= 0) && (
-                <p className="text-xs text-red-500">السعر الإجمالي مطلوب ويجب أن يكون أكبر من صفر</p>
+          {/* استبدل حقلي السعر الإجمالي والدفعة المقدمة ليكونا بمحاذاة علوية (top) بدلاً من bottom في نموذج إضافة مشروع جديد، وذلك بتغيير md:items-end إلى md:items-start في div الذي يحتوي الحقلين. */}
+          <div className="md:col-span-2 flex flex-col md:flex-row md:items-start gap-4">
+            {/* السعر الإجمالي */}
+            <div className="flex-1 flex flex-col justify-stretch">
+              <Label htmlFor="price" className="flex items-center mb-2">
+                السعر الإجمالي
+                <span className="text-red-500 mr-1">*</span>
+              </Label>
+              <div className="relative flex-1 flex flex-col justify-end">
+                <Input
+                  id="price"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={formData.price}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    if (value === "" || Number.parseFloat(value) >= 0) {
+                      setFormData((prev) => ({ ...prev, price: value }))
+                    }
+                  }}
+                  className={`pr-4 pl-16 mt-1 ${showValidationErrors && (!formData.price || Number.parseFloat(formData.price) <= 0) ? "border-red-500" : ""}`}
+                  style={{ WebkitAppearance: 'none', MozAppearance: 'textfield' }}
+                />
+                {showValidationErrors && (!formData.price || Number.parseFloat(formData.price) <= 0) && (
+                  <p className="text-xs text-red-500">السعر الإجمالي مطلوب ويجب أن يكون أكبر من صفر</p>
+                )}
+                <div className="absolute top-0 bottom-0 left-3 flex items-center space-x-1 space-x-reverse pointer-events-none">
+                  <span className="text-sm text-muted-foreground">ر.س</span>
+                  <img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-4 h-4 opacity-80 mr-1 block dark:hidden" loading="lazy" />
+                  <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline w-4 h-4 opacity-80 hidden dark:block" loading="lazy" />
+                </div>
+              </div>
+            </div>
+            {/* الدفعة المقدمة */}
+            <div className="flex-1 flex flex-col justify-stretch">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="down-payment" className="mb-2">الدفعة المقدمة</Label>
+                {Number.parseFloat(formData.price) > 0 && (
+                  <span className="text-xs text-muted-foreground ml-2">
+                    الحد الأقصى: {Number.parseFloat(formData.price).toLocaleString()} ريال
+                  </span>
+                )}
+              </div>
+              <div className="relative flex-1 flex flex-col justify-end">
+                <Input
+                  id="down-payment"
+                  type="number"
+                  min="0"
+                  max={Number.parseFloat(formData.price) || 0}
+                  step="0.01"
+                  placeholder="0.00"
+                  value={formData.downPayment}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    const price = Number.parseFloat(formData.price) || 0
+                    const downPayment = Number.parseFloat(value) || 0
+                    if (value === "" || (downPayment >= 0 && downPayment <= price)) {
+                      setFormData((prev) => ({ ...prev, downPayment: value }))
+                    }
+                  }}
+                  className={`pr-4 pl-16 mt-1 ${Number.parseFloat(formData.downPayment) > Number.parseFloat(formData.price) ? "border-red-500" : ""}`}
+                  style={{ WebkitAppearance: 'none', MozAppearance: 'textfield' }}
+                />
+                <div className="absolute top-0 bottom-0 left-3 flex items-center space-x-1 space-x-reverse pointer-events-none">
+                  <span className="text-sm text-muted-foreground">ر.س</span>
+                  <img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-4 h-4 opacity-80 mr-1 block dark:hidden" loading="lazy" />
+                  <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline w-4 h-4 opacity-80 hidden dark:block" loading="lazy" />
+                </div>
+              </div>
+              {Number.parseFloat(formData.downPayment) > Number.parseFloat(formData.price) && (
+                <p className="text-xs text-red-500">الدفعة المقدمة لا يمكن أن تتجاوز السعر الإجمالي</p>
               )}
-              <div className="absolute left-3 top-1/2 transform -translate-y-1/2 flex items-center space-x-1 space-x-reverse">
-                <span className="text-sm text-muted-foreground">ر.س</span>
-                <img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="w-4 h-4 opacity-80 block dark:hidden" />
-                <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="w-4 h-4 opacity-80 hidden dark:block" />
-              </div>
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="down-payment">الدفعة المقدمة</Label>
-            <div className="relative">
-              <Input
-                id="down-payment"
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="0.00"
-                value={formData.downPayment}
-                onChange={(e) => {
-                  const value = e.target.value
-                  if (value === "" || Number.parseFloat(value) >= 0) {
-                    setFormData((prev) => ({ ...prev, downPayment: value }))
-                  }
-                }}
-                className="pr-12"
-                style={{ WebkitAppearance: 'none', MozAppearance: 'textfield' }}
-              />
-              <div className="absolute left-3 top-1/2 transform -translate-y-1/2 flex items-center space-x-1 space-x-reverse">
-                <span className="text-sm text-muted-foreground">ر.س</span>
-                <img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="w-4 h-4 opacity-80 block dark:hidden" />
-                <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="w-4 h-4 opacity-80 hidden dark:block" />
-              </div>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="remaining-balance">المبلغ المتبقي</Label>
+            <Label htmlFor="remaining-balance" className="mb-2">المبلغ المتبقي</Label>
             <div className="relative">
               <Input
                 id="remaining-balance"
@@ -621,8 +737,8 @@ function ProjectDialog({ open, onClose }: { open: boolean; onClose: () => void }
               />
               <div className="absolute left-3 top-1/2 transform -translate-y-1/2 flex items-center space-x-1 space-x-reverse">
                 <span className="text-sm text-muted-foreground">ر.س</span>
-                <img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="w-4 h-4 opacity-80 block dark:hidden" />
-                <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="w-4 h-4 opacity-80 hidden dark:block" />
+                <img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-4 h-4 opacity-80 mr-1 block dark:hidden" loading="lazy" />
+                <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline w-4 h-4 opacity-80 hidden dark:block" loading="lazy" />
               </div>
             </div>
           </div>
@@ -698,8 +814,24 @@ function ProjectDialog({ open, onClose }: { open: boolean; onClose: () => void }
             />
           </div>
         </div>
+        {showValidationErrors && missingFields.length > 0 && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+            <h4 className="text-sm font-medium text-red-800 mb-2">الحقول المطلوبة:</h4>
+            <ul className="text-sm text-red-700 space-y-1">
+              {missingFields.map((field, index) => (
+                <li key={index} className="flex items-center">
+                  <span className="w-2 h-2 bg-red-500 rounded-full ml-2"></span>
+                  {field}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         <div className="flex justify-end space-x-2 space-x-reverse">
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={() => {
+            resetForm()
+            onClose()
+          }}>
             إلغاء
           </Button>
           <Button onClick={handleSubmit}>

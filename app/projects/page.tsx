@@ -305,8 +305,8 @@ function ProjectsPageContent() {
       })
     }
 
-    // إرسال تحديث فوري
-    realtimeUpdates.sendProjectUpdate('create', { project: newProject, userId: currentUser?.id, userName: currentUser?.name })
+    // إرسال تحديث فوري لجميع المستخدمين
+    realtimeUpdates.sendProjectUpdate({ action: 'create', project: newProject, userId: currentUser?.id, userName: currentUser?.name })
   }
 
   const handleUpdateProject = async () => {
@@ -482,6 +482,9 @@ function ProjectsPageContent() {
     
     // Add to clients list
     dispatch({ type: "ADD_CLIENT", payload: newClient })
+    
+    // بث تحديث فوري لجميع المستخدمين
+    realtimeUpdates.sendClientUpdate({ action: 'create', client: newClient, userId: currentUser?.id, userName: currentUser?.name })
     
     // Update form data
     setFormData(prev => ({ ...prev, clientId: newClient.id }))

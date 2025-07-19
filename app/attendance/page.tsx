@@ -42,6 +42,7 @@ import { ArabicNumber } from "@/components/ui/ArabicNumber"
 import { useApp, useAppActions } from "@/lib/context/AppContext"
 import { SwipeToDelete } from "@/components/ui/swipe-to-delete"
 import { PermissionGuard } from "@/components/ui/permission-guard"
+import { realtimeUpdates } from "@/lib/realtime-updates"
 
 export default function AttendancePage() {
   return (
@@ -238,10 +239,8 @@ function AttendancePageContent() {
       totalHours: 0,
     }
     setAttendanceRecords(prev => [...prev, newRecord])
-    // Save to localStorage
-    const existingRecords = JSON.parse(localStorage.getItem("attendanceRecords") || "[]")
-    existingRecords.push(newRecord)
-    localStorage.setItem("attendanceRecords", JSON.stringify(existingRecords))
+    // بث تحديث فوري لجميع المستخدمين
+    realtimeUpdates.sendAttendanceUpdate({ action: 'create', attendance: newRecord, userId: currentUser?.id, userName: currentUser?.name })
     showAlertDialogMessage("success", `تم تسجيل الحضور (${session === "morning" ? "صباحية" : "مسائية"}) بنجاح${status === "overtime" ? " (خارج أوقات الدوام - ساعات إضافية)" : ""}`)
     
     // Add notification to admin when attendance is recorded
@@ -286,6 +285,8 @@ function AttendancePageContent() {
         
         // تحديث state مباشرة
         dispatch({ type: "ADD_ATTENDANCE", payload: newAttendanceRecord })
+        // بث تحديث فوري لجميع المستخدمين
+        realtimeUpdates.sendAttendanceUpdate({ action: 'create', attendance: newAttendanceRecord, userId: currentUser.id, userName: currentUser.name })
       }
     }
   }
@@ -349,13 +350,8 @@ function AttendancePageContent() {
     }
 
     setAttendanceRecords(prev => prev.map((r, i) => i === recordIndex ? updatedRecord : r))
-    
-    // Update in localStorage
-    const existingRecords = JSON.parse(localStorage.getItem("attendanceRecords") || "[]")
-    const updatedRecords = existingRecords.map((r: any, i: number) => 
-      r.userId === currentUser.id && r.date === today && r.session === session && !r.checkOut ? updatedRecord : r
-    )
-    localStorage.setItem("attendanceRecords", JSON.stringify(updatedRecords))
+    // بث تحديث فوري لجميع المستخدمين
+    realtimeUpdates.sendAttendanceUpdate({ action: 'update', attendance: updatedRecord, userId: currentUser?.id, userName: currentUser?.name })
     
     showAlertDialogMessage("success", `تم تسجيل الانصراف (${session === "morning" ? "صباحية" : "مسائية"}) بنجاح`)
     
@@ -405,20 +401,8 @@ function AttendancePageContent() {
 
       setAttendanceRecords((prev) => [...prev, newRecord])
       
-      // Save to localStorage
-      const existingRecords = JSON.parse(localStorage.getItem("attendanceRecords") || "[]")
-      existingRecords.push(newRecord)
-      localStorage.setItem("attendanceRecords", JSON.stringify(existingRecords))
-      
-      // Update employee tracker
-      setEmployeeTracker(prev => ({
-        ...prev,
-        [employee.id]: {
-          ...prev[employee.id],
-          status: "present",
-          lastSeen: actionTime.toISOString()
-        }
-      }))
+      // بث تحديث فوري لجميع المستخدمين
+      realtimeUpdates.sendAttendanceUpdate({ action: 'create', attendance: newRecord, userId: employee.id, userName: employee.name })
     } else {
       // Find existing record for checkout
       const existingRecord = attendanceRecords.find(r => r.userId === employee.id && r.date === today)
@@ -438,20 +422,8 @@ function AttendancePageContent() {
 
       setAttendanceRecords((prev) => prev.map((record) => (record.id === existingRecord.id ? updatedRecord : record)))
       
-      // Update in localStorage
-      const existingRecords = JSON.parse(localStorage.getItem("attendanceRecords") || "[]")
-      const updatedRecords = existingRecords.map((r: any) => r.id === existingRecord.id ? updatedRecord : r)
-      localStorage.setItem("attendanceRecords", JSON.stringify(updatedRecords))
-      
-      // Update employee tracker
-      setEmployeeTracker(prev => ({
-        ...prev,
-        [employee.id]: {
-          ...prev[employee.id],
-          status: "offline",
-          lastSeen: actionTime.toISOString()
-        }
-      }))
+      // بث تحديث فوري لجميع المستخدمين
+      realtimeUpdates.sendAttendanceUpdate({ action: 'update', attendance: updatedRecord, userId: employee.id, userName: employee.name })
     }
 
     setAlert({ type: "success", message: `تم تسجيل ${manualFormData.action === "checkin" ? "الحضور" : "الانصراف"} بنجاح` })

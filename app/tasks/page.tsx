@@ -230,6 +230,9 @@ function TasksPageContent() {
 
     // Broadcast realtime update
     broadcastTaskUpdate('update', { task: updatedTask, userId: currentUser?.id, userName: currentUser?.name })
+    
+    // إرسال تحديث فوري لجميع المستخدمين
+    realtimeUpdates.sendTaskUpdate({ action: 'update', task: updatedTask, userId: currentUser?.id, userName: currentUser?.name })
 
     // Add notification to admin when task is completed
     if (destinationStatus === "completed" && currentUser?.role !== "admin") {
@@ -309,6 +312,9 @@ function TasksPageContent() {
     // Broadcast realtime update
     broadcastTaskUpdate('create', { task: newTask, userId: currentUser?.id, userName: currentUser?.name })
     
+    // إرسال تحديث فوري لجميع المستخدمين
+    realtimeUpdates.sendTaskUpdate({ action: 'create', task: newTask, userId: currentUser?.id, userName: currentUser?.name })
+    
     showSuccessToast("تم إنشاء المهمة بنجاح", `تم إنشاء المهمة "${newTask.title}" بنجاح`)
     setIsDialogOpen(false)
     resetForm()
@@ -374,6 +380,9 @@ function TasksPageContent() {
     
     // Broadcast realtime update
     broadcastTaskUpdate('update', { task: updatedTask, userId: currentUser?.id, userName: currentUser?.name })
+    
+    // إرسال تحديث فوري لجميع المستخدمين
+    realtimeUpdates.sendTaskUpdate({ action: 'update', task: updatedTask, userId: currentUser?.id, userName: currentUser?.name })
     
     showSuccessToast("تم تحديث المهمة بنجاح", `تم تحديث المهمة "${updatedTask.title}" بنجاح`)
     setIsEditDialogOpen(false)

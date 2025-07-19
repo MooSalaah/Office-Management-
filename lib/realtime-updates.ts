@@ -150,6 +150,11 @@ export class RealtimeUpdates {
 		this.broadcastUpdate("client", client);
 	}
 
+	// إرسال تحديث حضور
+	sendAttendanceUpdate(attendance: any) {
+		this.broadcastUpdate("attendance", attendance);
+	}
+
 	// تنظيف التحديثات القديمة
 	cleanup() {
 		if (typeof window === "undefined") return;
