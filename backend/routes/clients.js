@@ -3,6 +3,7 @@ const router = express.Router();
 const Client = require('../models/Client');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
+const fetch = require('node-fetch');
 
 // JWT middleware
 function authenticateToken(req, res, next) {
@@ -43,6 +44,23 @@ router.post('/', async (req, res) => {
   const client = new Client({ name, email, phone, address, company });
   try {
     const newClient = await client.save();
+    // Broadcast update to all clients
+    try {
+      const broadcastResponse = await fetch(`${req.protocol}://${req.get('host')}/api/realtime/broadcast`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'client',
+          action: 'create',
+          data: newClient,
+          userId: req.user ? req.user.id : 'system',
+          timestamp: Date.now()
+        })
+      });
+      console.log('Broadcast response:', await broadcastResponse.json());
+    } catch (broadcastError) {
+      console.error('Broadcast error:', broadcastError);
+    }
     res.status(201).json({ success: true, data: newClient });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
@@ -58,6 +76,23 @@ router.put('/:id', async (req, res) => {
       { new: true }
     );
     if (!updatedClient) return res.status(404).json({ success: false, error: 'Client not found' });
+    // Broadcast update to all clients
+    try {
+      const broadcastResponse = await fetch(`${req.protocol}://${req.get('host')}/api/realtime/broadcast`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'client',
+          action: 'update',
+          data: updatedClient,
+          userId: req.user ? req.user.id : 'system',
+          timestamp: Date.now()
+        })
+      });
+      console.log('Broadcast response:', await broadcastResponse.json());
+    } catch (broadcastError) {
+      console.error('Broadcast error:', broadcastError);
+    }
     res.json({ success: true, data: updatedClient });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
@@ -69,6 +104,23 @@ router.delete('/:id', async (req, res) => {
   try {
     const deletedClient = await Client.findByIdAndDelete(req.params.id);
     if (!deletedClient) return res.status(404).json({ success: false, error: 'Client not found' });
+    // Broadcast update to all clients
+    try {
+      const broadcastResponse = await fetch(`${req.protocol}://${req.get('host')}/api/realtime/broadcast`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'client',
+          action: 'delete',
+          data: deletedClient,
+          userId: req.user ? req.user.id : 'system',
+          timestamp: Date.now()
+        })
+      });
+      console.log('Broadcast response:', await broadcastResponse.json());
+    } catch (broadcastError) {
+      console.error('Broadcast error:', broadcastError);
+    }
     res.json({ success: true, message: 'Client deleted' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
