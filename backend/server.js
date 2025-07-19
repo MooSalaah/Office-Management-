@@ -6,22 +6,13 @@ require('dotenv').config();
 const app = express();
 const port = process.env.PORT || 5000;
 
-// Enhanced CORS configuration
-const corsOptions = {
-  origin: [
-    'https://your-app-name.netlify.app',
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'https://engineering-office-system.netlify.app'
-  ],
-  credentials: true,
-  optionsSuccessStatus: 200,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control', 'Pragma']
-};
+// Simplified CORS configuration
+app.use(cors({
+  origin: true, // Allow all origins for now
+  credentials: true
+}));
 
 // Middlewares
-app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -40,7 +31,9 @@ const connectDB = async () => {
   try {
     const mongoURI = process.env.MONGODB_URI;
     if (!mongoURI) {
-      throw new Error('MONGODB_URI is not defined in environment variables');
+      console.log('⚠️ MONGODB_URI not found, using fallback');
+      // Don't exit, just log warning
+      return;
     }
 
     await mongoose.connect(mongoURI, {
@@ -75,7 +68,7 @@ const connectDB = async () => {
 
   } catch (error) {
     console.error('❌ MongoDB connection failed:', error);
-    process.exit(1);
+    // Don't exit, just log error
   }
 };
 
@@ -118,18 +111,26 @@ app.use('*', (req, res) => {
 // Graceful shutdown
 process.on('SIGTERM', () => {
   console.log('SIGTERM received, shutting down gracefully');
-  mongoose.connection.close(() => {
-    console.log('MongoDB connection closed');
+  if (mongoose.connection.readyState === 1) {
+    mongoose.connection.close(() => {
+      console.log('MongoDB connection closed');
+      process.exit(0);
+    });
+  } else {
     process.exit(0);
-  });
+  }
 });
 
 process.on('SIGINT', () => {
   console.log('SIGINT received, shutting down gracefully');
-  mongoose.connection.close(() => {
-    console.log('MongoDB connection closed');
+  if (mongoose.connection.readyState === 1) {
+    mongoose.connection.close(() => {
+      console.log('MongoDB connection closed');
+      process.exit(0);
+    });
+  } else {
     process.exit(0);
-  });
+  }
 });
 
 app.listen(port, () => {
