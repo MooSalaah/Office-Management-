@@ -12,6 +12,8 @@ export interface ApiResponse<T = any> {
 
 class ApiClient {
 	private baseUrl: string;
+	private retryAttempts = 3;
+	private retryDelay = 1000;
 
 	constructor(baseUrl: string) {
 		this.baseUrl = baseUrl;
@@ -19,13 +21,16 @@ class ApiClient {
 
 	private async request<T>(
 		endpoint: string,
-		options: RequestInit = {}
+		options: RequestInit = {},
+		retryCount = 0
 	): Promise<ApiResponse<T>> {
 		try {
 			const url = `${this.baseUrl}${endpoint}`;
 			const response = await fetch(url, {
 				headers: {
 					"Content-Type": "application/json",
+					"Cache-Control": "no-cache",
+					Pragma: "no-cache",
 					...options.headers,
 				},
 				...options,
@@ -39,11 +44,33 @@ class ApiClient {
 			return data;
 		} catch (error) {
 			console.error(`API request failed for ${endpoint}:`, error);
+
+			// Retry logic for network errors
+			if (retryCount < this.retryAttempts && this.isRetryableError(error)) {
+				console.log(
+					`Retrying request (${retryCount + 1}/${this.retryAttempts})...`
+				);
+				await this.delay(this.retryDelay * (retryCount + 1));
+				return this.request(endpoint, options, retryCount + 1);
+			}
+
 			return {
 				success: false,
 				error: error instanceof Error ? error.message : "Unknown error",
 			};
 		}
+	}
+
+	private isRetryableError(error: any): boolean {
+		// Retry on network errors, not on 4xx client errors
+		return (
+			error instanceof TypeError ||
+			(error.message && error.message.includes("fetch"))
+		);
+	}
+
+	private delay(ms: number): Promise<void> {
+		return new Promise((resolve) => setTimeout(resolve, ms));
 	}
 
 	// Projects API
@@ -160,6 +187,11 @@ class ApiClient {
 			body: JSON.stringify(userData),
 		});
 	}
+
+	// Health check
+	async healthCheck() {
+		return this.request("/");
+	}
 }
 
 // Create and export API client instance
@@ -196,4 +228,5 @@ export const api = {
 			apiClient.login(credentials),
 		register: (userData: any) => apiClient.register(userData),
 	},
+	health: () => apiClient.healthCheck(),
 };

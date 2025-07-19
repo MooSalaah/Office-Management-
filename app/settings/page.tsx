@@ -38,6 +38,7 @@ import {
   Moon,
   Palette,
   Settings,
+  Wifi,
 } from "lucide-react"
 import { getCurrentUser, hasPermission, rolePermissions, getAllRoles, getRolePermissions } from "@/lib/auth"
 import { mockUsers } from "@/lib/data"
@@ -48,6 +49,7 @@ import { PermissionGuard } from "@/components/ui/permission-guard"
 import { realtimeUpdates } from "@/lib/realtime-updates"
 import { DeleteDialog } from "@/components/ui/delete-dialog"
 import { transliterateArabicToEnglish } from "@/lib/utils"
+import { ConnectionTest } from "@/components/ui/connection-test"
 
 export default function SettingsPage() {
   return (
@@ -1853,6 +1855,24 @@ function SettingsPageContent() {
         type="client"
         error={deleteError}
       />
+
+      {/* Connection Test Section - Only for admin */}
+      {isAdmin && (
+        <Card className="bg-card text-card-foreground border border-border">
+          <CardHeader>
+            <CardTitle className="flex items-center text-foreground">
+              <Wifi className="w-5 h-5 mr-2" />
+              اختبار الاتصال
+            </CardTitle>
+            <CardDescription className="text-muted-foreground">
+              اختبار الاتصال مع الخادم وقاعدة البيانات والتحديثات المباشرة
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ConnectionTest />
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

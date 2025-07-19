@@ -19,20 +19,32 @@ class RealtimeManager {
 		new Map();
 	private eventSource: EventSource | null = null;
 	private reconnectAttempts = 0;
-	private maxReconnectAttempts = 5;
+	private maxReconnectAttempts = 10;
 	private reconnectDelay = 1000;
+	private maxReconnectDelay = 30000;
+	private isConnected = false;
+	private connectionCheckInterval: NodeJS.Timeout | null = null;
 
 	constructor() {
 		// Only initialize on client side
 		if (typeof window !== "undefined") {
 			this.initializeEventSource();
+			this.startConnectionCheck();
 		}
 	}
 
 	private initializeEventSource() {
 		try {
+			// Close existing connection if any
+			if (this.eventSource) {
+				this.eventSource.close();
+			}
+
 			// Use Server-Sent Events for real-time updates
-			this.eventSource = new EventSource("/api/realtime");
+			const apiUrl =
+				process.env.NEXT_PUBLIC_API_URL ||
+				"https://engineering-office-backend.onrender.com";
+			this.eventSource = new EventSource(`${apiUrl}/api/realtime`);
 
 			this.eventSource.onmessage = (event) => {
 				try {
@@ -45,15 +57,18 @@ class RealtimeManager {
 
 			this.eventSource.onerror = (error) => {
 				console.error("EventSource error:", error);
+				this.isConnected = false;
 				this.handleReconnect();
 			};
 
 			this.eventSource.onopen = () => {
-				console.log("Realtime connection established");
+				console.log("✅ Realtime connection established");
+				this.isConnected = true;
 				this.reconnectAttempts = 0;
 			};
 		} catch (error) {
 			console.error("Failed to initialize EventSource:", error);
+			this.isConnected = false;
 			this.handleReconnect();
 		}
 	}
@@ -61,16 +76,58 @@ class RealtimeManager {
 	private handleReconnect() {
 		if (this.reconnectAttempts < this.maxReconnectAttempts) {
 			this.reconnectAttempts++;
+			const delay = Math.min(
+				this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1),
+				this.maxReconnectDelay
+			);
+
 			console.log(
-				`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`
+				`🔄 Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts}) in ${delay}ms...`
 			);
 
 			setTimeout(() => {
 				this.initializeEventSource();
-			}, this.reconnectDelay * this.reconnectAttempts);
+			}, delay);
 		} else {
-			console.error("Max reconnection attempts reached");
+			console.error("❌ Max reconnection attempts reached");
+			this.fallbackToPolling();
 		}
+	}
+
+	private fallbackToPolling() {
+		console.log("🔄 Falling back to polling mode");
+		// Implement polling as fallback
+		this.startPolling();
+	}
+
+	private startPolling() {
+		// Poll every 30 seconds as fallback
+		setInterval(async () => {
+			try {
+				const response = await fetch("/api/realtime/poll");
+				if (response.ok) {
+					const updates = await response.json();
+					updates.forEach((update: RealtimeUpdate) => {
+						this.notifyListeners(update);
+					});
+				}
+			} catch (error) {
+				console.error("Polling error:", error);
+			}
+		}, 30000);
+	}
+
+	private startConnectionCheck() {
+		// Check connection health every 30 seconds
+		this.connectionCheckInterval = setInterval(() => {
+			if (
+				!this.isConnected &&
+				this.reconnectAttempts < this.maxReconnectAttempts
+			) {
+				console.log("🔍 Connection check: attempting to reconnect...");
+				this.initializeEventSource();
+			}
+		}, 30000);
 	}
 
 	private notifyListeners(update: RealtimeUpdate) {
@@ -114,11 +171,24 @@ class RealtimeManager {
 		}
 	}
 
+	public getConnectionStatus() {
+		return {
+			isConnected: this.isConnected,
+			reconnectAttempts: this.reconnectAttempts,
+			maxReconnectAttempts: this.maxReconnectAttempts,
+		};
+	}
+
 	public disconnect() {
 		if (this.eventSource) {
 			this.eventSource.close();
 			this.eventSource = null;
 		}
+		if (this.connectionCheckInterval) {
+			clearInterval(this.connectionCheckInterval);
+			this.connectionCheckInterval = null;
+		}
+		this.isConnected = false;
 	}
 }
 
@@ -137,15 +207,26 @@ export const broadcastUpdate = async (
 
 	try {
 		// Send update to server
-		await fetch("/api/realtime/broadcast", {
+		const apiUrl =
+			process.env.NEXT_PUBLIC_API_URL ||
+			"https://engineering-office-backend.onrender.com";
+		const response = await fetch(`${apiUrl}/api/realtime/broadcast`, {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
+				"Cache-Control": "no-cache",
 			},
 			body: JSON.stringify(fullUpdate),
 		});
+
+		if (!response.ok) {
+			throw new Error(`HTTP error! status: ${response.status}`);
+		}
+
+		return await response.json();
 	} catch (error) {
 		console.error("Failed to broadcast update:", error);
+		throw error;
 	}
 };
 
@@ -162,4 +243,31 @@ export const useRealtime = (
 		const unsubscribe = realtimeManager.subscribe(type, callback);
 		return unsubscribe;
 	}, [type, callback]);
+};
+
+// Hook for connection status
+export const useRealtimeConnection = () => {
+	const { useState, useEffect } = require("react");
+	const [status, setStatus] = useState({
+		isConnected: false,
+		reconnectAttempts: 0,
+	});
+
+	useEffect(() => {
+		if (!realtimeManager) return;
+
+		const updateStatus = () => {
+			setStatus(realtimeManager.getConnectionStatus());
+		};
+
+		// Update status immediately
+		updateStatus();
+
+		// Update status every 5 seconds
+		const interval = setInterval(updateStatus, 5000);
+
+		return () => clearInterval(interval);
+	}, []);
+
+	return status;
 };

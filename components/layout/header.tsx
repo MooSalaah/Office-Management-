@@ -35,6 +35,7 @@ import { cn } from "@/lib/utils"
 import { useApp, useAppActions } from "@/lib/context/AppContext"
 import { updateUserPermissionsByRole } from "@/lib/auth"
 import { hasPermission } from "@/lib/auth"
+import { ConnectionStatus } from "@/components/ui/connection-status"
 
 const navigation = [
   { name: "لوحة التحكم", href: "/dashboard", icon: LayoutDashboard, permission: "dashboard" },
@@ -143,6 +144,9 @@ export function Header() {
 
           {/* Right side - Notifications and User Menu */}
           <div className="flex items-center space-x-4 space-x-reverse">
+            {/* Connection Status */}
+            <ConnectionStatus />
+            
             {/* Notifications */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
