@@ -38,6 +38,23 @@ app.get('/api/projects-test', (req, res) => {
   res.json({ success: true, data: [], message: 'Projects test route is working' });
 });
 
+// Simple test routes directly in server.js
+app.get('/api/projects-simple', (req, res) => {
+  res.json({ success: true, data: [], message: 'Projects simple route is working' });
+});
+
+app.get('/api/tasks-simple', (req, res) => {
+  res.json({ success: true, data: [], message: 'Tasks simple route is working' });
+});
+
+app.get('/api/clients-simple', (req, res) => {
+  res.json({ success: true, data: [], message: 'Clients simple route is working' });
+});
+
+app.get('/api/users-simple', (req, res) => {
+  res.json({ success: true, data: [], message: 'Users simple route is working' });
+});
+
 // Add routes with error handling
 app.use('/api/tasks', require('./routes/tasks'));
 app.use('/api/clients', require('./routes/clients'));
