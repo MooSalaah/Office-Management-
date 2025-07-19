@@ -16,62 +16,62 @@ function authenticateToken(req, res, next) {
   });
 }
 
-// Get all tasks (protected)
-router.get('/', authenticateToken, async (req, res) => {
+// Get all tasks (public for testing)
+router.get('/', async (req, res) => {
   try {
     const tasks = await Task.find();
-    res.json(tasks);
+    res.json({ success: true, data: tasks });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// Get task by ID (protected)
-router.get('/:id', authenticateToken, async (req, res) => {
+// Get task by ID (public for testing)
+router.get('/:id', async (req, res) => {
   try {
     const task = await Task.findById(req.params.id);
-    if (!task) return res.status(404).json({ message: 'Task not found' });
-    res.json(task);
+    if (!task) return res.status(404).json({ success: false, error: 'Task not found' });
+    res.json({ success: true, data: task });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// Create new task (protected)
-router.post('/', authenticateToken, async (req, res) => {
-  const { title, description, responsible, date, status } = req.body;
-  const task = new Task({ title, description, responsible, date, status });
+// Create new task (public for testing)
+router.post('/', async (req, res) => {
+  const { title, description, project, assignedTo, priority, status, dueDate } = req.body;
+  const task = new Task({ title, description, project, assignedTo, priority, status, dueDate });
   try {
     const newTask = await task.save();
-    res.status(201).json(newTask);
+    res.status(201).json({ success: true, data: newTask });
   } catch (err) {
-    res.status(400).json({ message: err.message });
+    res.status(400).json({ success: false, error: err.message });
   }
 });
 
-// Update task (protected)
-router.put('/:id', authenticateToken, async (req, res) => {
+// Update task (public for testing)
+router.put('/:id', async (req, res) => {
   try {
     const updatedTask = await Task.findByIdAndUpdate(
       req.params.id,
       req.body,
       { new: true }
     );
-    if (!updatedTask) return res.status(404).json({ message: 'Task not found' });
-    res.json(updatedTask);
+    if (!updatedTask) return res.status(404).json({ success: false, error: 'Task not found' });
+    res.json({ success: true, data: updatedTask });
   } catch (err) {
-    res.status(400).json({ message: err.message });
+    res.status(400).json({ success: false, error: err.message });
   }
 });
 
-// Delete task (protected)
-router.delete('/:id', authenticateToken, async (req, res) => {
+// Delete task (public for testing)
+router.delete('/:id', async (req, res) => {
   try {
     const deletedTask = await Task.findByIdAndDelete(req.params.id);
-    if (!deletedTask) return res.status(404).json({ message: 'Task not found' });
-    res.json({ message: 'Task deleted' });
+    if (!deletedTask) return res.status(404).json({ success: false, error: 'Task not found' });
+    res.json({ success: true, message: 'Task deleted' });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 

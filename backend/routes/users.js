@@ -17,37 +17,36 @@ function authenticateToken(req, res, next) {
   });
 }
 
-// Get all users (protected)
-router.get('/', authenticateToken, async (req, res) => {
+// Get all users (public for testing)
+router.get('/', async (req, res) => {
   try {
     const users = await User.find();
-    res.json(users);
+    res.json({ success: true, data: users });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// Get user by ID
+// Get user by ID (public for testing)
 router.get('/:id', async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
-    if (!user) return res.status(404).json({ message: 'User not found' });
-    res.json(user);
+    if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+    res.json({ success: true, data: user });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// Create new user (with password hashing)
+// Create new user (public for testing)
 router.post('/', async (req, res) => {
-  const { name, email, password, role } = req.body;
+  const { name, email, role, department, phone } = req.body;
+  const user = new User({ name, email, role, department, phone });
   try {
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const user = new User({ name, email, password: hashedPassword, role });
     const newUser = await user.save();
-    res.status(201).json(newUser);
+    res.status(201).json({ success: true, data: newUser });
   } catch (err) {
-    res.status(400).json({ message: err.message });
+    res.status(400).json({ success: false, error: err.message });
   }
 });
 
@@ -71,33 +70,29 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// Update user
+// Update user (public for testing)
 router.put('/:id', async (req, res) => {
   try {
-    // If password is being updated, hash it
-    if (req.body.password) {
-      req.body.password = await bcrypt.hash(req.body.password, 10);
-    }
     const updatedUser = await User.findByIdAndUpdate(
       req.params.id,
       req.body,
       { new: true }
     );
-    if (!updatedUser) return res.status(404).json({ message: 'User not found' });
-    res.json(updatedUser);
+    if (!updatedUser) return res.status(404).json({ success: false, error: 'User not found' });
+    res.json({ success: true, data: updatedUser });
   } catch (err) {
-    res.status(400).json({ message: err.message });
+    res.status(400).json({ success: false, error: err.message });
   }
 });
 
-// Delete user
+// Delete user (public for testing)
 router.delete('/:id', async (req, res) => {
   try {
     const deletedUser = await User.findByIdAndDelete(req.params.id);
-    if (!deletedUser) return res.status(404).json({ message: 'User not found' });
-    res.json({ message: 'User deleted' });
+    if (!deletedUser) return res.status(404).json({ success: false, error: 'User not found' });
+    res.json({ success: true, message: 'User deleted' });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 

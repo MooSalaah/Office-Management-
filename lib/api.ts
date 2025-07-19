@@ -1,127 +1,199 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+// API helper for connecting to backend server
+const API_BASE_URL =
+	process.env.NEXT_PUBLIC_API_URL ||
+	"https://engineering-office-backend.onrender.com";
 
-export const api = {
-	// Projects
+export interface ApiResponse<T = any> {
+	success: boolean;
+	data?: T;
+	error?: string;
+	message?: string;
+}
+
+class ApiClient {
+	private baseUrl: string;
+
+	constructor(baseUrl: string) {
+		this.baseUrl = baseUrl;
+	}
+
+	private async request<T>(
+		endpoint: string,
+		options: RequestInit = {}
+	): Promise<ApiResponse<T>> {
+		try {
+			const url = `${this.baseUrl}${endpoint}`;
+			const response = await fetch(url, {
+				headers: {
+					"Content-Type": "application/json",
+					...options.headers,
+				},
+				...options,
+			});
+
+			if (!response.ok) {
+				throw new Error(`HTTP error! status: ${response.status}`);
+			}
+
+			const data = await response.json();
+			return data;
+		} catch (error) {
+			console.error(`API request failed for ${endpoint}:`, error);
+			return {
+				success: false,
+				error: error instanceof Error ? error.message : "Unknown error",
+			};
+		}
+	}
+
+	// Projects API
 	async getProjects() {
-		const response = await fetch(`${API_BASE_URL}/api/projects`);
-		return response.json();
-	},
+		return this.request("/api/projects");
+	}
 
-	async createProject(project: any) {
-		const response = await fetch(`${API_BASE_URL}/api/projects`, {
+	async createProject(projectData: any) {
+		return this.request("/api/projects", {
 			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify(project),
+			body: JSON.stringify(projectData),
 		});
-		return response.json();
-	},
+	}
 
-	async updateProject(id: string, project: any) {
-		const response = await fetch(`${API_BASE_URL}/api/projects/${id}`, {
+	async updateProject(id: string, projectData: any) {
+		return this.request(`/api/projects/${id}`, {
 			method: "PUT",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify(project),
+			body: JSON.stringify(projectData),
 		});
-		return response.json();
-	},
+	}
 
 	async deleteProject(id: string) {
-		const response = await fetch(`${API_BASE_URL}/api/projects/${id}`, {
+		return this.request(`/api/projects/${id}`, {
 			method: "DELETE",
 		});
-		return response.json();
-	},
+	}
 
-	// Tasks
+	// Tasks API
 	async getTasks() {
-		const response = await fetch(`${API_BASE_URL}/api/tasks`);
-		return response.json();
-	},
+		return this.request("/api/tasks");
+	}
 
-	async createTask(task: any) {
-		const response = await fetch(`${API_BASE_URL}/api/tasks`, {
+	async createTask(taskData: any) {
+		return this.request("/api/tasks", {
 			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify(task),
+			body: JSON.stringify(taskData),
 		});
-		return response.json();
-	},
+	}
 
-	async updateTask(id: string, task: any) {
-		const response = await fetch(`${API_BASE_URL}/api/tasks/${id}`, {
+	async updateTask(id: string, taskData: any) {
+		return this.request(`/api/tasks/${id}`, {
 			method: "PUT",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify(task),
+			body: JSON.stringify(taskData),
 		});
-		return response.json();
-	},
+	}
 
 	async deleteTask(id: string) {
-		const response = await fetch(`${API_BASE_URL}/api/tasks/${id}`, {
+		return this.request(`/api/tasks/${id}`, {
 			method: "DELETE",
 		});
-		return response.json();
-	},
+	}
 
-	// Clients
+	// Clients API
 	async getClients() {
-		const response = await fetch(`${API_BASE_URL}/api/clients`);
-		return response.json();
-	},
+		return this.request("/api/clients");
+	}
 
-	async createClient(client: any) {
-		const response = await fetch(`${API_BASE_URL}/api/clients`, {
+	async createClient(clientData: any) {
+		return this.request("/api/clients", {
 			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify(client),
+			body: JSON.stringify(clientData),
 		});
-		return response.json();
-	},
+	}
 
-	async updateClient(id: string, client: any) {
-		const response = await fetch(`${API_BASE_URL}/api/clients/${id}`, {
+	async updateClient(id: string, clientData: any) {
+		return this.request(`/api/clients/${id}`, {
 			method: "PUT",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify(client),
+			body: JSON.stringify(clientData),
 		});
-		return response.json();
-	},
+	}
 
 	async deleteClient(id: string) {
-		const response = await fetch(`${API_BASE_URL}/api/clients/${id}`, {
+		return this.request(`/api/clients/${id}`, {
 			method: "DELETE",
 		});
-		return response.json();
-	},
+	}
 
-	// Users
+	// Users API
 	async getUsers() {
-		const response = await fetch(`${API_BASE_URL}/api/users`);
-		return response.json();
-	},
+		return this.request("/api/users");
+	}
 
-	async createUser(user: any) {
-		const response = await fetch(`${API_BASE_URL}/api/users`, {
+	async createUser(userData: any) {
+		return this.request("/api/users", {
 			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify(user),
+			body: JSON.stringify(userData),
 		});
-		return response.json();
-	},
+	}
 
-	async updateUser(id: string, user: any) {
-		const response = await fetch(`${API_BASE_URL}/api/users/${id}`, {
+	async updateUser(id: string, userData: any) {
+		return this.request(`/api/users/${id}`, {
 			method: "PUT",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify(user),
+			body: JSON.stringify(userData),
 		});
-		return response.json();
-	},
+	}
 
 	async deleteUser(id: string) {
-		const response = await fetch(`${API_BASE_URL}/api/users/${id}`, {
+		return this.request(`/api/users/${id}`, {
 			method: "DELETE",
 		});
-		return response.json();
+	}
+
+	// Auth API
+	async login(credentials: { email: string; password: string }) {
+		return this.request("/api/auth/login", {
+			method: "POST",
+			body: JSON.stringify(credentials),
+		});
+	}
+
+	async register(userData: any) {
+		return this.request("/api/auth/register", {
+			method: "POST",
+			body: JSON.stringify(userData),
+		});
+	}
+}
+
+// Create and export API client instance
+export const apiClient = new ApiClient(API_BASE_URL);
+
+// Export individual API functions for convenience
+export const api = {
+	projects: {
+		getAll: () => apiClient.getProjects(),
+		create: (data: any) => apiClient.createProject(data),
+		update: (id: string, data: any) => apiClient.updateProject(id, data),
+		delete: (id: string) => apiClient.deleteProject(id),
+	},
+	tasks: {
+		getAll: () => apiClient.getTasks(),
+		create: (data: any) => apiClient.createTask(data),
+		update: (id: string, data: any) => apiClient.updateTask(id, data),
+		delete: (id: string) => apiClient.deleteTask(id),
+	},
+	clients: {
+		getAll: () => apiClient.getClients(),
+		create: (data: any) => apiClient.createClient(data),
+		update: (id: string, data: any) => apiClient.updateClient(id, data),
+		delete: (id: string) => apiClient.deleteClient(id),
+	},
+	users: {
+		getAll: () => apiClient.getUsers(),
+		create: (data: any) => apiClient.createUser(data),
+		update: (id: string, data: any) => apiClient.updateUser(id, data),
+		delete: (id: string) => apiClient.deleteUser(id),
+	},
+	auth: {
+		login: (credentials: { email: string; password: string }) =>
+			apiClient.login(credentials),
+		register: (userData: any) => apiClient.register(userData),
 	},
 };
