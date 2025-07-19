@@ -1,20 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const Client = require('../models/Client');
-const jwt = require('jsonwebtoken');
-require('dotenv').config();
-
-// JWT middleware
-function authenticateToken(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-  if (!token) return res.status(401).json({ message: 'No token provided' });
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) return res.status(403).json({ message: 'Invalid token' });
-    req.user = user;
-    next();
-  });
-}
 
 // Get all clients (public for testing)
 router.get('/', async (req, res) => {
@@ -22,6 +8,7 @@ router.get('/', async (req, res) => {
     const clients = await Client.find();
     res.json({ success: true, data: clients });
   } catch (err) {
+    console.error('Error fetching clients:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -33,18 +20,20 @@ router.get('/:id', async (req, res) => {
     if (!client) return res.status(404).json({ success: false, error: 'Client not found' });
     res.json({ success: true, data: client });
   } catch (err) {
+    console.error('Error fetching client:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
 // Create new client (public for testing)
 router.post('/', async (req, res) => {
-  const { name, email, phone, address, company } = req.body;
-  const client = new Client({ name, email, phone, address, company });
   try {
+    const { name, email, phone, address, company } = req.body;
+    const client = new Client({ name, email, phone, address, company });
     const newClient = await client.save();
     res.status(201).json({ success: true, data: newClient });
   } catch (err) {
+    console.error('Error creating client:', err);
     res.status(400).json({ success: false, error: err.message });
   }
 });
@@ -60,6 +49,7 @@ router.put('/:id', async (req, res) => {
     if (!updatedClient) return res.status(404).json({ success: false, error: 'Client not found' });
     res.json({ success: true, data: updatedClient });
   } catch (err) {
+    console.error('Error updating client:', err);
     res.status(400).json({ success: false, error: err.message });
   }
 });
@@ -71,6 +61,7 @@ router.delete('/:id', async (req, res) => {
     if (!deletedClient) return res.status(404).json({ success: false, error: 'Client not found' });
     res.json({ success: true, message: 'Client deleted' });
   } catch (err) {
+    console.error('Error deleting client:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });

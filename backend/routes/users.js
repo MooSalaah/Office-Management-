@@ -1,21 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-require('dotenv').config();
-
-// JWT middleware
-function authenticateToken(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-  if (!token) return res.status(401).json({ message: 'No token provided' });
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) return res.status(403).json({ message: 'Invalid token' });
-    req.user = user;
-    next();
-  });
-}
 
 // Get all users (public for testing)
 router.get('/', async (req, res) => {
@@ -23,6 +8,7 @@ router.get('/', async (req, res) => {
     const users = await User.find();
     res.json({ success: true, data: users });
   } catch (err) {
+    console.error('Error fetching users:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -34,39 +20,21 @@ router.get('/:id', async (req, res) => {
     if (!user) return res.status(404).json({ success: false, error: 'User not found' });
     res.json({ success: true, data: user });
   } catch (err) {
+    console.error('Error fetching user:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
 // Create new user (public for testing)
 router.post('/', async (req, res) => {
-  const { name, email, role, department, phone } = req.body;
-  const user = new User({ name, email, role, department, phone });
   try {
+    const { name, email, role, department, phone } = req.body;
+    const user = new User({ name, email, role, department, phone });
     const newUser = await user.save();
     res.status(201).json({ success: true, data: newUser });
   } catch (err) {
+    console.error('Error creating user:', err);
     res.status(400).json({ success: false, error: err.message });
-  }
-});
-
-// User login (returns JWT)
-router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
-  try {
-    const user = await User.findOne({ email });
-    if (!user) return res.status(401).json({ message: 'Invalid email or password' });
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(401).json({ message: 'Invalid email or password' });
-    // Generate JWT
-    const token = jwt.sign(
-      { id: user._id, name: user.name, email: user.email, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-    res.json({ message: 'Login successful', token, user: { id: user._id, name: user.name, email: user.email, role: user.role } });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
   }
 });
 
@@ -81,6 +49,7 @@ router.put('/:id', async (req, res) => {
     if (!updatedUser) return res.status(404).json({ success: false, error: 'User not found' });
     res.json({ success: true, data: updatedUser });
   } catch (err) {
+    console.error('Error updating user:', err);
     res.status(400).json({ success: false, error: err.message });
   }
 });
@@ -92,6 +61,7 @@ router.delete('/:id', async (req, res) => {
     if (!deletedUser) return res.status(404).json({ success: false, error: 'User not found' });
     res.json({ success: true, message: 'User deleted' });
   } catch (err) {
+    console.error('Error deleting user:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });

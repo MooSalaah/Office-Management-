@@ -1,20 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const Project = require('../models/Project');
-const jwt = require('jsonwebtoken');
-require('dotenv').config();
-
-// JWT middleware
-function authenticateToken(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-  if (!token) return res.status(401).json({ message: 'No token provided' });
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) return res.status(403).json({ message: 'Invalid token' });
-    req.user = user;
-    next();
-  });
-}
 
 // Get all projects (public for testing)
 router.get('/', async (req, res) => {
@@ -22,6 +8,7 @@ router.get('/', async (req, res) => {
     const projects = await Project.find();
     res.json({ success: true, data: projects });
   } catch (err) {
+    console.error('Error fetching projects:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -33,18 +20,20 @@ router.get('/:id', async (req, res) => {
     if (!project) return res.status(404).json({ success: false, error: 'Project not found' });
     res.json({ success: true, data: project });
   } catch (err) {
+    console.error('Error fetching project:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
 // Create new project (public for testing)
 router.post('/', async (req, res) => {
-  const { name, client, description, startDate, endDate, status, notes } = req.body;
-  const project = new Project({ name, client, description, startDate, endDate, status, notes });
   try {
+    const { name, client, description, startDate, endDate, status, notes } = req.body;
+    const project = new Project({ name, client, description, startDate, endDate, status, notes });
     const newProject = await project.save();
     res.status(201).json({ success: true, data: newProject });
   } catch (err) {
+    console.error('Error creating project:', err);
     res.status(400).json({ success: false, error: err.message });
   }
 });
@@ -60,6 +49,7 @@ router.put('/:id', async (req, res) => {
     if (!updatedProject) return res.status(404).json({ success: false, error: 'Project not found' });
     res.json({ success: true, data: updatedProject });
   } catch (err) {
+    console.error('Error updating project:', err);
     res.status(400).json({ success: false, error: err.message });
   }
 });
@@ -71,6 +61,7 @@ router.delete('/:id', async (req, res) => {
     if (!deletedProject) return res.status(404).json({ success: false, error: 'Project not found' });
     res.json({ success: true, message: 'Project deleted' });
   } catch (err) {
+    console.error('Error deleting project:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });

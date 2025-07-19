@@ -1,20 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const Task = require('../models/Task');
-const jwt = require('jsonwebtoken');
-require('dotenv').config();
-
-// JWT middleware
-function authenticateToken(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-  if (!token) return res.status(401).json({ message: 'No token provided' });
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) return res.status(403).json({ message: 'Invalid token' });
-    req.user = user;
-    next();
-  });
-}
 
 // Get all tasks (public for testing)
 router.get('/', async (req, res) => {
@@ -22,6 +8,7 @@ router.get('/', async (req, res) => {
     const tasks = await Task.find();
     res.json({ success: true, data: tasks });
   } catch (err) {
+    console.error('Error fetching tasks:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -33,18 +20,20 @@ router.get('/:id', async (req, res) => {
     if (!task) return res.status(404).json({ success: false, error: 'Task not found' });
     res.json({ success: true, data: task });
   } catch (err) {
+    console.error('Error fetching task:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
 // Create new task (public for testing)
 router.post('/', async (req, res) => {
-  const { title, description, project, assignedTo, priority, status, dueDate } = req.body;
-  const task = new Task({ title, description, project, assignedTo, priority, status, dueDate });
   try {
+    const { title, description, project, assignedTo, priority, status, dueDate } = req.body;
+    const task = new Task({ title, description, project, assignedTo, priority, status, dueDate });
     const newTask = await task.save();
     res.status(201).json({ success: true, data: newTask });
   } catch (err) {
+    console.error('Error creating task:', err);
     res.status(400).json({ success: false, error: err.message });
   }
 });
@@ -60,6 +49,7 @@ router.put('/:id', async (req, res) => {
     if (!updatedTask) return res.status(404).json({ success: false, error: 'Task not found' });
     res.json({ success: true, data: updatedTask });
   } catch (err) {
+    console.error('Error updating task:', err);
     res.status(400).json({ success: false, error: err.message });
   }
 });
@@ -71,6 +61,7 @@ router.delete('/:id', async (req, res) => {
     if (!deletedTask) return res.status(404).json({ success: false, error: 'Task not found' });
     res.json({ success: true, message: 'Task deleted' });
   } catch (err) {
+    console.error('Error deleting task:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
