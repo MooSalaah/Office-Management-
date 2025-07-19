@@ -59,6 +59,11 @@ interface AppState {
     users: boolean
     notifications: boolean
   }
+  editingLocks: {
+    projects: { [key: string]: { userId: string; userName: string; timestamp: number } }
+    clients: { [key: string]: { userId: string; userName: string; timestamp: number } }
+    tasks: { [key: string]: { userId: string; userName: string; timestamp: number } }
+  }
 }
 
 type AppAction =
@@ -103,6 +108,9 @@ type AppAction =
   | { type: "SET_LOADING"; payload: boolean }
   | { type: "SET_LOADING_STATE"; payload: { key: keyof AppState['loadingStates']; value: boolean } }
   | { type: "SET_USERS"; payload: User[] }
+  | { type: "ACQUIRE_EDITING_LOCK"; payload: { type: 'projects' | 'clients' | 'tasks'; id: string; userId: string; userName: string } }
+  | { type: "RELEASE_EDITING_LOCK"; payload: { type: 'projects' | 'clients' | 'tasks'; id: string; userId: string } }
+  | { type: "CLEAR_EXPIRED_LOCKS"; payload: { type: 'projects' | 'clients' | 'tasks' } }
 
 const initialState: AppState = {
   currentUser: null,
@@ -124,6 +132,11 @@ const initialState: AppState = {
     transactions: false,
     users: false,
     notifications: false,
+  },
+  editingLocks: {
+    projects: {},
+    clients: {},
+    tasks: {},
   },
 }
 
@@ -330,6 +343,53 @@ function appReducer(state: AppState, action: AppAction): AppState {
       }
       return { ...state, users: uniqueUsers };
     }
+
+    case "ACQUIRE_EDITING_LOCK":
+      return {
+        ...state,
+        editingLocks: {
+          ...state.editingLocks,
+          [action.payload.type]: {
+            ...state.editingLocks[action.payload.type],
+            [action.payload.id]: {
+              userId: action.payload.userId,
+              userName: action.payload.userName,
+              timestamp: Date.now(),
+            },
+          },
+        },
+      }
+
+    case "RELEASE_EDITING_LOCK":
+      return {
+        ...state,
+        editingLocks: {
+          ...state.editingLocks,
+          [action.payload.type]: {
+            ...state.editingLocks[action.payload.type],
+            [action.payload.id]: undefined,
+          },
+        },
+      }
+
+    case "CLEAR_EXPIRED_LOCKS":
+      return {
+        ...state,
+        editingLocks: {
+          ...state.editingLocks,
+          [action.payload.type]: Object.fromEntries(
+            Object.entries(state.editingLocks[action.payload.type] || {})
+              .filter(([id, lock]) => {
+                const isExpired = Date.now() - lock.timestamp > 10000;
+                if (isExpired) {
+                  console.log(`Cleared expired lock: ${action.payload.type} - ${id}`);
+                }
+                return !isExpired;
+              })
+              .map(([id, lock]) => [id, { ...lock, timestamp: Date.now() }])
+          ),
+        },
+      }
 
     default:
       return state
@@ -1310,6 +1370,80 @@ export function useAppActions() {
     }
   }
 
+  // دوال إدارة قفل التعديل
+  const acquireEditingLock = (type: 'projects' | 'clients' | 'tasks', id: string) => {
+    if (!currentUser) return false;
+    
+    const lock = state.editingLocks[type][id];
+    const now = Date.now();
+    
+    // إذا كان هناك قفل منتهي الصلاحية، امسحه
+    if (lock && now - lock.timestamp > 10000) {
+      dispatch({ type: "CLEAR_EXPIRED_LOCKS", payload: { type } });
+    }
+    
+    // إذا كان هناك قفل نشط لشخص آخر
+    if (lock && lock.userId !== currentUser.id && now - lock.timestamp < 10000) {
+      return false;
+    }
+    
+    // احصل على القفل
+    dispatch({
+      type: "ACQUIRE_EDITING_LOCK",
+      payload: {
+        type,
+        id,
+        userId: currentUser.id,
+        userName: currentUser.name,
+      },
+    });
+    
+    return true;
+  }
+
+  const releaseEditingLock = (type: 'projects' | 'clients' | 'tasks', id: string) => {
+    if (!currentUser) return;
+    
+    const lock = state.editingLocks[type][id];
+    if (lock && lock.userId === currentUser.id) {
+      dispatch({
+        type: "RELEASE_EDITING_LOCK",
+        payload: { type, id, userId: currentUser.id },
+      });
+    }
+  }
+
+  const canEditItem = (type: 'projects' | 'clients' | 'tasks', id: string) => {
+    if (!currentUser) return false;
+    
+    const lock = state.editingLocks[type][id];
+    const now = Date.now();
+    
+    // إذا كان هناك قفل منتهي الصلاحية، امسحه
+    if (lock && now - lock.timestamp > 10000) {
+      dispatch({ type: "CLEAR_EXPIRED_LOCKS", payload: { type } });
+      return true;
+    }
+    
+    // إذا كان هناك قفل نشط لشخص آخر
+    if (lock && lock.userId !== currentUser.id && now - lock.timestamp < 10000) {
+      return false;
+    }
+    
+    return true;
+  }
+
+  const getEditingLockInfo = (type: 'projects' | 'clients' | 'tasks', id: string) => {
+    const lock = state.editingLocks[type][id];
+    const now = Date.now();
+    
+    if (lock && now - lock.timestamp < 10000) {
+      return lock;
+    }
+    
+    return null;
+  }
+
   return {
     // Loading state management
     setLoading,
@@ -1357,5 +1491,11 @@ export function useAppActions() {
     broadcastNotificationUpdate,
     broadcastUserUpdate,
     broadcastAttendanceUpdate,
+    
+    // Editing lock management
+    acquireEditingLock,
+    releaseEditingLock,
+    canEditItem,
+    getEditingLockInfo,
   }
 }

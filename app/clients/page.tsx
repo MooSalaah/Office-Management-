@@ -56,7 +56,7 @@ export default function ClientsPage() {
 
 function ClientsPageContent() {
   const { state, dispatch } = useApp()
-  const { addNotification, broadcastClientUpdate, showSuccessToast } = useAppActions()
+  const { addNotification, broadcastClientUpdate, showSuccessToast, acquireEditingLock, releaseEditingLock, canEditItem, getEditingLockInfo } = useAppActions()
   const { currentUser, clients, projects } = state
   const router = useRouter()
 
@@ -103,13 +103,25 @@ function ClientsPageContent() {
   const [phoneError, setPhoneError] = useState("");
 
   const memoizedClients = useMemo(() => {
-    return clients.filter(
+    // تصفية العملاء حسب الصلاحيات
+    let filteredClients = clients;
+    
+    // إذا كان المستخدم ليس مدير، تحقق من الصلاحيات
+    if (currentUser?.role !== "admin") {
+      // تحقق من صلاحية عرض العملاء
+      if (!hasPermission(currentUser?.role || "", "view", "clients")) {
+        filteredClients = [];
+      }
+    }
+    
+    // تطبيق البحث
+    return filteredClients.filter(
       (client) =>
         client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         client.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
         client.phone.includes(searchTerm),
     )
-  }, [clients, searchTerm])
+  }, [clients, searchTerm, currentUser])
 
   useEffect(() => {
     if (clientUpdates.length > 0) {
@@ -359,6 +371,21 @@ function ClientsPageContent() {
   }
 
   const openEditDialog = (client: Client) => {
+    // التحقق من إمكانية التعديل
+    if (!canEditItem('clients', client.id)) {
+      const lockInfo = getEditingLockInfo('clients', client.id);
+      if (lockInfo) {
+        setAlert({ type: "error", message: `هذا العميل قيد التعديل بواسطة ${lockInfo.userName}` });
+        return;
+      }
+    }
+    
+    // محاولة الحصول على قفل التعديل
+    if (!acquireEditingLock('clients', client.id)) {
+      setAlert({ type: "error", message: "هذا العميل قيد التعديل بواسطة مستخدم آخر" });
+      return;
+    }
+    
     setEditingClient(client)
     setFormData({
       name: client.name,
@@ -385,6 +412,11 @@ function ClientsPageContent() {
   }
 
   const resetForm = () => {
+    // إطلاق قفل التعديل إذا كان هناك عميل قيد التعديل
+    if (editingClient) {
+      releaseEditingLock('clients', editingClient.id);
+    }
+    
     setFormData({
       name: "",
       phone: "",
@@ -394,7 +426,9 @@ function ClientsPageContent() {
       notes: "",
       avatar: "",
     })
+    setEditingClient(null)
     setRequiredFieldsClient({ name: false, email: false, phone: false })
+    setPhoneError("")
   }
 
   const canCreateClient = hasPermission(currentUser?.role || "", "create", "clients")
