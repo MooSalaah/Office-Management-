@@ -61,8 +61,6 @@ const nextConfig = {
   },
   // إعدادات Netlify
   trailingSlash: true,
-  output: 'export',
-  distDir: 'out',
   // تحسين الأداء
   compress: true,
   poweredByHeader: false,
