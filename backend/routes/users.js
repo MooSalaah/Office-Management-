@@ -1,13 +1,28 @@
 const express = require('express');
 const router = express.Router();
+const User = require('../models/User');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+require('dotenv').config();
 
-// Simple test route without database
+// JWT middleware
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) return res.status(401).json({ message: 'No token provided' });
+  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+    if (err) return res.status(403).json({ message: 'Invalid token' });
+    req.user = user;
+    next();
+  });
+}
+
+// Get all users (public for testing)
 router.get('/', async (req, res) => {
   try {
-    console.log('GET /api/users - Test route');
-    res.json({ success: true, data: [], message: 'Users API is working' });
+    const users = await User.find();
+    res.json({ success: true, data: users });
   } catch (err) {
-    console.error('Error in users route:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -15,32 +30,57 @@ router.get('/', async (req, res) => {
 // Get user by ID (public for testing)
 router.get('/:id', async (req, res) => {
   try {
-    console.log('GET /api/users/:id - Test route');
-    res.json({ success: true, data: null, message: 'User by ID API is working' });
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+    res.json({ success: true, data: user });
   } catch (err) {
-    console.error('Error fetching user:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
 // Create new user (public for testing)
 router.post('/', async (req, res) => {
+  const { name, email, role, department, phone } = req.body;
+  const user = new User({ name, email, role, department, phone });
   try {
-    console.log('POST /api/users - Test route', req.body);
-    res.status(201).json({ success: true, data: req.body, message: 'User creation API is working' });
+    const newUser = await user.save();
+    res.status(201).json({ success: true, data: newUser });
   } catch (err) {
-    console.error('Error creating user:', err);
     res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// User login (returns JWT)
+router.post('/login', async (req, res) => {
+  const { email, password } = req.body;
+  try {
+    const user = await User.findOne({ email });
+    if (!user) return res.status(401).json({ message: 'Invalid email or password' });
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.status(401).json({ message: 'Invalid email or password' });
+    // Generate JWT
+    const token = jwt.sign(
+      { id: user._id, name: user.name, email: user.email, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+    res.json({ message: 'Login successful', token, user: { id: user._id, name: user.name, email: user.email, role: user.role } });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
 });
 
 // Update user (public for testing)
 router.put('/:id', async (req, res) => {
   try {
-    console.log('PUT /api/users/:id - Test route', req.body);
-    res.json({ success: true, data: req.body, message: 'User update API is working' });
+    const updatedUser = await User.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true }
+    );
+    if (!updatedUser) return res.status(404).json({ success: false, error: 'User not found' });
+    res.json({ success: true, data: updatedUser });
   } catch (err) {
-    console.error('Error updating user:', err);
     res.status(400).json({ success: false, error: err.message });
   }
 });
@@ -48,10 +88,10 @@ router.put('/:id', async (req, res) => {
 // Delete user (public for testing)
 router.delete('/:id', async (req, res) => {
   try {
-    console.log('DELETE /api/users/:id - Test route');
-    res.json({ success: true, message: 'User deletion API is working' });
+    const deletedUser = await User.findByIdAndDelete(req.params.id);
+    if (!deletedUser) return res.status(404).json({ success: false, error: 'User not found' });
+    res.json({ success: true, message: 'User deleted' });
   } catch (err) {
-    console.error('Error deleting user:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });

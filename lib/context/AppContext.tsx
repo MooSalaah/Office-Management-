@@ -27,7 +27,6 @@ import {
 import { getCurrentUser, initializeDefaultRoles, updateUserPermissionsByRole } from "../auth"
 import { useToast } from "@/hooks/use-toast"
 import { realtimeUpdates } from "../realtime-updates"
-import { api, syncData } from "../api"
 
 // تعريف اختياري لـ window.realtimeUpdates لتفادي أخطاء linter
 // @ts-ignore
@@ -696,28 +695,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       window.removeEventListener('online', handleOnline)
       window.removeEventListener('offline', handleOffline)
     }
-  }, [])
-
-  // مزامنة البيانات مع الـ backend
-  const syncDataWithBackend = async () => {
-    try {
-      console.log('Syncing data with backend...')
-      const { projects, tasks, clients, users } = await syncData.syncAll()
-      
-      if (Array.isArray(projects) && projects.length > 0) dispatch({ type: "LOAD_PROJECTS", payload: projects })
-      if (Array.isArray(tasks) && tasks.length > 0) dispatch({ type: "LOAD_TASKS", payload: tasks })
-      if (Array.isArray(clients) && clients.length > 0) dispatch({ type: "LOAD_CLIENTS", payload: clients })
-      if (Array.isArray(users) && users.length > 0) dispatch({ type: "LOAD_USERS", payload: users })
-      
-      console.log('Data sync completed')
-    } catch (error) {
-      console.error('Error syncing data:', error)
-    }
-  }
-
-  // مزامنة البيانات عند تحميل التطبيق
-  useEffect(() => {
-    syncDataWithBackend()
   }, [])
 
   // عند أي تغيير في البيانات، إذا online أرسل broadcast، إذا offline أضف لقائمة الانتظار:

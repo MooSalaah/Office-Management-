@@ -1,13 +1,27 @@
 const express = require('express');
 const router = express.Router();
+const Project = require('../models/Project');
+const jwt = require('jsonwebtoken');
+require('dotenv').config();
 
-// Simple test route without database
+// JWT middleware
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) return res.status(401).json({ message: 'No token provided' });
+  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+    if (err) return res.status(403).json({ message: 'Invalid token' });
+    req.user = user;
+    next();
+  });
+}
+
+// Get all projects (public for testing)
 router.get('/', async (req, res) => {
   try {
-    console.log('GET /api/projects - Test route');
-    res.json({ success: true, data: [], message: 'Projects API is working' });
+    const projects = await Project.find();
+    res.json({ success: true, data: projects });
   } catch (err) {
-    console.error('Error in projects route:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -15,21 +29,22 @@ router.get('/', async (req, res) => {
 // Get project by ID (public for testing)
 router.get('/:id', async (req, res) => {
   try {
-    console.log('GET /api/projects/:id - Test route');
-    res.json({ success: true, data: null, message: 'Project by ID API is working' });
+    const project = await Project.findById(req.params.id);
+    if (!project) return res.status(404).json({ success: false, error: 'Project not found' });
+    res.json({ success: true, data: project });
   } catch (err) {
-    console.error('Error fetching project:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
 // Create new project (public for testing)
 router.post('/', async (req, res) => {
+  const { name, client, description, startDate, endDate, status, notes } = req.body;
+  const project = new Project({ name, client, description, startDate, endDate, status, notes });
   try {
-    console.log('POST /api/projects - Test route', req.body);
-    res.status(201).json({ success: true, data: req.body, message: 'Project creation API is working' });
+    const newProject = await project.save();
+    res.status(201).json({ success: true, data: newProject });
   } catch (err) {
-    console.error('Error creating project:', err);
     res.status(400).json({ success: false, error: err.message });
   }
 });
@@ -37,10 +52,14 @@ router.post('/', async (req, res) => {
 // Update project (public for testing)
 router.put('/:id', async (req, res) => {
   try {
-    console.log('PUT /api/projects/:id - Test route', req.body);
-    res.json({ success: true, data: req.body, message: 'Project update API is working' });
+    const updatedProject = await Project.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true }
+    );
+    if (!updatedProject) return res.status(404).json({ success: false, error: 'Project not found' });
+    res.json({ success: true, data: updatedProject });
   } catch (err) {
-    console.error('Error updating project:', err);
     res.status(400).json({ success: false, error: err.message });
   }
 });
@@ -48,10 +67,10 @@ router.put('/:id', async (req, res) => {
 // Delete project (public for testing)
 router.delete('/:id', async (req, res) => {
   try {
-    console.log('DELETE /api/projects/:id - Test route');
-    res.json({ success: true, message: 'Project deletion API is working' });
+    const deletedProject = await Project.findByIdAndDelete(req.params.id);
+    if (!deletedProject) return res.status(404).json({ success: false, error: 'Project not found' });
+    res.json({ success: true, message: 'Project deleted' });
   } catch (err) {
-    console.error('Error deleting project:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });

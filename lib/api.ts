@@ -23,8 +23,6 @@ class ApiClient {
 	): Promise<ApiResponse<T>> {
 		try {
 			const url = `${this.baseUrl}${endpoint}`;
-			console.log(`API Request: ${options.method || "GET"} ${url}`);
-
 			const response = await fetch(url, {
 				headers: {
 					"Content-Type": "application/json",
@@ -38,7 +36,6 @@ class ApiClient {
 			}
 
 			const data = await response.json();
-			console.log(`API Response:`, data);
 			return data;
 		} catch (error) {
 			console.error(`API request failed for ${endpoint}:`, error);
@@ -198,81 +195,5 @@ export const api = {
 		login: (credentials: { email: string; password: string }) =>
 			apiClient.login(credentials),
 		register: (userData: any) => apiClient.register(userData),
-	},
-};
-
-// Data synchronization utilities
-export const syncData = {
-	// Sync projects from API to local storage
-	async syncProjects() {
-		try {
-			const response = await api.projects.getAll();
-			if (response.success && response.data) {
-				localStorage.setItem("projects", JSON.stringify(response.data));
-				return response.data;
-			}
-			return [];
-		} catch (error) {
-			console.error("Error syncing projects:", error);
-			return [];
-		}
-	},
-
-	// Sync tasks from API to local storage
-	async syncTasks() {
-		try {
-			const response = await api.tasks.getAll();
-			if (response.success && response.data) {
-				localStorage.setItem("tasks", JSON.stringify(response.data));
-				return response.data;
-			}
-			return [];
-		} catch (error) {
-			console.error("Error syncing tasks:", error);
-			return [];
-		}
-	},
-
-	// Sync clients from API to local storage
-	async syncClients() {
-		try {
-			const response = await api.clients.getAll();
-			if (response.success && response.data) {
-				localStorage.setItem("clients", JSON.stringify(response.data));
-				return response.data;
-			}
-			return [];
-		} catch (error) {
-			console.error("Error syncing clients:", error);
-			return [];
-		}
-	},
-
-	// Sync users from API to local storage
-	async syncUsers() {
-		try {
-			const response = await api.users.getAll();
-			if (response.success && response.data) {
-				localStorage.setItem("users", JSON.stringify(response.data));
-				return response.data;
-			}
-			return [];
-		} catch (error) {
-			console.error("Error syncing users:", error);
-			return [];
-		}
-	},
-
-	// Sync all data
-	async syncAll() {
-		console.log("Starting data synchronization...");
-		const [projects, tasks, clients, users] = await Promise.all([
-			this.syncProjects(),
-			this.syncTasks(),
-			this.syncClients(),
-			this.syncUsers(),
-		]);
-		console.log("Data synchronization completed");
-		return { projects, tasks, clients, users };
 	},
 };

@@ -7,7 +7,6 @@ const UserSchema = new mongoose.Schema({
   department: { type: String },
   phone: { type: String },
   createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now },
 });
 
 module.exports = mongoose.model('User', UserSchema); 

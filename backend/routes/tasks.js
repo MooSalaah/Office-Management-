@@ -1,13 +1,27 @@
 const express = require('express');
 const router = express.Router();
+const Task = require('../models/Task');
+const jwt = require('jsonwebtoken');
+require('dotenv').config();
 
-// Simple test route without database
+// JWT middleware
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) return res.status(401).json({ message: 'No token provided' });
+  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+    if (err) return res.status(403).json({ message: 'Invalid token' });
+    req.user = user;
+    next();
+  });
+}
+
+// Get all tasks (public for testing)
 router.get('/', async (req, res) => {
   try {
-    console.log('GET /api/tasks - Test route');
-    res.json({ success: true, data: [], message: 'Tasks API is working' });
+    const tasks = await Task.find();
+    res.json({ success: true, data: tasks });
   } catch (err) {
-    console.error('Error in tasks route:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -15,21 +29,22 @@ router.get('/', async (req, res) => {
 // Get task by ID (public for testing)
 router.get('/:id', async (req, res) => {
   try {
-    console.log('GET /api/tasks/:id - Test route');
-    res.json({ success: true, data: null, message: 'Task by ID API is working' });
+    const task = await Task.findById(req.params.id);
+    if (!task) return res.status(404).json({ success: false, error: 'Task not found' });
+    res.json({ success: true, data: task });
   } catch (err) {
-    console.error('Error fetching task:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
 // Create new task (public for testing)
 router.post('/', async (req, res) => {
+  const { title, description, project, assignedTo, priority, status, dueDate } = req.body;
+  const task = new Task({ title, description, project, assignedTo, priority, status, dueDate });
   try {
-    console.log('POST /api/tasks - Test route', req.body);
-    res.status(201).json({ success: true, data: req.body, message: 'Task creation API is working' });
+    const newTask = await task.save();
+    res.status(201).json({ success: true, data: newTask });
   } catch (err) {
-    console.error('Error creating task:', err);
     res.status(400).json({ success: false, error: err.message });
   }
 });
@@ -37,10 +52,14 @@ router.post('/', async (req, res) => {
 // Update task (public for testing)
 router.put('/:id', async (req, res) => {
   try {
-    console.log('PUT /api/tasks/:id - Test route', req.body);
-    res.json({ success: true, data: req.body, message: 'Task update API is working' });
+    const updatedTask = await Task.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true }
+    );
+    if (!updatedTask) return res.status(404).json({ success: false, error: 'Task not found' });
+    res.json({ success: true, data: updatedTask });
   } catch (err) {
-    console.error('Error updating task:', err);
     res.status(400).json({ success: false, error: err.message });
   }
 });
@@ -48,10 +67,10 @@ router.put('/:id', async (req, res) => {
 // Delete task (public for testing)
 router.delete('/:id', async (req, res) => {
   try {
-    console.log('DELETE /api/tasks/:id - Test route');
-    res.json({ success: true, message: 'Task deletion API is working' });
+    const deletedTask = await Task.findByIdAndDelete(req.params.id);
+    if (!deletedTask) return res.status(404).json({ success: false, error: 'Task not found' });
+    res.json({ success: true, message: 'Task deleted' });
   } catch (err) {
-    console.error('Error deleting task:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
