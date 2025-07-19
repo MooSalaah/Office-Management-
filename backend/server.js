@@ -6,11 +6,8 @@ require('dotenv').config();
 const app = express();
 const port = process.env.PORT || 5000;
 
-// Simplified CORS configuration
-app.use(cors({
-  origin: true, // Allow all origins for now
-  credentials: true
-}));
+// Basic CORS configuration
+app.use(cors());
 
 // Middlewares
 app.use(express.json({ limit: '10mb' }));
