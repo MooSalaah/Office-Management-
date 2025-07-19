@@ -1,6 +1,6 @@
 [build]
   command = "npm run build"
-  publish = "out"
+  publish = ".next"
 
 [build.environment]
   NODE_VERSION = "18"
@@ -20,10 +20,16 @@
 # [[plugins]]
 # package = "@netlify/plugin-nextjs"
 
-# Redirects for SPA
+# Redirects for Next.js
 [[redirects]]
   from = "/*"
   to = "/index.html"
+  status = 200
+
+# Handle Next.js routing
+[[redirects]]
+  from = "/_next/*"
+  to = "/_next/:splat"
   status = 200
 
 # Headers for security and caching

@@ -12,15 +12,6 @@ const nextConfig = {
   // تحسينات الأداء
   experimental: {
     optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
-    // optimizeCss: true, // Disabled to avoid critters error
-    turbo: {
-      rules: {
-        '*.svg': {
-          loaders: ['@svgr/webpack'],
-          as: '*.js',
-        },
-      },
-    },
   },
   // تحسين تجربة التطوير
   webpack: (config, { dev, isServer }) => {
