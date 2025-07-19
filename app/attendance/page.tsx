@@ -247,47 +247,32 @@ function AttendancePageContent() {
     if (currentUser.role !== "admin") {
       addNotification({
         userId: "1", // Admin user ID
-        title: "تسجيل حضور",
-        message: `تم تسجيل حضور ${currentUser.name} (${session === "morning" ? "صباحية" : "مسائية"}) في ${now.toLocaleTimeString("ar-SA")}`,
+        title: "تسجيل حضور جديد",
+        message: `تم تسجيل حضور ${currentUser.name} للفترة ${session === "morning" ? "الصباحية" : "المسائية"}`,
         type: "attendance",
         actionUrl: `/attendance`,
         triggeredBy: currentUser.id,
         isRead: false,
       })
       
-      // إضافة المستخدم إلى قائمة الحاضرين في صفحة الحضور للمدير
-      const existingRecord = attendanceRecords.find(r => 
-        r.userId === currentUser.id && 
-        r.date === today && 
-        r.session === session
-      )
-      
-      if (!existingRecord) {
-        const newAttendanceRecord: AttendanceRecord = {
+      // إرسال إشعار فوري للمدير عبر SSE
+      realtimeUpdates.broadcastUpdate("notification", {
+        action: 'create',
+        notification: {
           id: Date.now().toString(),
-          userId: currentUser.id,
-          userName: currentUser.name,
-          date: today,
-          session: session,
-          checkIn: checkInTime,
-          checkOut: undefined,
-          regularHours: 0,
-          lateHours: 0,
-          overtimeHours: 0,
-          totalHours: 0,
-          status: "present",
-        }
-        
-        // إضافة سجل الحضور إلى localStorage
-        const existingAttendance = JSON.parse(localStorage.getItem("attendanceRecords") || "[]")
-        existingAttendance.push(newAttendanceRecord)
-        localStorage.setItem("attendanceRecords", JSON.stringify(existingAttendance))
-        
-        // تحديث state مباشرة
-        dispatch({ type: "ADD_ATTENDANCE", payload: newAttendanceRecord })
-        // بث تحديث فوري لجميع المستخدمين
-        realtimeUpdates.sendAttendanceUpdate({ action: 'create', attendance: newAttendanceRecord, userId: currentUser.id, userName: currentUser.name })
-      }
+          userId: "1",
+          title: "تسجيل حضور جديد",
+          message: `تم تسجيل حضور ${currentUser.name} للفترة ${session === "morning" ? "الصباحية" : "المسائية"}`,
+          type: "attendance",
+          actionUrl: `/attendance`,
+          triggeredBy: currentUser.id,
+          isRead: false,
+          createdAt: new Date().toISOString(),
+        },
+        userId: currentUser.id,
+        userName: currentUser.name,
+        targetUserId: "1"
+      })
     }
   }
 

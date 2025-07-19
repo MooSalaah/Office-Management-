@@ -303,6 +303,25 @@ function ProjectsPageContent() {
         triggeredBy: currentUser?.id || "",
         isRead: false,
       })
+      
+      // إرسال إشعار فوري للمهندس عبر SSE
+      realtimeUpdates.broadcastUpdate("notification", {
+        action: 'create',
+        notification: {
+          id: Date.now().toString(),
+          userId: engineer.id,
+          title: "مشروع جديد مُعيّن لك",
+          message: `تم تعيين مشروع "${formData.name}" لك`,
+          type: "project",
+          actionUrl: `/projects/${newProject.id}`,
+          triggeredBy: currentUser?.id || "",
+          isRead: false,
+          createdAt: new Date().toISOString(),
+        },
+        userId: currentUser?.id,
+        userName: currentUser?.name,
+        targetUserId: engineer.id
+      })
     }
 
     // إرسال تحديث فوري لجميع المستخدمين
@@ -367,7 +386,7 @@ function ProjectsPageContent() {
     }
 
     // إرسال تحديث فوري
-    realtimeUpdates.sendProjectUpdate('update', { project: updatedProject, userId: currentUser?.id, userName: currentUser?.name })
+    realtimeUpdates.sendProjectUpdate({ action: 'update', project: updatedProject, userId: currentUser?.id, userName: currentUser?.name })
   }
 
   const handleDeleteProject = (projectId: string) => {

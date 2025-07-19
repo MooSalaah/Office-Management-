@@ -908,6 +908,17 @@ export function useAppActions() {
     // إرسال إشعار فوري لجميع المستخدمين
     realtimeUpdates.sendNotification(newNotification)
     
+    // إرسال إشعار فوري للمستخدم المعني عبر SSE
+    if (notification.userId && notification.userId !== currentUser?.id) {
+      realtimeUpdates.broadcastUpdate("notification", {
+        action: 'create',
+        notification: newNotification,
+        userId: currentUser?.id,
+        userName: currentUser?.name,
+        targetUserId: notification.userId
+      })
+    }
+    
     // Show browser notification if it's for the current user
     if (newNotification.userId === currentUser?.id && 'Notification' in window && Notification.permission === 'granted') {
       const browserNotification = new Notification(newNotification.title, {
@@ -1000,7 +1011,7 @@ export function useAppActions() {
       localStorage.setItem("projects", JSON.stringify(filteredProjects))
       
       // Broadcast realtime update
-      broadcastOrQueue('delete', project, isOnline, setPendingUpdates)
+      realtimeUpdates.sendProjectUpdate({ action: 'delete', project, userId: currentUser?.id, userName: currentUser?.name })
       
       showSuccessToast("تم حذف المشروع بنجاح", `تم حذف مشروع "${project.name}"`)
     } catch (error) {

@@ -245,6 +245,25 @@ function TasksPageContent() {
         triggeredBy: currentUser?.id || "",
         isRead: false,
       })
+      
+      // إرسال إشعار فوري للمدير عبر SSE
+      realtimeUpdates.broadcastUpdate("notification", {
+        action: 'create',
+        notification: {
+          id: Date.now().toString(),
+          userId: "1",
+          title: "مهمة مكتملة",
+          message: `تم إنجاز مهمة "${task.title}" بواسطة ${currentUser?.name}`,
+          type: "task",
+          actionUrl: `/tasks/${task.id}`,
+          triggeredBy: currentUser?.id || "",
+          isRead: false,
+          createdAt: new Date().toISOString(),
+        },
+        userId: currentUser?.id,
+        userName: currentUser?.name,
+        targetUserId: "1"
+      })
     }
 
     // Add notification to assignee when task is assigned
@@ -258,9 +277,26 @@ function TasksPageContent() {
         triggeredBy: currentUser?.id || "",
         isRead: false,
       })
+      
+      // إرسال إشعار فوري للمسؤول عبر SSE
+      realtimeUpdates.broadcastUpdate("notification", {
+        action: 'create',
+        notification: {
+          id: Date.now().toString(),
+          userId: task.assigneeId,
+          title: "مهمة جديدة مُعيّنة لك",
+          message: `تم تعيين مهمة "${task.title}" لك`,
+          type: "task",
+          actionUrl: `/tasks/${task.id}`,
+          triggeredBy: currentUser?.id || "",
+          isRead: false,
+          createdAt: new Date().toISOString(),
+        },
+        userId: currentUser?.id,
+        userName: currentUser?.name,
+        targetUserId: task.assigneeId
+      })
     }
-
-
   }
 
   const handleCreateTask = () => {

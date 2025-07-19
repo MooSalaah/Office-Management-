@@ -5,6 +5,16 @@ import { broadcastUpdate, useRealtime as useSSERealtime } from "./realtime";
 export class RealtimeUpdates {
 	private static instance: RealtimeUpdates;
 	private listeners: Map<string, Set<(data: any) => void>> = new Map();
+	private baseUrl: string =
+		process.env.NEXT_PUBLIC_API_URL ||
+		"https://engineering-office-backend.onrender.com";
+	private eventSource: EventSource | null = null;
+	private pollingInterval: NodeJS.Timeout | null = null;
+	private processedUpdates: Set<string> = new Set();
+	private retryCount = 0;
+	private maxRetries = 3;
+	private retryDelay = 2000; // 2 seconds
+	private isConnected = false;
 
 	static getInstance(): RealtimeUpdates {
 		if (!RealtimeUpdates.instance) {
@@ -176,6 +186,131 @@ export class RealtimeUpdates {
 				}
 			}
 		});
+	}
+
+	// إضافة retry logic للاتصال
+	private async retryConnection() {
+		if (this.retryCount < this.maxRetries) {
+			this.retryCount++;
+			console.log(
+				`Retrying connection... Attempt ${this.retryCount}/${this.maxRetries}`
+			);
+
+			setTimeout(() => {
+				this.connect();
+			}, this.retryDelay * this.retryCount);
+		} else {
+			console.error("Max retry attempts reached. Falling back to polling.");
+			this.startPolling();
+		}
+	}
+
+	// إيقاف polling
+	private stopPolling() {
+		if (this.pollingInterval) {
+			clearInterval(this.pollingInterval);
+			this.pollingInterval = null;
+		}
+	}
+
+	// تحسين الاتصال مع error handling
+	private connect() {
+		try {
+			const eventSource = new EventSource(
+				`${this.baseUrl}/api/realtime/stream`
+			);
+
+			eventSource.onopen = () => {
+				console.log("SSE connection established");
+				this.retryCount = 0;
+				this.isConnected = true;
+				this.stopPolling();
+			};
+
+			eventSource.onmessage = (event) => {
+				try {
+					const data = JSON.parse(event.data);
+					this.handleUpdate(data);
+				} catch (error) {
+					console.error("Error parsing SSE message:", error);
+				}
+			};
+
+			eventSource.onerror = (error) => {
+				console.error("SSE connection error:", error);
+				this.isConnected = false;
+				eventSource.close();
+				this.retryConnection();
+			};
+
+			this.eventSource = eventSource;
+		} catch (error) {
+			console.error("Error establishing SSE connection:", error);
+			this.retryConnection();
+		}
+	}
+
+	// تحسين polling مع exponential backoff
+	private startPolling() {
+		if (this.pollingInterval) {
+			clearInterval(this.pollingInterval);
+		}
+
+		let pollDelay = 5000; // Start with 5 seconds
+
+		this.pollingInterval = setInterval(async () => {
+			try {
+				const response = await fetch(`${this.baseUrl}/api/realtime/poll`);
+				if (response.ok) {
+					const data = await response.json();
+					if (data.updates && data.updates.length > 0) {
+						data.updates.forEach((update: any) => {
+							this.handleUpdate(update);
+						});
+					}
+					// Reset delay on successful poll
+					pollDelay = 5000;
+				} else {
+					// Increase delay on error
+					pollDelay = Math.min(pollDelay * 1.5, 30000); // Max 30 seconds
+				}
+			} catch (error) {
+				console.error("Polling error:", error);
+				pollDelay = Math.min(pollDelay * 1.5, 30000);
+			}
+		}, pollDelay);
+	}
+
+	// تحسين handleUpdate مع duplicate prevention
+	private handleUpdate(data: any) {
+		const updateId = `${data.type}_${data.action}_${
+			data.timestamp || Date.now()
+		}`;
+
+		// منع التحديثات المكررة
+		if (this.processedUpdates.has(updateId)) {
+			return;
+		}
+
+		this.processedUpdates.add(updateId);
+
+		// تنظيف التحديثات القديمة (احتفظ بآخر 1000 تحديث)
+		if (this.processedUpdates.size > 1000) {
+			const updatesArray = Array.from(this.processedUpdates);
+			this.processedUpdates = new Set(updatesArray.slice(-500));
+		}
+
+		// إرسال التحديث للمستمعين
+		const listeners = this.listeners.get(data.type);
+		if (listeners) {
+			listeners.forEach((callback) => {
+				try {
+					callback(data);
+				} catch (error) {
+					console.error("Error in update callback:", error);
+				}
+			});
+		}
 	}
 }
 
