@@ -147,6 +147,12 @@ function appReducer(state: AppState, action: AppAction): AppState {
         projects: state.projects.filter((p) => p.id !== action.payload),
       }
 
+    case "LOAD_PROJECTS":
+      return {
+        ...state,
+        projects: action.payload,
+      }
+
     case "ADD_CLIENT":
       return { ...state, clients: [...state.clients, action.payload] }
 
@@ -162,6 +168,12 @@ function appReducer(state: AppState, action: AppAction): AppState {
         clients: state.clients.filter((c) => c.id !== action.payload),
       }
 
+    case "LOAD_CLIENTS":
+      return {
+        ...state,
+        clients: action.payload,
+      }
+
     case "ADD_TASK":
       return { ...state, tasks: [...state.tasks, action.payload] }
 
@@ -175,6 +187,12 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         tasks: state.tasks.filter((t) => t.id !== action.payload),
+      }
+
+    case "LOAD_TASKS":
+      return {
+        ...state,
+        tasks: action.payload,
       }
 
     case "ADD_TRANSACTION":
@@ -247,6 +265,12 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         attendanceRecords: state.attendanceRecords.map((a) => (a.id === action.payload.id ? action.payload : a)),
+      }
+
+    case "LOAD_ATTENDANCE":
+      return {
+        ...state,
+        attendanceRecords: action.payload,
       }
 
     case "UPDATE_COMPANY_SETTINGS":
@@ -445,17 +469,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           })
         }
 
-        // Load projects (only if not already loaded)
+        // Load projects - always load from localStorage to ensure all users see all projects
         const projectsData = localStorage.getItem("projects")
-        if (projectsData && state.projects.length === mockProjects.length) {
+        if (projectsData) {
           const projects = JSON.parse(projectsData)
-          projects.forEach((project: any) => {
-            // Check if project already exists
-            const existingProject = state.projects.find(p => p.id === project.id)
-            if (!existingProject) {
-              dispatch({ type: "ADD_PROJECT", payload: project })
-            }
-          })
+          console.log("Loading projects from localStorage:", projects)
+          // Replace all projects with localStorage data to ensure consistency
+          dispatch({ type: "LOAD_PROJECTS", payload: projects })
         }
 
         // Load clients - always load from localStorage to ensure all users see all clients

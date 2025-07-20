@@ -589,14 +589,18 @@ function ProjectsPageContent() {
       // Update form data
       setFormData(prev => ({ ...prev, clientId: newClient.id }))
       
-      // Add notification
-      addNotification({
-        userId: currentUser?.id || "",
-        title: "تم إضافة عميل جديد",
-        message: `تم إضافة العميل "${newClient.name}" بنجاح`,
-        type: "project",
-        isRead: false,
-        triggeredBy: currentUser?.id || "",
+      // Add notification to all users except the creator
+      users.forEach(user => {
+        if (user.id !== currentUser?.id) {
+          addNotification({
+            userId: user.id,
+            title: "تم إضافة عميل جديد",
+            message: `تم إضافة العميل "${newClient.name}" بواسطة ${currentUser?.name}`,
+            type: "project",
+            isRead: false,
+            triggeredBy: currentUser?.id || "",
+          })
+        }
       })
       
       // Reset input

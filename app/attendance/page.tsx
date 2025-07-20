@@ -250,52 +250,64 @@ function AttendancePageContent() {
     realtimeUpdates.sendAttendanceUpdate({ action: 'create', attendance: newRecord, userId: currentUser?.id, userName: currentUser?.name })
     showAlertDialogMessage("success", `تم تسجيل الحضور (${session === "morning" ? "صباحية" : "مسائية"}) بنجاح${status === "overtime" ? " (خارج أوقات الدوام - ساعات إضافية)" : ""}`)
     
-    // Add notification to admin when attendance is recorded
-    if (currentUser.role !== "admin") {
-      addNotification({
-        userId: "1", // Admin user ID
-        title: "تسجيل حضور",
-        message: `تم تسجيل حضور ${currentUser.name} (${session === "morning" ? "صباحية" : "مسائية"}) في ${now.toLocaleTimeString("ar-SA")}`,
-        type: "attendance",
-        actionUrl: `/attendance`,
-        triggeredBy: currentUser.id,
-        isRead: false,
-      })
-      
-      // إضافة المستخدم إلى قائمة الحاضرين في صفحة الحضور للمدير
-      const existingRecord = attendanceRecords.find(r => 
-        r.userId === currentUser.id && 
-        r.date === today && 
-        r.session === session
-      )
-      
-      if (!existingRecord) {
-        const newAttendanceRecord: AttendanceRecord = {
-          id: Date.now().toString(),
-          userId: currentUser.id,
-          userName: currentUser.name,
-          date: today,
-          session: session,
-          checkIn: checkInTime,
-          checkOut: undefined,
-          regularHours: 0,
-          lateHours: 0,
-          overtimeHours: 0,
-          totalHours: 0,
-          status: "present",
+          // Add notification to admin when attendance is recorded
+      if (currentUser.role !== "admin") {
+        addNotification({
+          userId: "1", // Admin user ID
+          title: "تسجيل حضور",
+          message: `تم تسجيل حضور ${currentUser.name} (${session === "morning" ? "صباحية" : "مسائية"}) في ${now.toLocaleTimeString("ar-SA")}`,
+          type: "attendance",
+          actionUrl: `/attendance`,
+          triggeredBy: currentUser.id,
+          isRead: false,
+        })
+        
+        // إضافة المستخدم إلى قائمة الحاضرين في صفحة الحضور للمدير
+        const existingRecord = attendanceRecords.find(r => 
+          r.userId === currentUser.id && 
+          r.date === today && 
+          r.session === session
+        )
+        
+        if (!existingRecord) {
+          const newAttendanceRecord: AttendanceRecord = {
+            id: Date.now().toString(),
+            userId: currentUser.id,
+            userName: currentUser.name,
+            date: today,
+            session: session,
+            checkIn: checkInTime,
+            checkOut: undefined,
+            regularHours: 0,
+            lateHours: 0,
+            overtimeHours: 0,
+            totalHours: 0,
+            status: "present",
+          }
+          
+          // إضافة سجل الحضور إلى localStorage
+          const existingAttendance = JSON.parse(localStorage.getItem("attendanceRecords") || "[]")
+          existingAttendance.push(newAttendanceRecord)
+          localStorage.setItem("attendanceRecords", JSON.stringify(existingAttendance))
+          
+          // تحديث state مباشرة
+          dispatch({ type: "ADD_ATTENDANCE", payload: newAttendanceRecord })
+          
+          // بث تحديث فوري لجميع المستخدمين
+          realtimeUpdates.sendAttendanceUpdate({ action: 'create', attendance: newAttendanceRecord, userId: currentUser.id, userName: currentUser.name })
+          
+          // إرسال إشعار فوري للمدير
+          addNotification({
+            userId: "1",
+            title: "تسجيل حضور جديد",
+            message: `تم تسجيل حضور ${currentUser.name} (${session === "morning" ? "صباحية" : "مسائية"})`,
+            type: "attendance",
+            actionUrl: `/attendance`,
+            triggeredBy: currentUser.id,
+            isRead: false,
+          })
         }
-        
-        // إضافة سجل الحضور إلى localStorage
-        const existingAttendance = JSON.parse(localStorage.getItem("attendanceRecords") || "[]")
-        existingAttendance.push(newAttendanceRecord)
-        localStorage.setItem("attendanceRecords", JSON.stringify(existingAttendance))
-        
-        // تحديث state مباشرة
-        dispatch({ type: "ADD_ATTENDANCE", payload: newAttendanceRecord })
-        // بث تحديث فوري لجميع المستخدمين
-        realtimeUpdates.sendAttendanceUpdate({ action: 'create', attendance: newAttendanceRecord, userId: currentUser.id, userName: currentUser.name })
       }
-    }
   }
 
   // تسجيل الانصراف وحساب الساعات الإضافية

@@ -37,6 +37,7 @@ import {
 } from "lucide-react"
 import { useApp, useAppActions } from "@/lib/context/AppContext"
 import { hasPermission } from "@/lib/auth"
+import { realtimeUpdates } from "@/lib/realtime-updates"
 import type { Transaction, UpcomingPayment } from "@/lib/types"
 import { formatCurrency } from "@/lib/utils"
 import { ArabicNumber } from "@/components/ui/ArabicNumber"
@@ -69,6 +70,7 @@ function FinancePageContent() {
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false)
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
+  const [transactionLocks, setTransactionLocks] = useState<{[key: string]: {userId: string, userName: string, timestamp: number}}>({})
   const [isMonthlyGrowthDialogOpen, setIsMonthlyGrowthDialogOpen] = useState(false)
   const [isPaymentDetailsDialogOpen, setIsPaymentDetailsDialogOpen] = useState(false)
   const [selectedPayment, setSelectedPayment] = useState<any>(null)
@@ -229,6 +231,9 @@ function FinancePageContent() {
       return
     }
 
+    // Release the lock after successful update
+    releaseTransactionLock(editingTransaction.id)
+
     if (Number.parseFloat(formData.amount) <= 0) {
       setAlert({ type: "error", message: "لا يمكن إدخال قيمة سالبة أو صفرية" })
       return
@@ -280,7 +285,81 @@ function FinancePageContent() {
     setIsDetailsDialogOpen(true)
   }
 
+  const acquireTransactionLock = (transactionId: string): boolean => {
+    const now = Date.now()
+    const lockTimeout = 5 * 60 * 1000 // 5 minutes
+    
+    // Check if transaction is already locked
+    const existingLock = transactionLocks[transactionId]
+    if (existingLock) {
+      // Check if lock has expired
+      if (now - existingLock.timestamp < lockTimeout) {
+        // Lock is still valid
+        if (existingLock.userId === currentUser?.id) {
+          // User already has the lock, refresh it
+          setTransactionLocks(prev => ({
+            ...prev,
+            [transactionId]: { userId: currentUser.id, userName: currentUser.name || "", timestamp: now }
+          }))
+          return true
+        } else {
+          // Lock is held by another user
+          return false
+        }
+      } else {
+        // Lock has expired, remove it
+        setTransactionLocks(prev => {
+          const newLocks = { ...prev }
+          delete newLocks[transactionId]
+          return newLocks
+        })
+      }
+    }
+    
+    // Acquire new lock
+    setTransactionLocks(prev => ({
+      ...prev,
+      [transactionId]: { userId: currentUser?.id || "", userName: currentUser?.name || "", timestamp: now }
+    }))
+    
+    // Broadcast lock to other users
+    realtimeUpdates.sendTransactionUpdate({ 
+      action: 'lock', 
+      transaction: { id: transactionId }, 
+      userId: currentUser?.id, 
+      userName: currentUser?.name 
+    })
+    
+    return true
+  }
+
+  const releaseTransactionLock = (transactionId: string) => {
+    setTransactionLocks(prev => {
+      const newLocks = { ...prev }
+      delete newLocks[transactionId]
+      return newLocks
+    })
+    
+    // Broadcast lock release to other users
+    realtimeUpdates.sendTransactionUpdate({ 
+      action: 'unlock', 
+      transaction: { id: transactionId }, 
+      userId: currentUser?.id, 
+      userName: currentUser?.name 
+    })
+  }
+
   const openEditDialog = (transaction: Transaction) => {
+    // Try to acquire lock
+    if (!acquireTransactionLock(transaction.id)) {
+      const lock = transactionLocks[transaction.id]
+      setAlert({ 
+        type: "error", 
+        message: `هذه المعاملة محجوزة للتعديل بواسطة ${lock.userName}. يرجى المحاولة لاحقاً.` 
+      })
+      return
+    }
+    
     setEditingTransaction(transaction)
     setFormData({
       type: transaction.type,
@@ -293,7 +372,7 @@ function FinancePageContent() {
       date: transaction.date,
       notes: "",
       remainingAmount: transaction.remainingAmount ? transaction.remainingAmount.toString() : "",
-      payerName: transaction.payerName,
+      payerName: transaction.payerName || "",
     })
     setIsDialogOpen(true)
   }
@@ -1098,7 +1177,12 @@ function FinancePageContent() {
                   </div>
                 </div>
                 <div className="flex justify-end space-x-2 space-x-reverse">
-                  <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                  <Button variant="outline" onClick={() => {
+                    if (editingTransaction) {
+                      releaseTransactionLock(editingTransaction.id)
+                    }
+                    setIsDialogOpen(false)
+                  }}>
                     إلغاء
                   </Button>
                   <Button onClick={editingTransaction ? handleUpdateTransaction : handleCreateTransaction}>

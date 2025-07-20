@@ -716,6 +716,14 @@ function SettingsPageContent() {
       // إرسال تحديث فوري لجميع المستخدمين
       realtimeUpdates.sendUserUpdate({ action: 'update', user: updatedUser })
       
+      // إرسال تحديث فوري للصلاحيات لجميع المستخدمين
+      realtimeUpdates.sendUserUpdate({ 
+        action: 'permissions_update', 
+        user: updatedUser,
+        userId: currentUser?.id,
+        userName: currentUser?.name
+      })
+      
       // Show success dialog with confirmation
       showSuccessToast("تم تحديث المستخدم بنجاح", `تم تحديث المستخدم "${updatedUser.name}" بنجاح`)
       
