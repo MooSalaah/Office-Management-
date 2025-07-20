@@ -111,28 +111,6 @@ function ClientsPageContent() {
     )
   }, [clients, searchTerm])
 
-  // Load clients from API on component mount
-  useEffect(() => {
-    const loadClientsFromAPI = async () => {
-      try {
-        const response = await fetch('/api/clients')
-        if (response.ok) {
-          const data = await response.json()
-          if (data.success) {
-            console.log('Clients loaded from API:', data.data)
-            dispatch({ type: "LOAD_CLIENTS", payload: data.data })
-            // Save to localStorage as backup
-            localStorage.setItem("clients", JSON.stringify(data.data))
-          }
-        }
-      } catch (error) {
-        console.error('Error loading clients from API:', error)
-      }
-    }
-    
-    loadClientsFromAPI()
-  }, [dispatch])
-
   useEffect(() => {
     if (clientUpdates.length > 0) {
       const lastUpdate = clientUpdates[clientUpdates.length - 1];
@@ -250,8 +228,6 @@ function ClientsPageContent() {
     }
 
     try {
-      console.log('Attempting to save client to API:', newClient);
-      
       // Save to backend database
       const response = await fetch('/api/clients', {
         method: 'POST',
@@ -261,13 +237,8 @@ function ClientsPageContent() {
         body: JSON.stringify(newClient),
       });
 
-      console.log('API response status:', response.status);
-      console.log('API response ok:', response.ok);
-
       if (!response.ok) {
-        const errorData = await response.json();
-        console.error('API error response:', errorData);
-        throw new Error(`Failed to save client to database: ${errorData.error || 'Unknown error'}`);
+        throw new Error('Failed to save client to database');
       }
 
       const result = await response.json();
@@ -288,25 +259,21 @@ function ClientsPageContent() {
       setIsDialogOpen(false)
       resetForm()
 
-      // Add notification to all users except the creator
-      const allUsers = JSON.parse(localStorage.getItem("users") || "[]")
-      allUsers.forEach((user: any) => {
-        if (user.id !== currentUser?.id) {
-          addNotification({
-            userId: user.id,
-            title: "عميل جديد تم إضافته",
-            message: `تم إضافة عميل جديد "${formData.name}" بواسطة ${currentUser?.name}`,
-            type: "project",
-            actionUrl: `/clients/${newClient.id}`,
-            triggeredBy: currentUser?.id || "",
-            isRead: false,
-          })
-        }
-      })
+      // Add notification to admin when client is created
+      if (currentUser?.role !== "admin") {
+        addNotification({
+          userId: "1", // Admin user ID
+          title: "عميل جديد تم إضافته",
+          message: `تم إضافة عميل جديد "${formData.name}" بواسطة ${currentUser?.name}`,
+          type: "project",
+          actionUrl: `/clients/${newClient.id}`,
+          triggeredBy: currentUser?.id || "",
+          isRead: false,
+        })
+      }
     } catch (error) {
       console.error('Error creating client:', error);
-      const errorMessage = error instanceof Error ? error.message : "حدث خطأ غير معروف";
-      setAlert({ type: "error", message: `حدث خطأ أثناء حفظ العميل في قاعدة البيانات: ${errorMessage}` });
+      setAlert({ type: "error", message: "حدث خطأ أثناء حفظ العميل في قاعدة البيانات" });
     }
   }
 

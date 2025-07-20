@@ -1,25 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
 
-const dataDir = path.join(process.cwd(), "data");
-const clientsFile = path.join(dataDir, "clients.json");
-
-// Ensure data directory exists
-if (!fs.existsSync(dataDir)) {
-	fs.mkdirSync(dataDir, { recursive: true });
-}
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
 export async function GET() {
 	try {
-		if (!fs.existsSync(clientsFile)) {
-			return NextResponse.json({ success: true, data: [] });
-		}
-
-		const clientsData = fs.readFileSync(clientsFile, "utf8");
-		const clients = JSON.parse(clientsData);
-
-		return NextResponse.json({ success: true, data: clients });
+		const response = await fetch(`${BACKEND_URL}/api/clients`);
+		const data = await response.json();
+		return NextResponse.json(data);
 	} catch (error) {
 		console.error("Error fetching clients:", error);
 		return NextResponse.json(
@@ -31,52 +18,20 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
 	try {
-		console.log("POST /api/clients - Starting client creation");
-
 		const clientData = await request.json();
-		console.log("Client data received:", clientData);
-
-		// Ensure data directory exists
-		if (!fs.existsSync(dataDir)) {
-			console.log("Creating data directory:", dataDir);
-			fs.mkdirSync(dataDir, { recursive: true });
-		}
-
-		// Load existing clients
-		let clients = [];
-		if (fs.existsSync(clientsFile)) {
-			console.log("Loading existing clients from:", clientsFile);
-			const existingData = fs.readFileSync(clientsFile, "utf8");
-			clients = JSON.parse(existingData);
-			console.log("Existing clients count:", clients.length);
-		} else {
-			console.log("No existing clients file found, starting fresh");
-		}
-
-		// Add new client
-		clients.push(clientData);
-		console.log("Client added to array, total clients:", clients.length);
-
-		// Save to file
-		const fileContent = JSON.stringify(clients, null, 2);
-		fs.writeFileSync(clientsFile, fileContent);
-		console.log("Clients saved to file:", clientsFile);
-
-		console.log("Client created successfully:", clientData);
-
-		return NextResponse.json({
-			success: true,
-			message: "Client created successfully",
-			data: clientData,
+		const response = await fetch(`${BACKEND_URL}/api/clients`, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify(clientData),
 		});
+		const data = await response.json();
+		return NextResponse.json(data);
 	} catch (error) {
 		console.error("Error creating client:", error);
 		return NextResponse.json(
-			{
-				success: false,
-				error: "Failed to create client",
-				details: error instanceof Error ? error.message : "Unknown error",
-			},
+			{ success: false, error: "Failed to create client" },
 			{ status: 500 }
 		);
 	}
@@ -94,35 +49,15 @@ export async function PUT(request: NextRequest) {
 		}
 
 		const clientData = await request.json();
-
-		// Load existing clients
-		let clients = [];
-		if (fs.existsSync(clientsFile)) {
-			const existingData = fs.readFileSync(clientsFile, "utf8");
-			clients = JSON.parse(existingData);
-		}
-
-		// Update client
-		const clientIndex = clients.findIndex((c: any) => c.id === id);
-		if (clientIndex === -1) {
-			return NextResponse.json(
-				{ success: false, error: "Client not found" },
-				{ status: 404 }
-			);
-		}
-
-		clients[clientIndex] = { ...clients[clientIndex], ...clientData };
-
-		// Save to file
-		fs.writeFileSync(clientsFile, JSON.stringify(clients, null, 2));
-
-		console.log("Client updated successfully:", clientData);
-
-		return NextResponse.json({
-			success: true,
-			message: "Client updated successfully",
-			data: clients[clientIndex],
+		const response = await fetch(`${BACKEND_URL}/api/clients/${id}`, {
+			method: "PUT",
+			headers: {
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify(clientData),
 		});
+		const data = await response.json();
+		return NextResponse.json(data);
 	} catch (error) {
 		console.error("Error updating client:", error);
 		return NextResponse.json(
@@ -143,25 +78,11 @@ export async function DELETE(request: NextRequest) {
 			);
 		}
 
-		// Load existing clients
-		let clients = [];
-		if (fs.existsSync(clientsFile)) {
-			const existingData = fs.readFileSync(clientsFile, "utf8");
-			clients = JSON.parse(existingData);
-		}
-
-		// Remove client
-		const filteredClients = clients.filter((c: any) => c.id !== id);
-
-		// Save to file
-		fs.writeFileSync(clientsFile, JSON.stringify(filteredClients, null, 2));
-
-		console.log("Client deleted successfully:", id);
-
-		return NextResponse.json({
-			success: true,
-			message: "Client deleted successfully",
+		const response = await fetch(`${BACKEND_URL}/api/clients/${id}`, {
+			method: "DELETE",
 		});
+		const data = await response.json();
+		return NextResponse.json(data);
 	} catch (error) {
 		console.error("Error deleting client:", error);
 		return NextResponse.json(

@@ -155,11 +155,6 @@ export class RealtimeUpdates {
 		this.broadcastUpdate("attendance", attendance);
 	}
 
-	// إرسال تحديث صلاحيات
-	sendPermissionUpdate(permissionData: any) {
-		this.broadcastUpdate("permission", permissionData);
-	}
-
 	// تنظيف التحديثات القديمة
 	cleanup() {
 		if (typeof window === "undefined") return;
