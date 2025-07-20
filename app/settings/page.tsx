@@ -515,6 +515,47 @@ function SettingsPageContent() {
     }
   }
 
+  // دالة لحفظ جميع إعدادات المستخدم في قاعدة البيانات
+  const saveAllUserSettings = async () => {
+    try {
+      const allSettings = {
+        userId: currentUser?.id,
+        profileSettings: {
+          name: currentUser?.name,
+          email: currentUser?.email,
+          phone: currentUser?.phone,
+          avatar: currentUser?.avatar,
+        },
+        notificationSettings,
+        userSettings: JSON.parse(localStorage.getItem("userSettings") || "{}"),
+        companySettings: JSON.parse(localStorage.getItem("companySettings") || "{}"),
+        rolePermissions: JSON.parse(localStorage.getItem("rolePermissions") || "{}"),
+        jobRoles: JSON.parse(localStorage.getItem("jobRoles") || "[]"),
+      }
+
+      // Save to backend database
+      const response = await fetch('/api/settings/all', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(allSettings),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save all settings to database');
+      }
+
+      const result = await response.json();
+      console.log('All settings saved to database:', result);
+
+      setAlert({ type: "success", message: "تم حفظ جميع الإعدادات في قاعدة البيانات بنجاح" })
+    } catch (error) {
+      console.error('Error saving all settings:', error);
+      setAlert({ type: "error", message: "حدث خطأ أثناء حفظ الإعدادات في قاعدة البيانات" });
+    }
+  }
+
   const [userFormErrors, setUserFormErrors] = useState({
     name: "",
     email: "",
@@ -717,8 +758,8 @@ function SettingsPageContent() {
       realtimeUpdates.sendUserUpdate({ action: 'update', user: updatedUser })
       
       // إرسال تحديث فوري للصلاحيات لجميع المستخدمين
-      realtimeUpdates.sendUserUpdate({ 
-        action: 'permissions_update', 
+      realtimeUpdates.sendPermissionUpdate({ 
+        action: 'update', 
         user: updatedUser,
         userId: currentUser?.id,
         userName: currentUser?.name
@@ -1980,6 +2021,27 @@ function SettingsPageContent() {
         type="client"
         error={deleteError}
       />
+
+      {/* Save All Settings Section */}
+      {isAdmin && (
+        <Card className="bg-card text-card-foreground border border-border">
+          <CardHeader>
+            <CardTitle className="flex items-center text-foreground">
+              <Save className="w-5 h-5 mr-2" />
+              حفظ جميع الإعدادات
+            </CardTitle>
+            <CardDescription className="text-muted-foreground">
+              حفظ جميع الإعدادات في قاعدة البيانات لضمان استمراريتها عند تحديث التطبيق
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={saveAllUserSettings} className="w-full">
+              <Save className="w-4 h-4 mr-2" />
+              حفظ جميع الإعدادات في قاعدة البيانات
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Connection Test Section - Only for admin */}
       {isAdmin && (

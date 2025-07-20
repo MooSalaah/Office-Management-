@@ -301,7 +301,7 @@ function AttendancePageContent() {
             userId: "1",
             title: "تسجيل حضور جديد",
             message: `تم تسجيل حضور ${currentUser.name} (${session === "morning" ? "صباحية" : "مسائية"})`,
-            type: "attendance",
+            type: "attendance" as const,
             actionUrl: `/attendance`,
             triggeredBy: currentUser.id,
             isRead: false,

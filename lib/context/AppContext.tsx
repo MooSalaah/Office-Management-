@@ -732,14 +732,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (window.realtimeUpdates) {
       window.realtimeUpdates.subscribe('*', (data: any) => {
+        console.log("Realtime update received:", data)
+        
         // مثال: إذا كان التحديث لمستخدم
         if (data && data.id) {
           dispatch({ type: 'UPDATE_USER', payload: data })
         }
+        
+        // معالجة تحديثات الصلاحيات
+        if (data && data.type === "permission" && data.action === "update") {
+          const updatedUser = data.user
+          dispatch({ type: "UPDATE_USER", payload: updatedUser })
+          
+          // إذا كان هذا المستخدم الحالي، تحديث currentUser أيضاً
+          if (state.currentUser && data.user.id === state.currentUser.id) {
+            dispatch({ type: "SET_CURRENT_USER", payload: updatedUser })
+            localStorage.setItem("currentUser", JSON.stringify(updatedUser))
+            
+            // إعادة تحميل الصفحة لتطبيق الصلاحيات الجديدة فوراً
+            window.location.reload()
+          }
+        }
+        
         // أضف منطق التحديث لباقي الأنواع حسب الحاجة
       })
     }
-  }, [])
+  }, [state.currentUser])
 
   // @ts-ignore
   if (typeof window !== 'undefined' && !window.realtimeUpdates) {

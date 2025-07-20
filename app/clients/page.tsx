@@ -259,18 +259,21 @@ function ClientsPageContent() {
       setIsDialogOpen(false)
       resetForm()
 
-      // Add notification to admin when client is created
-      if (currentUser?.role !== "admin") {
-        addNotification({
-          userId: "1", // Admin user ID
-          title: "عميل جديد تم إضافته",
-          message: `تم إضافة عميل جديد "${formData.name}" بواسطة ${currentUser?.name}`,
-          type: "project",
-          actionUrl: `/clients/${newClient.id}`,
-          triggeredBy: currentUser?.id || "",
-          isRead: false,
-        })
-      }
+      // Add notification to all users except the creator
+      const allUsers = JSON.parse(localStorage.getItem("users") || "[]")
+      allUsers.forEach((user: any) => {
+        if (user.id !== currentUser?.id) {
+          addNotification({
+            userId: user.id,
+            title: "عميل جديد تم إضافته",
+            message: `تم إضافة عميل جديد "${formData.name}" بواسطة ${currentUser?.name}`,
+            type: "project",
+            actionUrl: `/clients/${newClient.id}`,
+            triggeredBy: currentUser?.id || "",
+            isRead: false,
+          })
+        }
+      })
     } catch (error) {
       console.error('Error creating client:', error);
       setAlert({ type: "error", message: "حدث خطأ أثناء حفظ العميل في قاعدة البيانات" });
