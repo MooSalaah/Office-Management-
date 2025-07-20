@@ -250,6 +250,8 @@ function ClientsPageContent() {
     }
 
     try {
+      console.log('Attempting to save client to API:', newClient);
+      
       // Save to backend database
       const response = await fetch('/api/clients', {
         method: 'POST',
@@ -259,8 +261,13 @@ function ClientsPageContent() {
         body: JSON.stringify(newClient),
       });
 
+      console.log('API response status:', response.status);
+      console.log('API response ok:', response.ok);
+
       if (!response.ok) {
-        throw new Error('Failed to save client to database');
+        const errorData = await response.json();
+        console.error('API error response:', errorData);
+        throw new Error(`Failed to save client to database: ${errorData.error || 'Unknown error'}`);
       }
 
       const result = await response.json();
@@ -298,7 +305,8 @@ function ClientsPageContent() {
       })
     } catch (error) {
       console.error('Error creating client:', error);
-      setAlert({ type: "error", message: "حدث خطأ أثناء حفظ العميل في قاعدة البيانات" });
+      const errorMessage = error instanceof Error ? error.message : "حدث خطأ غير معروف";
+      setAlert({ type: "error", message: `حدث خطأ أثناء حفظ العميل في قاعدة البيانات: ${errorMessage}` });
     }
   }
 

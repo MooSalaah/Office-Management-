@@ -31,20 +31,36 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
 	try {
+		console.log("POST /api/clients - Starting client creation");
+
 		const clientData = await request.json();
+		console.log("Client data received:", clientData);
+
+		// Ensure data directory exists
+		if (!fs.existsSync(dataDir)) {
+			console.log("Creating data directory:", dataDir);
+			fs.mkdirSync(dataDir, { recursive: true });
+		}
 
 		// Load existing clients
 		let clients = [];
 		if (fs.existsSync(clientsFile)) {
+			console.log("Loading existing clients from:", clientsFile);
 			const existingData = fs.readFileSync(clientsFile, "utf8");
 			clients = JSON.parse(existingData);
+			console.log("Existing clients count:", clients.length);
+		} else {
+			console.log("No existing clients file found, starting fresh");
 		}
 
 		// Add new client
 		clients.push(clientData);
+		console.log("Client added to array, total clients:", clients.length);
 
 		// Save to file
-		fs.writeFileSync(clientsFile, JSON.stringify(clients, null, 2));
+		const fileContent = JSON.stringify(clients, null, 2);
+		fs.writeFileSync(clientsFile, fileContent);
+		console.log("Clients saved to file:", clientsFile);
 
 		console.log("Client created successfully:", clientData);
 
@@ -56,7 +72,11 @@ export async function POST(request: NextRequest) {
 	} catch (error) {
 		console.error("Error creating client:", error);
 		return NextResponse.json(
-			{ success: false, error: "Failed to create client" },
+			{
+				success: false,
+				error: "Failed to create client",
+				details: error instanceof Error ? error.message : "Unknown error",
+			},
 			{ status: 500 }
 		);
 	}

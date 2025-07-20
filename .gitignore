@@ -121,3 +121,6 @@ temp/
 .netlify
 
 /lib/generated/prisma
+
+# Local data storage
+/data/
