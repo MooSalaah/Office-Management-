@@ -196,10 +196,8 @@ function ProjectsPageContent() {
       filtered = filtered.filter((project) => project.status === filterStatus)
     }
 
-    // Filter by user role
-    if (currentUser?.role === "engineer") {
-      filtered = filtered.filter((project) => project.assignedEngineerId === currentUser.id)
-    }
+      // Filter by user role - جميع المستخدمين يرون جميع المشاريع طالما لديهم صلاحية العرض
+  // لا يتم فلترة المشاريع حسب المستخدم، فقط حسب الصلاحيات
 
     return filtered
   }, [projects, searchTerm, filterStatus, currentUser, clientParam])

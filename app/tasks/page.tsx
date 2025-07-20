@@ -581,12 +581,12 @@ function TasksPageContent() {
   // استخدام التحسينات الجديدة للبحث والفلترة
   const searchedTasks = useTaskSearch(tasks, searchTerm)
   
-  // Filter by user role - المدير يرى جميع المهام، المستخدم يرى مهامه فقط
+  // Filter by user role - المدير يرى جميع المهام، المستخدم يرى مهامه المخصصة له فقط
   const filteredTasks = searchedTasks.filter((task) => {
     if (currentUser?.role === "admin") {
       return true // المدير يرى جميع المهام
     }
-    return task.assigneeId === currentUser?.id // المستخدم يرى مهامه فقط
+    return task.assigneeId === currentUser?.id // المستخدم يرى مهامه المخصصة له فقط (وليس المهام التي أنشأها)
   })
 
   // إضافة فحص للمهام المتأخرة

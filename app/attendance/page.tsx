@@ -99,20 +99,27 @@ function AttendancePageContent() {
     // تحميل المستخدمين من localStorage
     const storedUsers = JSON.parse(localStorage.getItem("users") || "[]")
     setUsers(storedUsers)
-    // تحميل سجلات الحضور من localStorage
+    
+    // تحميل سجلات الحضور من localStorage - المدير يرى جميع السجلات
     const stored = localStorage.getItem("attendanceRecords")
     if (stored) {
-      setAttendanceRecords(JSON.parse(stored))
+      const allRecords = JSON.parse(stored)
+      setAttendanceRecords(allRecords)
     }
+    
     // تحميل المستخدم الحالي
     const user = getCurrentUser()
     setCurrentUser(user)
 
-    // إضافة مراقب لتغييرات المستخدمين في localStorage
+    // إضافة مراقب لتغييرات المستخدمين وسجلات الحضور في localStorage
     const handleStorageChange = (event: StorageEvent) => {
       if (event.key === "users") {
         const updatedUsers = JSON.parse(event.newValue || "[]")
         setUsers(updatedUsers)
+      }
+      if (event.key === "attendanceRecords") {
+        const updatedRecords = JSON.parse(event.newValue || "[]")
+        setAttendanceRecords(updatedRecords)
       }
     }
     window.addEventListener("storage", handleStorageChange)
