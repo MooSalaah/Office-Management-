@@ -111,6 +111,28 @@ function ClientsPageContent() {
     )
   }, [clients, searchTerm])
 
+  // Load clients from API on component mount
+  useEffect(() => {
+    const loadClientsFromAPI = async () => {
+      try {
+        const response = await fetch('/api/clients')
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success) {
+            console.log('Clients loaded from API:', data.data)
+            dispatch({ type: "LOAD_CLIENTS", payload: data.data })
+            // Save to localStorage as backup
+            localStorage.setItem("clients", JSON.stringify(data.data))
+          }
+        }
+      } catch (error) {
+        console.error('Error loading clients from API:', error)
+      }
+    }
+    
+    loadClientsFromAPI()
+  }, [dispatch])
+
   useEffect(() => {
     if (clientUpdates.length > 0) {
       const lastUpdate = clientUpdates[clientUpdates.length - 1];

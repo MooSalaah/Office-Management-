@@ -94,38 +94,51 @@ function AttendancePageContent() {
   const isMorning = hour >= 8 && hour < 12
   const isEvening = hour >= 16 && hour < 21
 
-  // Load attendance from localStorage
+  // Load data from API and localStorage
   useEffect(() => {
-    // تحميل المستخدمين من localStorage
-    const storedUsers = JSON.parse(localStorage.getItem("users") || "[]")
-    setUsers(storedUsers)
-    
-    // تحميل سجلات الحضور من localStorage - المدير يرى جميع السجلات
-    const stored = localStorage.getItem("attendanceRecords")
-    if (stored) {
-      const allRecords = JSON.parse(stored)
-      setAttendanceRecords(allRecords)
-    }
-    
-    // تحميل المستخدم الحالي
-    const user = getCurrentUser()
-    setCurrentUser(user)
+    const loadData = async () => {
+      try {
+        // تحميل المستخدمين من localStorage
+        const storedUsers = JSON.parse(localStorage.getItem("users") || "[]")
+        setUsers(storedUsers)
+        
+        // تحميل سجلات الحضور من API
+        const response = await fetch('/api/attendance')
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success) {
+            console.log('Attendance records loaded from API:', data.data)
+            setAttendanceRecords(data.data)
+            // Save to localStorage as backup
+            localStorage.setItem("attendanceRecords", JSON.stringify(data.data))
+          }
+        }
+        
+        // تحميل المستخدم الحالي
+        const user = getCurrentUser()
+        setCurrentUser(user)
 
-    // إضافة مراقب لتغييرات المستخدمين وسجلات الحضور في localStorage
-    const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === "users") {
-        const updatedUsers = JSON.parse(event.newValue || "[]")
-        setUsers(updatedUsers)
-      }
-      if (event.key === "attendanceRecords") {
-        const updatedRecords = JSON.parse(event.newValue || "[]")
-        setAttendanceRecords(updatedRecords)
+        // إضافة مراقب لتغييرات المستخدمين وسجلات الحضور في localStorage
+        const handleStorageChange = (event: StorageEvent) => {
+          if (event.key === "users") {
+            const updatedUsers = JSON.parse(event.newValue || "[]")
+            setUsers(updatedUsers)
+          }
+          if (event.key === "attendanceRecords") {
+            const updatedRecords = JSON.parse(event.newValue || "[]")
+            setAttendanceRecords(updatedRecords)
+          }
+        }
+        window.addEventListener("storage", handleStorageChange)
+        return () => {
+          window.removeEventListener("storage", handleStorageChange)
+        }
+      } catch (error) {
+        console.error('Error loading data:', error)
       }
     }
-    window.addEventListener("storage", handleStorageChange)
-    return () => {
-      window.removeEventListener("storage", handleStorageChange)
-    }
+    
+    loadData()
   }, [])
 
   // Save attendance to localStorage on change
@@ -203,7 +216,7 @@ function AttendancePageContent() {
   }
 
   // تسجيل الحضور
-  const handleCheckIn = (session: "morning" | "evening") => {
+  const handleCheckIn = async (session: "morning" | "evening") => {
     if (!currentUser) return
     const now = new Date()
     const hour = now.getHours()
@@ -246,6 +259,24 @@ function AttendancePageContent() {
       totalHours: 0,
     }
     setAttendanceRecords(prev => [...prev, newRecord])
+    
+    // Save to API
+    try {
+      const response = await fetch('/api/attendance', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newRecord),
+      });
+      
+      if (response.ok) {
+        console.log('Attendance record saved to API successfully');
+      }
+    } catch (error) {
+      console.error('Error saving attendance to API:', error);
+    }
+    
     // بث تحديث فوري لجميع المستخدمين
     realtimeUpdates.sendAttendanceUpdate({ action: 'create', attendance: newRecord, userId: currentUser?.id, userName: currentUser?.name })
     showAlertDialogMessage("success", `تم تسجيل الحضور (${session === "morning" ? "صباحية" : "مسائية"}) بنجاح${status === "overtime" ? " (خارج أوقات الدوام - ساعات إضافية)" : ""}`)
