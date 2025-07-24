@@ -40,9 +40,8 @@ router.get('/:id', async (req, res) => {
 
 // Create new task (public for testing)
 router.post('/', async (req, res) => {
-  const { title, description, project, assignedTo, priority, status, dueDate } = req.body;
-  const task = new Task({ title, description, project, assignedTo, priority, status, dueDate });
   try {
+    const task = new Task(req.body);
     const newTask = await task.save();
     // Broadcast update to all clients
     try {

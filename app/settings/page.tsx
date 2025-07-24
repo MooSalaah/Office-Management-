@@ -592,43 +592,23 @@ function SettingsPageContent() {
       createdAt: new Date().toISOString(),
     }
 
-    console.log("Creating new user:", newUser)
-
     try {
       // Save to backend database
       const response = await fetch('/api/users', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newUser),
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to save user to database');
-      }
-
       const result = await response.json();
-      console.log('User saved to database:', result);
-
-      // Save to localStorage as backup
-      existingUsers.push(newUser)
-      localStorage.setItem("users", JSON.stringify(existingUsers))
-      console.log("Users saved to localStorage:", existingUsers)
-      
-      // Update global state
-      dispatch({ type: "ADD_USER", payload: newUser })
-      
-      // إرسال تحديث فوري لجميع المستخدمين
-      realtimeUpdates.sendUserUpdate({ action: 'create', user: newUser })
-      
-      // Show success dialog with confirmation
-      showSuccessToast("تم إنشاء المستخدم بنجاح", `تم إنشاء المستخدم "${newUser.name}" بنجاح`)
-      
-      setIsUserDialogOpen(false)
-      resetUserForm()
+      if (result.success && result.data) {
+        dispatch({ type: "ADD_USER", payload: result.data });
+        showSuccessToast("تم إنشاء المستخدم بنجاح", `تم إنشاء المستخدم "${result.data.name}" بنجاح`)
+        setIsUserDialogOpen(false)
+        resetUserForm()
+      } else {
+        setAlert({ type: "error", message: result.error || "فشل حفظ المستخدم في قاعدة البيانات" });
+      }
     } catch (error) {
-      console.error('Error creating user:', error);
       setAlert({ type: "error", message: "حدث خطأ أثناء حفظ المستخدم في قاعدة البيانات" });
     }
   }
@@ -638,13 +618,11 @@ function SettingsPageContent() {
       setAlert({ type: "error", message: "ليس لديك صلاحية لتعديل المستخدمين" })
       return
     }
-
     // التحقق من وجود البريد الإلكتروني
     if (!userFormData.email) {
       setAlert({ type: "error", message: "البريد الإلكتروني مطلوب" })
       return
     }
-
     // التحقق من عدم تكرار البريد الإلكتروني (إذا تم تغييره)
     if (userFormData.email !== editingUser.email) {
       const existingUsers = JSON.parse(localStorage.getItem("users") || "[]")
@@ -654,12 +632,11 @@ function SettingsPageContent() {
         return
       }
     }
-
     const updatedUser: UserType = {
       ...editingUser,
       name: userFormData.name,
       email: userFormData.email,
-      password: userFormData.password || editingUser.password, // الاحتفاظ بكلمة المرور القديمة إذا لم يتم تغييرها
+      password: userFormData.password || editingUser.password,
       phone: userFormData.phone,
       role: userFormData.role,
       isActive: userFormData.isActive,
@@ -667,77 +644,25 @@ function SettingsPageContent() {
       monthlySalary: userFormData.monthlySalary,
       avatar: userFormData.avatar,
     }
-
-    console.log("Updating user:", updatedUser)
-
     try {
       // Save to backend database
       const response = await fetch(`/api/users?id=${editingUser.id}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedUser),
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to update user in database');
-      }
-
       const result = await response.json();
-      console.log('User updated in database:', result);
-
-      // Save to localStorage
-      const existingUsers = JSON.parse(localStorage.getItem("users") || "[]")
-      const updatedUsers = existingUsers.map((u: any) => u.id === editingUser.id ? updatedUser : u)
-      localStorage.setItem("users", JSON.stringify(updatedUsers))
-      
-      if (currentUser && editingUser.id === currentUser.id) {
-        localStorage.setItem("currentUser", JSON.stringify(updatedUser))
+      if (result.success && result.data) {
+        dispatch({ type: "UPDATE_USER", payload: result.data });
+        showSuccessToast("تم تحديث المستخدم بنجاح", `تم تحديث المستخدم "${result.data.name}" بنجاح`)
+        setIsUserDialogOpen(false)
+        setEditingUser(null)
+        resetUserForm()
+        reloadUsersFromStorage()
+      } else {
+        setAlert({ type: "error", message: result.error || "فشل تحديث المستخدم في قاعدة البيانات" });
       }
-      
-      console.log("Users saved to localStorage:", updatedUsers)
-      
-      // Update state
-      dispatch({ type: "UPDATE_USER", payload: updatedUser })
-      
-      // If this is the current user, update currentUser as well
-      if (currentUser && editingUser.id === currentUser.id) {
-        dispatch({ type: "SET_CURRENT_USER", payload: updatedUser })
-        // Also update localStorage
-        localStorage.setItem("currentUser", JSON.stringify(updatedUser))
-        
-        // Update user permissions based on current role
-        const jobRoles = JSON.parse(localStorage.getItem("jobRoles") || "[]")
-        const userRole = jobRoles.find((role: any) => role.id === updatedUser.role)
-        if (userRole) {
-          const updatedUserWithPermissions = { ...updatedUser, permissions: userRole.permissions }
-          dispatch({ type: "SET_CURRENT_USER", payload: updatedUserWithPermissions })
-          localStorage.setItem("currentUser", JSON.stringify(updatedUserWithPermissions))
-        }
-      }
-      
-      // إرسال تحديث فوري لجميع المستخدمين
-      realtimeUpdates.sendUserUpdate({ action: 'update', user: updatedUser })
-      
-      // إرسال تحديث فوري للصلاحيات لجميع المستخدمين
-      realtimeUpdates.sendUserUpdate({ 
-        action: 'permissions_update', 
-        user: updatedUser,
-        userId: currentUser?.id,
-        userName: currentUser?.name
-      })
-      
-      // Show success dialog with confirmation
-      showSuccessToast("تم تحديث المستخدم بنجاح", `تم تحديث المستخدم "${updatedUser.name}" بنجاح`)
-      
-      setIsUserDialogOpen(false)
-      setEditingUser(null)
-      resetUserForm()
-      // إعادة تحميل المستخدمين من التخزين بعد التحديث
-      reloadUsersFromStorage()
     } catch (error) {
-      console.error('Error updating user:', error);
       setAlert({ type: "error", message: "حدث خطأ أثناء تحديث المستخدم في قاعدة البيانات" });
     }
   }

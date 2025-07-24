@@ -94,7 +94,85 @@ function AttendancePageContent() {
   const isMorning = hour >= 8 && hour < 12
   const isEvening = hour >= 16 && hour < 21
 
-  // Load attendance from localStorage
+  // أضف متغير API_BASE_URL
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+
+  // جلب سجلات الحضور من backend
+  useEffect(() => {
+    async function fetchAttendance() {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/attendance`);
+        const data = await res.json();
+        if (data.success) {
+          dispatch({ type: "LOAD_ATTENDANCE", payload: data.data });
+          setAttendanceRecords(data.data);
+        }
+      } catch (err) {}
+    }
+    fetchAttendance();
+  }, [dispatch]);
+
+  // إضافة سجل حضور
+  const handleCreateAttendance = async (newRecord: AttendanceRecord) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/attendance`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newRecord),
+      });
+      const data = await res.json();
+      if (data.success && data.data) {
+        dispatch({ type: "ADD_ATTENDANCE", payload: data.data });
+        setAttendanceRecords((prev) => [...prev, data.data]);
+        setAlert({ type: "success", message: "تم حفظ الحضور في قاعدة البيانات بنجاح" });
+      } else {
+        setAlert({ type: "error", message: data.error || "فشل حفظ الحضور في قاعدة البيانات" });
+      }
+    } catch (err) {
+      setAlert({ type: "error", message: "حدث خطأ أثناء حفظ الحضور في قاعدة البيانات" });
+    }
+  };
+
+  // تحديث سجل حضور
+  const handleUpdateAttendance = async (id: string, updatedRecord: AttendanceRecord) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/attendance/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updatedRecord),
+      });
+      const data = await res.json();
+      if (data.success && data.data) {
+        dispatch({ type: "UPDATE_ATTENDANCE", payload: data.data });
+        setAttendanceRecords((prev) => prev.map((r) => r.id === id ? data.data : r));
+        setAlert({ type: "success", message: "تم تحديث الحضور في قاعدة البيانات بنجاح" });
+      } else {
+        setAlert({ type: "error", message: data.error || "فشل تحديث الحضور في قاعدة البيانات" });
+      }
+    } catch (err) {
+      setAlert({ type: "error", message: "حدث خطأ أثناء تحديث الحضور في قاعدة البيانات" });
+    }
+  };
+
+  // حذف سجل حضور
+  const handleDeleteAttendance = async (id: string) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/attendance/${id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAttendanceRecords((prev) => prev.filter((r) => r.id !== id));
+        setAlert({ type: "success", message: "تم حذف سجل الحضور من قاعدة البيانات" });
+      } else {
+        setAlert({ type: "error", message: data.error || "فشل حذف سجل الحضور من قاعدة البيانات" });
+      }
+    } catch (err) {
+      setAlert({ type: "error", message: "حدث خطأ أثناء حذف سجل الحضور من قاعدة البيانات" });
+    }
+  };
+
+  // تحميل المستخدمين من localStorage
   useEffect(() => {
     // تحميل المستخدمين من localStorage
     const storedUsers = JSON.parse(localStorage.getItem("users") || "[]")

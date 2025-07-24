@@ -972,10 +972,14 @@ export function useAppActions() {
       const data = await res.json();
       if (data.success) {
         dispatch({ type: "DELETE_NOTIFICATION", payload: notificationId });
+      } else {
+        // يمكن عرض رسالة خطأ للمستخدم هنا
+        console.error("فشل حذف الإشعار من قاعدة البيانات", data.error);
       }
     } catch (err) {
       // fallback: حذف محلي فقط
       dispatch({ type: "DELETE_NOTIFICATION", payload: notificationId });
+      console.error("حدث خطأ أثناء حذف الإشعار من قاعدة البيانات", err);
     }
   };
 

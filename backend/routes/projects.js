@@ -40,9 +40,8 @@ router.get('/:id', async (req, res) => {
 
 // Create new project (public for testing)
 router.post('/', async (req, res) => {
-  const { name, client, description, startDate, endDate, status, notes } = req.body;
-  const project = new Project({ name, client, description, startDate, endDate, status, notes });
   try {
+    const project = new Project(req.body);
     const newProject = await project.save();
     
     // Broadcast update to all clients

@@ -41,9 +41,8 @@ router.get('/:id', async (req, res) => {
 
 // Create new user (public for testing)
 router.post('/', async (req, res) => {
-  const { name, email, role, department, phone } = req.body;
-  const user = new User({ name, email, role, department, phone });
   try {
+    const user = new User(req.body);
     const newUser = await user.save();
     // Broadcast update to all clients
     try {

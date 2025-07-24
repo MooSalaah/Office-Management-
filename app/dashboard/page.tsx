@@ -119,7 +119,7 @@ function ProjectDialog({ open, onClose }: { open: boolean; onClose: () => void }
 
   const remainingBalance = Number(formData.price) - Number(formData.downPayment)
 
-  const handleAddNewClient = () => {
+  const handleAddNewClient = async () => {
     if (!newClientName.trim()) {
       setNewClientInputError("يرجى إدخال اسم العميل الجديد");
       return;
@@ -129,7 +129,7 @@ function ProjectDialog({ open, onClose }: { open: boolean; onClose: () => void }
       const newClient = {
         id: Date.now().toString(),
         name: newClientName,
-        phone: "",
+        phone: "", // غير إلزامي
         email: "",
         address: "",
         status: "active" as const,
@@ -138,25 +138,37 @@ function ProjectDialog({ open, onClose }: { open: boolean; onClose: () => void }
         totalValue: 0,
         lastContact: new Date().toISOString().split("T")[0],
         createdAt: new Date().toISOString(),
+      };
+      try {
+        // حفظ العميل في قاعدة البيانات
+        const response = await fetch('/api/clients', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newClient),
+        });
+        if (!response.ok) throw new Error('Failed to save client to database');
+        const result = await response.json();
+        // أضف للـ state
+        dispatch({ type: "ADD_CLIENT", payload: result.data || newClient });
+        setFormData(prev => ({ ...prev, clientId: (result.data?.id || newClient.id) }));
+        setShowNewClientInput(false);
+        setNewClientName("");
+        addNotification({
+          userId: "1",
+          title: "عميل جديد تم إضافته",
+          message: `تم إضافة العميل "${newClientName}" بنجاح`,
+          type: "system",
+          isRead: false,
+          actionUrl: `/clients`,
+          triggeredBy: state.currentUser?.id || "",
+        });
+        // بث تحديث فوري لجميع المستخدمين
+        realtimeUpdates.sendClientUpdate({ action: 'create', client: result.data || newClient, userId: state.currentUser?.id, userName: state.currentUser?.name });
+      } catch (error) {
+        setNewClientInputError("حدث خطأ أثناء حفظ العميل في قاعدة البيانات");
       }
-      dispatch({ type: "ADD_CLIENT", payload: newClient })
-      setFormData(prev => ({ ...prev, clientId: newClient.id }))
-      setShowNewClientInput(false)
-      setNewClientName("")
-      addNotification({
-        userId: "1",
-        title: "عميل جديد تم إضافته",
-        message: `تم إضافة العميل "${newClientName}" بنجاح`,
-        type: "system",
-        isRead: false,
-        actionUrl: `/clients`,
-        triggeredBy: state.currentUser?.id || "",
-      })
-
-      // بث تحديث فوري لجميع المستخدمين
-      realtimeUpdates.sendClientUpdate({ action: 'create', client: newClient, userId: state.currentUser?.id, userName: state.currentUser?.name })
     }
-  }
+  };
 
   const handleAddNewProjectType = () => {
     if (!newProjectType.trim()) {

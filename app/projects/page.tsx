@@ -544,73 +544,50 @@ function ProjectsPageContent() {
       return;
     }
     setNewClientInputError("");
-    
     const newClient = {
       id: Date.now().toString(),
       name: newClientName.trim(),
       email: "",
-      phone: "",
+      phone: "", // غير إلزامي
       address: "",
       projectsCount: 0,
       totalValue: 0,
       lastContact: new Date().toISOString(),
       status: "active" as const,
       createdAt: new Date().toISOString(),
-    }
-    
+    };
     try {
-      // Save to backend database
+      // حفظ العميل في قاعدة البيانات
       const response = await fetch('/api/clients', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newClient),
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to save client to database');
-      }
-
+      if (!response.ok) throw new Error('Failed to save client to database');
       const result = await response.json();
-      console.log('Client saved to database:', result);
-
-      // Add to clients list
-      dispatch({ type: "ADD_CLIENT", payload: newClient })
-      
-      // Save to localStorage
-      const existingClients = JSON.parse(localStorage.getItem("clients") || "[]")
-      existingClients.push(newClient)
-      localStorage.setItem("clients", JSON.stringify(existingClients))
-      
+      dispatch({ type: "ADD_CLIENT", payload: result.data || newClient });
+      setFormData(prev => ({ ...prev, clientId: (result.data?.id || newClient.id) }));
       // بث تحديث فوري لجميع المستخدمين
-      realtimeUpdates.sendClientUpdate({ action: 'create', client: newClient, userId: currentUser?.id, userName: currentUser?.name })
-      
-      // Update form data
-      setFormData(prev => ({ ...prev, clientId: newClient.id }))
-      
+      realtimeUpdates.sendClientUpdate({ action: 'create', client: result.data || newClient, userId: currentUser?.id, userName: currentUser?.name });
       // Add notification to all users except the creator
       users.forEach(user => {
         if (user.id !== currentUser?.id) {
           addNotification({
             userId: user.id,
             title: "تم إضافة عميل جديد",
-            message: `تم إضافة العميل "${newClient.name}" بواسطة ${currentUser?.name}`,
+            message: `تم إضافة العميل \"${newClient.name}\" بواسطة ${currentUser?.name}`,
             type: "project",
             isRead: false,
             triggeredBy: currentUser?.id || "",
-          })
+          });
         }
-      })
-      
-      // Reset input
-      setShowNewClientInput(false)
-      setNewClientName("")
+      });
+      setShowNewClientInput(false);
+      setNewClientName("");
     } catch (error) {
-      console.error('Error creating client:', error);
       setNewClientInputError("حدث خطأ أثناء حفظ العميل في قاعدة البيانات");
     }
-  }
+  };
 
   // Handle adding new project type
   const handleAddNewProjectType = () => {

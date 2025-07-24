@@ -288,24 +288,18 @@ function TasksPageContent() {
       setAlert({ type: "error", message: "ليس لديك صلاحية لإنشاء مهام جديدة" })
       return
     }
-
     // التحقق من الحقول المطلوبة
     const missingFields = {
       title: !formData.title.trim(),
       assigneeId: !formData.assigneeId,
       dueDate: !formData.dueDate,
     }
-
     setRequiredFields(missingFields)
-
     if (missingFields.title || missingFields.assigneeId || missingFields.dueDate) {
-      // لا تعرض alert عام، فقط أظهر الأخطاء تحت الحقول
       return
     }
-
     const assignee = users.find((u) => u.id === formData.assigneeId)
     const project = projects.find((p) => p.id === formData.projectId)
-
     const newTask: Task = {
       id: Date.now().toString(),
       title: formData.title,
@@ -321,85 +315,35 @@ function TasksPageContent() {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
-
     try {
       // Save to backend database
       const response = await fetch('/api/tasks', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newTask),
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to save task to database');
-      }
-
-      const result = await response.json();
-      console.log('Task saved to database:', result);
-
-      // Update local state
-      dispatch({ type: "ADD_TASK", payload: newTask })
-      
-      // Save to localStorage as backup
-      const existingTasks = JSON.parse(localStorage.getItem("tasks") || "[]")
-      existingTasks.push(newTask)
-      localStorage.setItem("tasks", JSON.stringify(existingTasks))
-      
-      // Broadcast realtime update
-      broadcastTaskUpdate('create', { task: newTask, userId: currentUser?.id, userName: currentUser?.name })
-      
-      // إرسال تحديث فوري لجميع المستخدمين
-      realtimeUpdates.sendTaskUpdate({ action: 'create', task: newTask, userId: currentUser?.id, userName: currentUser?.name })
-      
-      showSuccessToast("تم إنشاء المهمة بنجاح", `تم إنشاء المهمة "${newTask.title}" بنجاح`)
-      setIsDialogOpen(false)
-      resetForm()
-
-      // Add notification to assignee when task is assigned
-      if (assignee && assignee.id !== currentUser?.id) {
-        addNotification({
-          userId: assignee.id,
-          title: "مهمة جديدة مُعيّنة لك",
-          message: `تم تعيين مهمة "${formData.title}" لك بواسطة ${currentUser?.name}`,
-          type: "task",
-          actionUrl: `/tasks/${newTask.id}`,
-          triggeredBy: currentUser?.id || "",
-          isRead: false,
-        })
-      }
-
-      // Add notification to admin when task is created by non-admin
-      if (currentUser?.role !== "admin") {
-        addNotification({
-          userId: "1", // Admin user ID
-          title: "مهمة جديدة تم إنشاؤها",
-          message: `تم إنشاء مهمة جديدة "${formData.title}" بواسطة ${currentUser?.name}`,
-          type: "task",
-          actionUrl: `/tasks/${newTask.id}`,
-          triggeredBy: currentUser?.id || "",
-          isRead: false,
-        })
+      const data = await response.json();
+      if (data.success && data.data) {
+        dispatch({ type: "ADD_TASK", payload: data.data });
+        showSuccessToast("تم إنشاء المهمة بنجاح", `تم إنشاء المهمة "${data.data.title}" بنجاح`);
+        setIsDialogOpen(false);
+        resetForm();
+      } else {
+        setAlert({ type: "error", message: data.error || "فشل حفظ المهمة في قاعدة البيانات" });
       }
     } catch (error) {
-      console.error('Error creating task:', error);
       setAlert({ type: "error", message: "حدث خطأ أثناء حفظ المهمة في قاعدة البيانات" });
     }
-  }
+  };
 
   const handleUpdateTask = async () => {
     if (!editingTask) return
-
-    // Check if user can edit tasks
     if (!hasPermission(currentUser?.role || "", "edit", "tasks")) {
       setAlert({ type: "error", message: "ليس لديك صلاحية لتعديل المهام" })
       return
     }
-
     const assignee = users.find((u) => u.id === formData.assigneeId)
     const project = projects.find((p) => p.id === formData.projectId)
-
     const updatedTask: Task = {
       ...editingTask,
       title: formData.title,
@@ -412,73 +356,26 @@ function TasksPageContent() {
       dueDate: formData.dueDate,
       updatedAt: new Date().toISOString(),
     }
-
     try {
-      // Save to backend database
       const response = await fetch(`/api/tasks?id=${editingTask.id}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedTask),
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to update task in database');
-      }
-
-      const result = await response.json();
-      console.log('Task updated in database:', result);
-
-      // Update local state
-      dispatch({ type: "UPDATE_TASK", payload: updatedTask })
-      
-      // Update in localStorage
-      const existingTasks = JSON.parse(localStorage.getItem("tasks") || "[]")
-      const updatedTasks = existingTasks.map((t: any) => t.id === editingTask.id ? updatedTask : t)
-      localStorage.setItem("tasks", JSON.stringify(updatedTasks))
-      
-      // Broadcast realtime update
-      broadcastTaskUpdate('update', { task: updatedTask, userId: currentUser?.id, userName: currentUser?.name })
-      
-      // إرسال تحديث فوري لجميع المستخدمين
-      realtimeUpdates.sendTaskUpdate({ action: 'update', task: updatedTask, userId: currentUser?.id, userName: currentUser?.name })
-      
-      showSuccessToast("تم تحديث المهمة بنجاح", `تم تحديث المهمة "${updatedTask.title}" بنجاح`)
-      setIsEditDialogOpen(false)
-      setEditingTask(null)
-      resetForm()
-
-      // Add notification to assignee when task is updated
-      if (assignee && assignee.id !== currentUser?.id) {
-        addNotification({
-          userId: assignee.id,
-          title: "مهمة تم تحديثها",
-          message: `تم تحديث مهمة "${formData.title}" بواسطة ${currentUser?.name}`,
-          type: "task",
-          actionUrl: `/tasks/${editingTask?.id}`,
-          triggeredBy: currentUser?.id || "",
-          isRead: false,
-        })
-      }
-
-      // Add notification to admin when task is updated by non-admin
-      if (currentUser?.role !== "admin") {
-        addNotification({
-          userId: "1", // Admin user ID
-          title: "مهمة تم تحديثها",
-          message: `تم تحديث مهمة "${formData.title}" بواسطة ${currentUser?.name}`,
-          type: "task",
-          actionUrl: `/tasks/${editingTask?.id}`,
-          triggeredBy: currentUser?.id || "",
-          isRead: false,
-        })
+      const data = await response.json();
+      if (data.success && data.data) {
+        dispatch({ type: "UPDATE_TASK", payload: data.data });
+        showSuccessToast("تم تحديث المهمة بنجاح", `تم تحديث المهمة "${data.data.title}" بنجاح`);
+        setIsEditDialogOpen(false);
+        setEditingTask(null);
+        resetForm();
+      } else {
+        setAlert({ type: "error", message: data.error || "فشل تحديث المهمة في قاعدة البيانات" });
       }
     } catch (error) {
-      console.error('Error updating task:', error);
       setAlert({ type: "error", message: "حدث خطأ أثناء تحديث المهمة في قاعدة البيانات" });
     }
-  }
+  };
 
   const handleDeleteTask = (taskId: string) => {
     if (!hasPermission(currentUser?.role || "", "delete", "tasks")) {

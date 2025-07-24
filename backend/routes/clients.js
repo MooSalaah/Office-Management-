@@ -40,9 +40,8 @@ router.get('/:id', async (req, res) => {
 
 // Create new client (public for testing)
 router.post('/', async (req, res) => {
-  const { name, email, phone, address, company } = req.body;
-  const client = new Client({ name, email, phone, address, company });
   try {
+    const client = new Client(req.body);
     const newClient = await client.save();
     // Broadcast update to all clients
     try {
