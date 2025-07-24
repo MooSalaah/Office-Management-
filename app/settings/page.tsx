@@ -421,34 +421,67 @@ function SettingsPageContent() {
     }
   }
 
+  // أضف متغير API_BASE_URL إذا لم يكن موجودًا
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+
+  // جلب إعدادات المكتب من backend
+  useEffect(() => {
+    async function fetchCompanySettings() {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/companySettings`);
+        const data = await res.json();
+        if (data.success && data.data) {
+          setOfficeData(prev => ({ ...prev, ...data.data }));
+          dispatch({ type: "UPDATE_COMPANY_SETTINGS", payload: data.data });
+        }
+      } catch (err) {}
+    }
+    fetchCompanySettings();
+  }, [dispatch]);
+
+  // جلب إعدادات المستخدم من backend
+  useEffect(() => {
+    async function fetchUserSettings() {
+      if (!currentUser?.id) return;
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/userSettings/${currentUser.id}`);
+        const data = await res.json();
+        if (data.success && data.data) {
+          setNotificationSettings(data.data.notificationSettings || notificationSettings);
+          dispatch({ type: "UPDATE_USER_SETTINGS", payload: data.data });
+        }
+      } catch (err) {}
+    }
+    fetchUserSettings();
+  }, [currentUser, dispatch]);
+
+  // جلب الأدوار من backend
+  useEffect(() => {
+    async function fetchRoles() {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/roles`);
+        const data = await res.json();
+        if (data.success && Array.isArray(data.data)) {
+          setJobRoles(data.data);
+        }
+      } catch (err) {}
+    }
+    fetchRoles();
+  }, []);
+
+  // حفظ إعدادات المكتب في backend
   const handleOfficeUpdate = async () => {
     try {
-      // Save to backend database first
-      const response = await fetch('/api/settings/company', {
+      const response = await fetch(`${API_BASE_URL}/api/companySettings`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(officeData),
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to save company settings to database');
-      }
-
+      if (!response.ok) throw new Error('Failed to save company settings to database');
       const result = await response.json();
-      console.log('Company settings saved to database:', result);
-
-      // Save to localStorage
-      localStorage.setItem("companySettings", JSON.stringify(officeData))
-      console.log("Office settings saved to localStorage:", officeData)
-      
-      // Update state
-      dispatch({ type: "UPDATE_COMPANY_INFO", payload: officeData })
-      
-      setAlert(null)
-      setSuccessDialog("تم تحديث بيانات المكتب بنجاح وتم حفظ البيانات في قاعدة البيانات")
-      
+      dispatch({ type: "UPDATE_COMPANY_INFO", payload: officeData });
+      setAlert(null);
+      setSuccessDialog("تم تحديث بيانات المكتب بنجاح وتم حفظ البيانات في قاعدة البيانات");
       addNotification({
         userId: "1",
         title: "تحديث بيانات المكتب",
@@ -457,63 +490,34 @@ function SettingsPageContent() {
         actionUrl: `/settings`,
         triggeredBy: currentUser?.id || "",
         isRead: false,
-      })
+      });
     } catch (error) {
-      console.error('Error updating company settings:', error);
       setAlert({ type: "error", message: "حدث خطأ أثناء حفظ إعدادات المكتب في قاعدة البيانات" });
     }
-  }
+  };
 
+  // حفظ إعدادات الإشعارات للمستخدم في backend
   const handleNotificationUpdate = async () => {
     try {
-      // Request browser notification permission if enabled
       if (notificationSettings.browserNotifications && 'Notification' in window) {
         Notification.requestPermission().then((permission) => {
-          if (permission === 'granted') {
-            console.log('Browser notifications enabled')
-          } else {
-            console.log('Browser notifications denied')
-            // Disable browser notifications if permission denied
-            setNotificationSettings(prev => ({ ...prev, browserNotifications: false }))
-          }
-        })
+          if (permission !== 'granted') setNotificationSettings(prev => ({ ...prev, browserNotifications: false }));
+        });
       }
-
-      // Save to backend database first
-      const response = await fetch('/api/settings/notifications', {
+      const response = await fetch(`${API_BASE_URL}/api/userSettings`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId: currentUser?.id,
-          notificationSettings
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: currentUser?.id, notificationSettings }),
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to save notification settings to database');
-      }
-
+      if (!response.ok) throw new Error('Failed to save notification settings to database');
       const result = await response.json();
-      console.log('Notification settings saved to database:', result);
-
-      // تحديث userSettings في localStorage
-      const userSettings = JSON.parse(localStorage.getItem("userSettings") || "{}")
-      const updatedUserSettings = { ...userSettings, notificationSettings }
-      localStorage.setItem("userSettings", JSON.stringify(updatedUserSettings))
-      console.log("Notification settings saved to userSettings in localStorage:", updatedUserSettings)
-
-      // ثم تحديث الحالة العامة
-      dispatch({ type: "UPDATE_NOTIFICATION_SETTINGS", payload: notificationSettings })
-
-      setAlert({ type: "success", message: "تم تحديث إعدادات الإشعارات بنجاح" })
-      setSuccessDialog("تم تحديث إعدادات الإشعارات بنجاح وتم حفظ البيانات في قاعدة البيانات")
+      dispatch({ type: "UPDATE_NOTIFICATION_SETTINGS", payload: notificationSettings });
+      setAlert({ type: "success", message: "تم تحديث إعدادات الإشعارات بنجاح" });
+      setSuccessDialog("تم تحديث إعدادات الإشعارات بنجاح وتم حفظ البيانات في قاعدة البيانات");
     } catch (error) {
-      console.error('Error updating notification settings:', error);
       setAlert({ type: "error", message: "حدث خطأ أثناء حفظ إعدادات الإشعارات في قاعدة البيانات" });
     }
-  }
+  };
 
   const [userFormErrors, setUserFormErrors] = useState({
     name: "",

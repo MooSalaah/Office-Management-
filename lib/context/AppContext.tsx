@@ -899,56 +899,85 @@ export function useAppActions() {
     }
   }
 
-  const addNotification = (notification: Omit<Notification, "id" | "createdAt">) => {
-    const newNotification: Notification = {
-      ...notification,
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString(),
-    }
-
-    dispatch({ type: "ADD_NOTIFICATION", payload: newNotification })
-    
-    // Save to localStorage
-    const existingNotifications = JSON.parse(localStorage.getItem("notifications") || "[]")
-    existingNotifications.push(newNotification)
-    localStorage.setItem("notifications", JSON.stringify(existingNotifications))
-    
-    // إرسال إشعار فوري لجميع المستخدمين
-    realtimeUpdates.sendNotification(newNotification)
-    
-    // Show browser notification if it's for the current user
-    if (newNotification.userId === currentUser?.id && 'Notification' in window && Notification.permission === 'granted') {
-      const browserNotification = new Notification(newNotification.title, {
-        body: newNotification.message,
-        icon: "/logo.png",
-        badge: "/logo.png",
-        tag: newNotification.id,
-        requireInteraction: true,
-      })
-
-      browserNotification.onclick = () => {
-        if (newNotification.actionUrl) {
-          window.focus()
-          window.location.href = newNotification.actionUrl
+  const addNotification = async (notification: Omit<Notification, "id" | "createdAt">) => {
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/notifications`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(notification),
+      });
+      const data = await res.json();
+      if (data.success) {
+        const newNotification: Notification = data.data;
+        dispatch({ type: "ADD_NOTIFICATION", payload: newNotification });
+        // إرسال إشعار فوري لجميع المستخدمين
+        realtimeUpdates.sendNotification(newNotification);
+        // Show browser notification if it's for the current user
+        if (newNotification.userId === currentUser?.id && 'Notification' in window && Notification.permission === 'granted') {
+          const browserNotification = new Notification(newNotification.title, {
+            body: newNotification.message,
+            icon: "/logo.png",
+            badge: "/logo.png",
+            tag: newNotification.id,
+            requireInteraction: true,
+          });
+          browserNotification.onclick = () => {
+            if (newNotification.actionUrl) {
+              window.focus();
+              window.location.href = newNotification.actionUrl;
+            }
+            browserNotification.close();
+          };
         }
-        browserNotification.close()
+      }
+    } catch (err) {
+      // fallback: dispatch محلي فقط
+      const fallbackNotification: Notification = {
+        ...notification,
+        id: Date.now().toString(),
+        createdAt: new Date().toISOString(),
+      };
+      dispatch({ type: "ADD_NOTIFICATION", payload: fallbackNotification });
+    }
+  };
+
+  const markNotificationAsRead = async (notificationId: string) => {
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/notifications/${notificationId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isRead: true }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        dispatch({ type: "UPDATE_NOTIFICATION", payload: data.data });
+      }
+    } catch (err) {
+      // fallback: تحديث محلي فقط
+      const notification = state.notifications.find((n) => n.id === notificationId);
+      if (notification) {
+        dispatch({ type: "UPDATE_NOTIFICATION", payload: { ...notification, isRead: true } });
       }
     }
-  }
+  };
 
-  const markNotificationAsRead = (notificationId: string) => {
-    const notification = state.notifications.find((n) => n.id === notificationId)
-    if (notification) {
-      dispatch({
-        type: "UPDATE_NOTIFICATION",
-        payload: { ...notification, isRead: true },
-      })
+  const deleteNotification = async (notificationId: string) => {
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/notifications/${notificationId}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (data.success) {
+        dispatch({ type: "DELETE_NOTIFICATION", payload: notificationId });
+      }
+    } catch (err) {
+      // fallback: حذف محلي فقط
+      dispatch({ type: "DELETE_NOTIFICATION", payload: notificationId });
     }
-  }
-
-  const deleteNotification = (notificationId: string) => {
-    dispatch({ type: "DELETE_NOTIFICATION", payload: notificationId })
-  }
+  };
 
   const createProjectWithDownPayment = async (project: Project) => {
     await createProjectWithFinancialTransaction(project)

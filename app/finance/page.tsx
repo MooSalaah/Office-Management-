@@ -47,6 +47,9 @@ import { useTransactionSearch, useTypeFilter, useDateFilter, useSortedData } fro
 import { InvoiceGenerator } from "@/lib/invoice-generator"
 import { DeleteDialog } from "@/components/ui/delete-dialog"
 
+// أضف متغير API_BASE_URL
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+
 export default function FinancePage() {
   const { state, dispatch } = useApp()
   const { addNotification } = useAppActions()
@@ -176,7 +179,38 @@ function FinancePageContent() {
   const [transactionToDelete, setTransactionToDelete] = useState<string | null>(null)
   const [deleteError, setDeleteError] = useState("")
 
-  const handleCreateTransaction = () => {
+  // استبدل جلب المعاملات من state بجلبها من backend
+  useEffect(() => {
+    async function fetchTransactions() {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/transactions`);
+        const data = await res.json();
+        if (data.success) {
+          dispatch({ type: "LOAD_TRANSACTIONS", payload: data.data });
+        }
+      } catch (err) {
+        // يمكن عرض رسالة خطأ هنا
+      }
+    }
+    fetchTransactions();
+  }, [dispatch]);
+
+  // جلب المدفوعات القادمة من backend
+  useEffect(() => {
+    async function fetchUpcomingPayments() {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/upcomingPayments`);
+        const data = await res.json();
+        if (data.success) {
+          dispatch({ type: "LOAD_UPCOMING_PAYMENTS", payload: data.data });
+        }
+      } catch (err) {}
+    }
+    fetchUpcomingPayments();
+  }, [dispatch]);
+
+  // استبدل إضافة معاملة مالية
+  const handleCreateTransaction = async () => {
     const missingFields = {
       description: !formData.description,
       amount: !formData.amount,
@@ -219,13 +253,28 @@ function FinancePageContent() {
       payerName: formData.payerName,
     }
 
-    dispatch({ type: "ADD_TRANSACTION", payload: newTransaction })
-    setIsDialogOpen(false)
-    resetForm()
-    showSuccessToast("تم إنشاء المعاملة بنجاح", `تم إنشاء معاملة بقيمة ${newTransaction.amount} ريال بنجاح`)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/transactions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newTransaction),
+      });
+      const data = await res.json();
+      if (data.success) {
+        dispatch({ type: "ADD_TRANSACTION", payload: data.data });
+        setIsDialogOpen(false);
+        resetForm();
+        showSuccessToast("تم إنشاء المعاملة بنجاح", `تم إنشاء معاملة بقيمة ${newTransaction.amount} ريال بنجاح`);
+      } else {
+        setAlert({ type: "error", message: "فشل حفظ المعاملة في قاعدة البيانات" });
+      }
+    } catch (err) {
+      setAlert({ type: "error", message: "حدث خطأ أثناء حفظ المعاملة في قاعدة البيانات" });
+    }
   }
 
-  const handleUpdateTransaction = () => {
+  // استبدل تحديث معاملة مالية
+  const handleUpdateTransaction = async () => {
     if (!editingTransaction || !hasPermission(currentUser?.role || "", "edit", "finance")) {
       setAlert({ type: "error", message: "ليس لديك صلاحية لتعديل المعاملات المالية" })
       return
@@ -259,20 +308,25 @@ function FinancePageContent() {
       payerName: formData.payerName,
     }
 
-    dispatch({ type: "UPDATE_TRANSACTION", payload: updatedTransaction })
-    
-    // Update in localStorage
-    const existingTransactions = JSON.parse(localStorage.getItem("transactions") || "[]")
-    const updatedTransactions = existingTransactions.map((t: any) => t.id === editingTransaction.id ? updatedTransaction : t)
-    localStorage.setItem("transactions", JSON.stringify(updatedTransactions))
-    
-    // Broadcast realtime update
-    broadcastTransactionUpdate('update', { transaction: updatedTransaction, userId: currentUser?.id, userName: currentUser?.name })
-    
-    setIsDialogOpen(false)
-    setEditingTransaction(null)
-    resetForm()
-    showSuccessToast("تم تحديث المعاملة بنجاح", `تم تحديث معاملة بقيمة ${updatedTransaction.amount} ريال بنجاح`)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/transactions/${editingTransaction.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updatedTransaction),
+      });
+      const data = await res.json();
+      if (data.success) {
+        dispatch({ type: "UPDATE_TRANSACTION", payload: data.data });
+        setIsDialogOpen(false);
+        setEditingTransaction(null);
+        resetForm();
+        showSuccessToast("تم تحديث المعاملة بنجاح", `تم تحديث معاملة بقيمة ${updatedTransaction.amount} ريال بنجاح`);
+      } else {
+        setAlert({ type: "error", message: "فشل تحديث المعاملة في قاعدة البيانات" });
+      }
+    } catch (err) {
+      setAlert({ type: "error", message: "حدث خطأ أثناء تحديث المعاملة في قاعدة البيانات" });
+    }
   }
 
   const handleDeleteTransaction = (transactionId: string) => {
@@ -475,77 +529,95 @@ function FinancePageContent() {
     setPaymentActionToConfirm(null)
   }
 
-  const handleAddPayment = () => {
+  // إضافة دفعة قادمة
+  const handleAddPayment = async () => {
     if (!hasPermission(currentUser?.role || "", "create", "finance")) {
       setAlert({ type: "error", message: "ليس لديك صلاحية لإنشاء دفعات قادمة" })
       return
     }
 
     const project = projects.find(p => p.id === formData.projectId)
-
-    const newPayment: UpcomingPayment = {
+    const newPayment = {
       id: Date.now().toString(),
       client: project?.client || formData.description,
       amount: Number(formData.amount),
       type: formData.type,
       dueDate: (new Date().toISOString().split("T")[0]) || "",
-      status: "pending" as "pending" | "overdue",
+      status: "pending",
       payerName: formData.payerName || "",
-    }
+    };
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/upcomingPayments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newPayment),
+      });
+      const data = await res.json();
+      if (data.success) {
+        dispatch({ type: "ADD_UPCOMING_PAYMENT", payload: data.data });
+        setAlert({ type: "success", message: "تم إضافة الدفعة القادمة بنجاح" });
+        setIsAddPaymentDialogOpen(false);
+        setPaymentFormData({
+          client: "",
+          amount: "",
+          type: "income",
+          dueDate: "",
+          description: "",
+          payerName: currentUser?.name || "",
+        });
+      }
+    } catch (err) {}
+  };
 
-    dispatch({ type: "ADD_UPCOMING_PAYMENT", payload: newPayment })
-    
-    // Save to localStorage
-    const existingPayments = JSON.parse(localStorage.getItem("upcomingPayments") || "[]")
-    existingPayments.push(newPayment)
-    localStorage.setItem("upcomingPayments", JSON.stringify(existingPayments))
-    
-    setAlert({ type: "success", message: "تم إضافة الدفعة القادمة بنجاح" })
-    setIsAddPaymentDialogOpen(false)
-    setPaymentFormData({
-      client: "",
-      amount: "",
-      type: "income",
-      dueDate: "",
-      description: "",
-      payerName: currentUser?.name || "",
-    })
-  }
-
-  const handleUpdatePayment = () => {
-    if (!selectedPayment || !hasPermission(currentUser?.role || "", "edit", "finance")) {
-      setAlert({ type: "error", message: "ليس لديك صلاحية لتعديل الدفعات القادمة" })
-      return
-    }
-
-    const updatedPayment: UpcomingPayment = {
+  // تحديث دفعة قادمة
+  const handleUpdatePayment = async () => {
+    if (!selectedPayment) return;
+    const updatedPayment = {
       ...selectedPayment,
       client: paymentFormData.client,
       amount: Number(paymentFormData.amount),
       type: paymentFormData.type,
       dueDate: paymentFormData.dueDate || "",
       payerName: paymentFormData.payerName || "",
-    }
+    };
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/upcomingPayments/${selectedPayment.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updatedPayment),
+      });
+      const data = await res.json();
+      if (data.success) {
+        dispatch({ type: "UPDATE_UPCOMING_PAYMENT", payload: data.data });
+        setAlert({ type: "success", message: "تم تحديث الدفعة القادمة بنجاح" });
+        setIsAddPaymentDialogOpen(false);
+        setSelectedPayment(null);
+        setPaymentFormData({
+          client: "",
+          amount: "",
+          type: "income",
+          dueDate: "",
+          description: "",
+          payerName: currentUser?.name || "",
+        });
+      }
+    } catch (err) {}
+  };
 
-    dispatch({ type: "UPDATE_UPCOMING_PAYMENT", payload: updatedPayment })
-    
-    // Update in localStorage
-    const existingPayments = JSON.parse(localStorage.getItem("upcomingPayments") || "[]")
-    const updatedPayments = existingPayments.map((p: any) => p.id === selectedPayment.id ? updatedPayment : p)
-    localStorage.setItem("upcomingPayments", JSON.stringify(updatedPayments))
-    
-    setAlert({ type: "success", message: "تم تحديث الدفعة القادمة بنجاح" })
-    setIsAddPaymentDialogOpen(false)
-    setSelectedPayment(null)
-    setPaymentFormData({
-      client: "",
-      amount: "",
-      type: "income",
-      dueDate: "",
-      description: "",
-      payerName: currentUser?.name || "",
-    })
-  }
+  // حذف دفعة قادمة
+  const handleDeletePayment = async (id: string) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/upcomingPayments/${id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (data.success) {
+        dispatch({ type: "DELETE_UPCOMING_PAYMENT", payload: id });
+        setSuccessMessage("تم حذف الدفعة بنجاح");
+        setIsSuccessDialogOpen(true);
+      }
+    } catch (err) {}
+  };
 
   const exportPDF = (type: "income" | "expense" | "all") => {
     // Create PDF content
@@ -889,25 +961,22 @@ function FinancePageContent() {
   }
 
   const confirmDelete = async () => {
-    if (!transactionToDelete) return
+    if (!transactionToDelete) return;
     try {
-      const transaction = transactions.find(t => t.id === transactionToDelete)
-      if (!transaction) {
-        setDeleteError("المعاملة غير موجودة")
-        return
+      const res = await fetch(`${API_BASE_URL}/api/transactions/${transactionToDelete}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (data.success) {
+        dispatch({ type: "DELETE_TRANSACTION", payload: transactionToDelete });
+        showSuccessToast("تم حذف المعاملة بنجاح", "تم حذف المعاملة بنجاح");
+      } else {
+        setDeleteError("فشل حذف المعاملة من قاعدة البيانات");
       }
-      dispatch({ type: "DELETE_TRANSACTION", payload: transactionToDelete })
-      // Remove from localStorage
-      const existingTransactions = JSON.parse(localStorage.getItem("transactions") || "[]")
-      const filteredTransactions = existingTransactions.filter((t: any) => t.id !== transactionToDelete)
-      localStorage.setItem("transactions", JSON.stringify(filteredTransactions))
-      broadcastTransactionUpdate('delete', { ...transaction })
-      showSuccessToast("تم حذف المعاملة بنجاح", `تم حذف معاملة بقيمة ${transaction.amount} ريال بنجاح`)
-      setDeleteDialogOpen(false)
-      setTransactionToDelete(null)
-      setDeleteError("")
-    } catch (error) {
-      setDeleteError("حدث خطأ أثناء حذف المعاملة")
+      setDeleteDialogOpen(false);
+      setTransactionToDelete(null);
+    } catch (err) {
+      setDeleteError("حدث خطأ أثناء حذف المعاملة من قاعدة البيانات");
     }
   }
 
