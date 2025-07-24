@@ -7,7 +7,6 @@ const app = express();
 const port = process.env.PORT || 5000;
 
 // Basic CORS configuration
-const cors = require('cors');
 app.use(cors({
   origin: 'https://theofficemanagemet.netlify.app',
   credentials: true
