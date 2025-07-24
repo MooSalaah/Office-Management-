@@ -46,7 +46,7 @@ class RealtimeManager {
 			// Use Server-Sent Events for real-time updates
 			const apiUrl =
 				process.env.NEXT_PUBLIC_API_URL ||
-				"https://engineering-office-backend.onrender.com";
+				"https://office-management-fsy7.onrender.com";
 			this.eventSource = new EventSource(`${apiUrl}/api/realtime`);
 
 			this.eventSource.onmessage = (event) => {
@@ -109,7 +109,7 @@ class RealtimeManager {
 			try {
 				const apiUrl =
 					process.env.NEXT_PUBLIC_API_URL ||
-					"https://engineering-office-backend.onrender.com";
+					"https://office-management-fsy7.onrender.com";
 				const response = await fetch(
 					`${apiUrl}/api/realtime/poll?since=${this.lastUpdateTimestamp}`
 				);
@@ -227,7 +227,7 @@ export const broadcastUpdate = async (
 		// Send update to server
 		const apiUrl =
 			process.env.NEXT_PUBLIC_API_URL ||
-			"https://engineering-office-backend.onrender.com";
+			"https://office-management-fsy7.onrender.com";
 		const response = await fetch(`${apiUrl}/api/realtime/broadcast`, {
 			method: "POST",
 			headers: {

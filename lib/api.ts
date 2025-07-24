@@ -1,7 +1,7 @@
 // API helper for connecting to backend server
 const API_BASE_URL =
 	process.env.NEXT_PUBLIC_API_URL ||
-	"https://engineering-office-backend.onrender.com";
+	"https://office-management-fsy7.onrender.com";
 
 export interface ApiResponse<T = any> {
 	success: boolean;
