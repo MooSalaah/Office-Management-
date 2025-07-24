@@ -175,7 +175,7 @@ class ApiClient {
 
 	// Auth API
 	async login(credentials: { email: string; password: string }) {
-		return this.request("/api/auth/login", {
+		return this.request("/api/users/login", {
 			method: "POST",
 			body: JSON.stringify(credentials),
 		});
