@@ -1,6 +1,7 @@
 "use client";
 
 import type { User } from "./types";
+import { api } from "./api";
 
 // Mock authentication - في التطبيق الحقيقي سيكون مع JWT أو session
 export const mockUsers: User[] = [
@@ -160,37 +161,41 @@ export const updateUserPermissionsByRole = (user: User): User => {
 	return user;
 };
 
-export const login = (email: string, password: string): User | null => {
-	// Initialize default roles first
-	initializeDefaultRoles();
-
-	// First check localStorage for users (dynamic users)
-	const savedUsers = localStorage.getItem("users");
-	if (savedUsers) {
-		const users = JSON.parse(savedUsers);
-		const user = users.find(
-			(u: any) => u.email === email && u.password === password && u.isActive
-		);
-		if (user) {
-			// Update user permissions based on current role
-			const updatedUser = updateUserPermissionsByRole(user);
-			localStorage.setItem("currentUser", JSON.stringify(updatedUser));
-			return updatedUser;
+export const login = async (email: string, password: string): Promise<User | null> => {
+	try {
+		const response = await api.auth.login({ email, password });
+		if (response && response.token && response.user) {
+			const user = {
+				id: response.user.id || response.user._id || "",
+				name: response.user.name,
+				email: response.user.email,
+				role: response.user.role,
+				isActive: true,
+				createdAt: response.user.createdAt || "",
+				permissions: response.user.permissions || [],
+				phone: response.user.phone || "",
+				avatar: response.user.avatar || undefined,
+				monthlySalary: response.user.monthlySalary || undefined,
+				workingHours: response.user.workingHours || undefined,
+			};
+			localStorage.setItem("currentUser", JSON.stringify(user));
+			localStorage.setItem("token", response.token);
+			return user;
 		}
+		return null;
+	} catch (err) {
+		// fallback: mockUsers (dev only)
+		if (process.env.NODE_ENV === "development") {
+			const user = mockUsers.find(
+				(u) => u.email === email && u.password === password && u.isActive
+			);
+			if (user) {
+				localStorage.setItem("currentUser", JSON.stringify(user));
+				return user;
+			}
+		}
+		return null;
 	}
-
-	// Fallback to mock users
-	const user = mockUsers.find(
-		(u) => u.email === email && u.password === password && u.isActive
-	);
-	if (user) {
-		// Update user permissions based on current role
-		const updatedUser = updateUserPermissionsByRole(user);
-		localStorage.setItem("currentUser", JSON.stringify(updatedUser));
-		return updatedUser;
-	}
-
-	return null;
 };
 
 export const logout = () => {

@@ -27,7 +27,7 @@ export default function LoginPage() {
     setError("")
 
     try {
-      const user = login(email, password)
+      const user = await login(email, password)
       if (user) {
         // Update user permissions based on current role
         const updatedUser = updateUserPermissionsByRole(user)
