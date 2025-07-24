@@ -535,28 +535,31 @@ function FinancePageContent() {
       setAlert({ type: "error", message: "ليس لديك صلاحية لإنشاء دفعات قادمة" })
       return
     }
-
-    const project = projects.find(p => p.id === formData.projectId)
+    // استخدم paymentFormData بدلاً من formData
     const newPayment = {
       id: Date.now().toString(),
-      client: project?.client || formData.description,
-      amount: Number(formData.amount),
-      type: formData.type,
-      dueDate: (new Date().toISOString().split("T")[0]) || "",
+      client: paymentFormData.client,
+      amount: Number(paymentFormData.amount),
+      type: paymentFormData.type,
+      dueDate: paymentFormData.dueDate,
       status: "pending",
-      payerName: formData.payerName || "",
+      payerName: paymentFormData.payerName || "",
+      description: paymentFormData.description || "",
     };
     try {
       const res = await fetch(`${API_BASE_URL}/api/upcomingPayments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newPayment),
+        credentials: "include",
       });
       const data = await res.json();
-      if (data.success) {
+      if (res.ok && data.success) {
         dispatch({ type: "ADD_UPCOMING_PAYMENT", payload: data.data });
-        setAlert({ type: "success", message: "تم إضافة الدفعة القادمة بنجاح" });
         setIsAddPaymentDialogOpen(false);
+        setSuccessMessage("تمت إضافة الدفعة بنجاح!");
+        setIsSuccessDialogOpen(true);
+        // إعادة تعيين النموذج
         setPaymentFormData({
           client: "",
           amount: "",
@@ -565,8 +568,12 @@ function FinancePageContent() {
           description: "",
           payerName: currentUser?.name || "",
         });
+      } else {
+        setAlert({ type: "error", message: data.message || "حدث خطأ أثناء إضافة الدفعة" });
       }
-    } catch (err) {}
+    } catch (error) {
+      setAlert({ type: "error", message: "حدث خطأ أثناء إضافة الدفعة" });
+    }
   };
 
   // تحديث دفعة قادمة
