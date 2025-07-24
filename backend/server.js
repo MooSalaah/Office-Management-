@@ -88,6 +88,15 @@ app.use('/api/projects', require('./routes/projects'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/realtime', require('./routes/realtime'));
 
+// New routes
+app.use('/api/transactions', require('./routes/transactions'));
+app.use('/api/attendance', require('./routes/attendance'));
+app.use('/api/notifications', require('./routes/notifications'));
+app.use('/api/upcomingPayments', require('./routes/upcomingPayments'));
+app.use('/api/companySettings', require('./routes/companySettings'));
+app.use('/api/userSettings', require('./routes/userSettings'));
+app.use('/api/roles', require('./routes/roles'));
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Error:', err);
