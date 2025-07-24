@@ -7,7 +7,11 @@ const app = express();
 const port = process.env.PORT || 5000;
 
 // Basic CORS configuration
-app.use(cors());
+const cors = require('cors');
+app.use(cors({
+  origin: 'https://theofficemanagemet.netlify.app',
+  credentials: true
+}));
 
 // Middlewares
 app.use(express.json({ limit: '10mb' }));
