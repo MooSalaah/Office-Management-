@@ -858,23 +858,55 @@ export function useAppActions() {
     }
   }
 
-  // دالة لتحديث معاملة مالية عند تحديث المشروع
+  const addNotification = async (notification: Omit<Notification, "id" | "createdAt">) => {
+    const newNotification: Notification = {
+      ...notification,
+      id: Date.now().toString(),
+      createdAt: new Date().toISOString(),
+    };
+    dispatch({ type: "ADD_NOTIFICATION", payload: newNotification });
+    if (window.realtimeUpdates) {
+      window.realtimeUpdates.broadcastUpdate('notification', newNotification);
+    }
+  };
+
+  const notifyProjectEngineers = async (project: Project, action: 'update' | 'delete', actorName: string) => {
+    // اجمع كل المهندسين المسؤولين (بدون تكرار)
+    const engineerIds = new Set<string>();
+    if (project.assignedEngineerId) engineerIds.add(project.assignedEngineerId);
+    if (Array.isArray(project.team)) project.team.forEach(id => engineerIds.add(id));
+    engineerIds.forEach((engineerId) => {
+      if (!engineerId) return;
+      addNotification({
+        userId: engineerId,
+        title: action === 'update' ? `تم تحديث مشروع` : `تم حذف مشروع`,
+        message: `قام ${actorName} ${(action === 'update') ? 'بتحديث' : 'بحذف'} المشروع "${project.name}"`,
+        type: "project",
+        actionUrl: `/projects/${project.id}`,
+        triggeredBy: state.currentUser?.id || "",
+        isRead: false,
+      });
+    });
+  };
+
   const updateProjectWithFinancialTransaction = async (project: Project) => {
     try {
       setLoadingState('projects', true);
-      // تحديث المشروع في الباكند أولاً
       const response = await api.projects.update(project.id, project);
       if (response && response.success && typeof response.data === 'object' && response.data !== null && 'id' in response.data) {
         dispatch({ type: "UPDATE_PROJECT", payload: response.data as Project });
         if (window.realtimeUpdates) {
           window.realtimeUpdates.sendProjectUpdate({ action: 'update', project: response.data });
         }
+        await notifyProjectEngineers(response.data as Project, 'update', state.currentUser?.name || 'مستخدم');
+        showSuccessToast("تم تحديث المشروع بنجاح", `تم تحديث مشروع \"${project.name}\"`);
       } else if (response && response.success) {
-        // fallback: استخدم المشروع المرسل إذا لم يرجع السيرفر مشروع كامل
         dispatch({ type: "UPDATE_PROJECT", payload: project });
         if (window.realtimeUpdates) {
           window.realtimeUpdates.sendProjectUpdate({ action: 'update', project });
         }
+        await notifyProjectEngineers(project, 'update', state.currentUser?.name || 'مستخدم');
+        showSuccessToast("تم تحديث المشروع بنجاح", `تم تحديث مشروع \"${project.name}\"`);
       } else {
         showErrorToast("خطأ في تحديث المشروع", response?.error || "فشل التحديث في الباكند");
       }
@@ -883,90 +915,6 @@ export function useAppActions() {
       console.error("Error updating project:", error);
     } finally {
       setLoadingState('projects', false);
-    }
-  };
-
-  const addNotification = async (notification: Omit<Notification, "id" | "createdAt">) => {
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/notifications`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(notification),
-      });
-      const data = await res.json();
-      if (data.success) {
-        const newNotification: Notification = data.data;
-        dispatch({ type: "ADD_NOTIFICATION", payload: newNotification });
-        // إرسال إشعار فوري لجميع المستخدمين
-        realtimeUpdates.sendNotification(newNotification);
-        // Show browser notification if it's for the current user
-        if (newNotification.userId === currentUser?.id && 'Notification' in window && Notification.permission === 'granted') {
-          const browserNotification = new Notification(newNotification.title, {
-            body: newNotification.message,
-            icon: "/logo.png",
-            badge: "/logo.png",
-            tag: newNotification.id,
-            requireInteraction: true,
-          });
-          browserNotification.onclick = () => {
-            if (newNotification.actionUrl) {
-              window.focus();
-              window.location.href = newNotification.actionUrl;
-            }
-            browserNotification.close();
-          };
-        }
-      }
-    } catch (err) {
-      // fallback: dispatch محلي فقط
-      const fallbackNotification: Notification = {
-        ...notification,
-        id: Date.now().toString(),
-        createdAt: new Date().toISOString(),
-      };
-      dispatch({ type: "ADD_NOTIFICATION", payload: fallbackNotification });
-    }
-  };
-
-  const markNotificationAsRead = async (notificationId: string) => {
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/notifications/${notificationId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isRead: true }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        dispatch({ type: "UPDATE_NOTIFICATION", payload: data.data });
-      }
-    } catch (err) {
-      // fallback: تحديث محلي فقط
-      const notification = state.notifications.find((n) => n.id === notificationId);
-      if (notification) {
-        dispatch({ type: "UPDATE_NOTIFICATION", payload: { ...notification, isRead: true } });
-      }
-    }
-  };
-
-  const deleteNotification = async (notificationId: string) => {
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/notifications/${notificationId}`, {
-        method: "DELETE",
-      });
-      const data = await res.json();
-      if (data.success) {
-        dispatch({ type: "DELETE_NOTIFICATION", payload: notificationId });
-      } else {
-        // يمكن عرض رسالة خطأ للمستخدم هنا
-        console.error("فشل حذف الإشعار من قاعدة البيانات", data.error);
-      }
-    } catch (err) {
-      // fallback: حذف محلي فقط
-      dispatch({ type: "DELETE_NOTIFICATION", payload: notificationId });
-      console.error("حدث خطأ أثناء حذف الإشعار من قاعدة البيانات", err);
     }
   };
 
@@ -1013,16 +961,19 @@ export function useAppActions() {
   const deleteProject = async (projectId: string) => {
     try {
       setLoadingState('projects', true);
-      // حذف المشروع من الباكند أولاً
+      const project = state.projects.find(p => p.id === projectId);
+      if (!project) {
+        showErrorToast("خطأ في حذف المشروع", "المشروع غير موجود");
+        return;
+      }
       const response = await api.projects.delete(projectId);
       if (response && response.success) {
         dispatch({ type: "DELETE_PROJECT", payload: projectId });
-        // Broadcast realtime update
-        const project = state.projects.find(p => p.id === projectId);
-        if (window.realtimeUpdates && project) {
+        if (window.realtimeUpdates) {
           window.realtimeUpdates.sendProjectUpdate({ action: 'delete', project });
         }
-        showSuccessToast("تم حذف المشروع بنجاح", project ? `تم حذف مشروع \"${project.name}\"` : "تم حذف المشروع");
+        await notifyProjectEngineers(project, 'delete', state.currentUser?.name || 'مستخدم');
+        showSuccessToast("تم حذف المشروع بنجاح", `تم حذف مشروع \"${project.name}\"`);
       } else {
         showErrorToast("خطأ في حذف المشروع", response?.error || "فشل الحذف في الباكند");
       }
@@ -1350,8 +1301,8 @@ export function useAppActions() {
     
     // Notification management
     addNotification,
-    markNotificationAsRead,
-    deleteNotification,
+    // markNotificationAsRead, // مؤقتًا احذفها من return
+    // deleteNotification, // مؤقتًا احذفها من return
     
     // User management
     setCurrentUser,
