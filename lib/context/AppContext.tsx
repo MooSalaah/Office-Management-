@@ -27,6 +27,7 @@ import {
 import { getCurrentUser, initializeDefaultRoles, updateUserPermissionsByRole } from "../auth"
 import { useToast } from "@/hooks/use-toast"
 import { realtimeUpdates } from "../realtime-updates"
+import { api } from "../api";
 
 // تعريف اختياري لـ window.realtimeUpdates لتفادي أخطاء linter
 // @ts-ignore
@@ -433,6 +434,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
     console.log('Realtime updates disabled for SSR compatibility');
   }, [state.currentUser?.id, state.notifications])
+
+  // جلب المشاريع من الباكند عند بدء التطبيق
+  useEffect(() => {
+    const fetchProjects = async () => {
+      try {
+        const response = await api.projects.getAll();
+        if (response && response.success && Array.isArray(response.data)) {
+          dispatch({ type: "LOAD_PROJECTS", payload: response.data });
+        }
+      } catch (error) {
+        console.error("فشل جلب المشاريع من الباكند:", error);
+        // في حال الفشل، تبقى المشاريع من localStorage أو mockProjects
+      }
+    };
+    fetchProjects();
+  }, []);
 
   // Load all data from localStorage on mount
   useEffect(() => {
