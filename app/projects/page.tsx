@@ -46,6 +46,7 @@ import { DeleteConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { LoadingStates } from "@/components/ui/loading-skeleton"
 import { transliterateArabicToEnglish } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast"
+import { Checkbox } from "@/components/ui/checkbox"
 
 export default function ProjectsPage() {
   return (
@@ -155,6 +156,7 @@ function ProjectsPageContent() {
   const [newClientInputError, setNewClientInputError] = useState("");
   const [newTypeInputError, setNewTypeInputError] = useState("");
   const [newEngineerInputError, setNewEngineerInputError] = useState("");
+  const [newClientPhone, setNewClientPhone] = useState("");
 
   const [formData, setFormData] = useState({
     name: "",
@@ -534,6 +536,7 @@ function ProjectsPageContent() {
     setNewProjectType("")
     setNewEngineerName("")
     setShowValidationErrors(false)
+    setNewClientPhone("")
   }
 
   const canCreateProject = hasPermission(currentUser?.role || "", "create", "projects")
@@ -553,7 +556,7 @@ function ProjectsPageContent() {
       id: Date.now().toString(),
       name: newClientName.trim(),
       email: "",
-      phone: "", // غير إلزامي
+      phone: newClientPhone.trim() || "", // غير إلزامي
       address: "",
       projectsCount: 0,
       totalValue: 0,
@@ -589,6 +592,7 @@ function ProjectsPageContent() {
       });
       setShowNewClientInput(false);
       setNewClientName("");
+      setNewClientPhone("");
     } catch (error) {
       setNewClientInputError("حدث خطأ أثناء حفظ العميل في قاعدة البيانات");
     }
@@ -898,6 +902,7 @@ function ProjectsPageContent() {
                           onClick={() => {
                             setShowNewClientInput(false)
                             setNewClientName("")
+                            setNewClientPhone("")
                           }}
                           className="shrink-0"
                           title="إلغاء"
@@ -905,6 +910,14 @@ function ProjectsPageContent() {
                           <X className="w-4 h-4" />
                         </Button>
                       </div>
+                      {/* حقل رقم العميل */}
+                      <Input
+                        placeholder="رقم العميل (اختياري)"
+                        value={newClientPhone}
+                        onChange={(e) => setNewClientPhone(e.target.value)}
+                        type="tel"
+                        className="w-full"
+                      />
                       {newClientInputError && (
                         <p className="text-xs text-red-500 mt-1">{newClientInputError}</p>
                       )}
@@ -1017,27 +1030,30 @@ function ProjectsPageContent() {
                     <span className="text-red-500 mr-1">*</span>
                   </Label>
                   <div className="flex flex-col gap-2 max-h-40 overflow-y-auto border rounded p-2">
-                    {users.filter((u) => u.role === "engineer" || u.role === "admin").map((engineer) => (
+                    {users.filter((u) => u.role === "engineer" || u.role === "admin").map((engineer, idx) => (
                       <label key={engineer.id} className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={formData.team.includes(engineer.id)}
-                          onChange={(e) => {
-                            setFormData((prev) => ({
-                              ...prev,
-                              team: e.target.checked
-                                ? [...prev.team, engineer.id]
-                                : prev.team.filter((id) => id !== engineer.id),
-                            }))
+                          onCheckedChange={(checked) => {
+                            setFormData((prev) => {
+                              let newTeam = prev.team.includes(engineer.id)
+                                ? prev.team.filter((id) => id !== engineer.id)
+                                : [...prev.team, engineer.id];
+                              return { ...prev, team: newTeam };
+                            });
                           }}
                         />
                         <span>{engineer.name}</span>
                         <Badge variant="outline" className="text-xs">
                           {engineer.role === "admin" ? "مدير" : "مهندس"}
                         </Badge>
+                        {formData.team[0] === engineer.id && (
+                          <Badge variant="outline" className="text-xs bg-blue-100 text-blue-800 ml-2">قائد المشروع</Badge>
+                        )}
                       </label>
                     ))}
                   </div>
+                  <p className="text-xs text-muted-foreground mt-1">أول مهندس يتم اختياره هو قائد المشروع تلقائيًا.</p>
                 </div>
                 {/* استبدل حقلي السعر الإجمالي والدفعة المقدمة ليكونا بمحاذاة علوية (top) بدلاً من bottom في نموذج إضافة مشروع جديد، وذلك بتغيير md:items-end إلى md:items-start في div الذي يحتوي الحقلين. */}
                 <div className="md:col-span-2 flex flex-col md:flex-row md:items-start gap-4">
