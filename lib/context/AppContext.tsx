@@ -861,60 +861,38 @@ export function useAppActions() {
   // دالة لتحديث معاملة مالية عند تحديث المشروع
   const updateProjectWithFinancialTransaction = async (project: Project) => {
     try {
-      setLoadingState('projects', true)
-      
-      // تحديث المشروع
-      dispatch({ type: "UPDATE_PROJECT", payload: project })
-      
-      // البحث عن معاملة الدفعة المقدمة السابقة
-      const existingTransaction = state.transactions.find(t => 
-        t.projectId === project.id && t.description.includes("دفعة مقدمة")
-      )
-      
-      if (existingTransaction) {
-        // تحديث المعاملة الموجودة
-        const updatedTransaction: Transaction = {
-          ...existingTransaction,
-          amount: project.downPayment,
-          description: `دفعة مقدمة - مشروع ${project.name}`,
+      setLoadingState('projects', true);
+      // تحديث المشروع في الباكند أولاً
+      const response = await api.projects.update(project.id, project);
+      if (response && response.success) {
+        await updateProjectWithFinancialTransaction(project);
+        // إرسال تحديث فوري
+        if (window.realtimeUpdates) {
+          window.realtimeUpdates.sendProjectUpdate({ action: 'update', project });
         }
-        
-        dispatch({ type: "UPDATE_TRANSACTION", payload: updatedTransaction })
-      } else if (project.downPayment > 0) {
-        // إنشاء معاملة جديدة إذا لم تكن موجودة
-        const downPaymentTransaction: Transaction = {
-          id: Date.now().toString() + "_dp",
-          type: "income",
-          amount: project.downPayment,
-          description: `دفعة مقدمة - مشروع ${project.name}`,
-          clientId: project.clientId,
-          clientName: project.client,
-          projectId: project.id,
-          projectName: project.name,
-          category: "دفعة مقدمة",
-          transactionType: "design",
-          importance: project.importance,
-          paymentMethod: "transfer",
-          date: project.startDate,
-          status: "completed",
-          createdBy: currentUser?.id || "",
-          createdAt: new Date().toISOString(),
+        // إشعار للمهندس المسؤول إذا تم تغيير المهندس
+        if (project.assignedEngineerId && project.assignedEngineerId !== currentUser?.id) {
+          addNotification({
+            userId: project.assignedEngineerId,
+            title: "تم تحديث مشروع مُعيّن لك",
+            message: `تم تحديث مشروع "${project.name}"`,
+            type: "project",
+            actionUrl: `/projects/${project.id}`,
+            triggeredBy: currentUser?.id || "",
+            isRead: false,
+          });
         }
-        
-        dispatch({ type: "ADD_TRANSACTION", payload: downPaymentTransaction })
+        showSuccessToast("تم تحديث المشروع بنجاح", `تم تحديث مشروع \"${project.name}\"`);
+      } else {
+        showErrorToast("خطأ في تحديث المشروع", response?.error || "فشل التحديث في الباكند");
       }
-      
-      // حفظ البيانات
-      saveDataToStorage()
-      
-      showSuccessToast("تم تحديث المشروع بنجاح", `تم تحديث مشروع "${project.name}"`)
     } catch (error) {
-      showErrorToast("خطأ في تحديث المشروع", "حدث خطأ أثناء تحديث المشروع")
-      console.error("Error updating project:", error)
+      showErrorToast("خطأ في تحديث المشروع", "حدث خطأ أثناء تحديث المشروع");
+      console.error("Error updating project:", error);
     } finally {
-      setLoadingState('projects', false)
+      setLoadingState('projects', false);
     }
-  }
+  };
 
   const addNotification = async (notification: Omit<Notification, "id" | "createdAt">) => {
     const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
@@ -1042,34 +1020,27 @@ export function useAppActions() {
 
   const deleteProject = async (projectId: string) => {
     try {
-      setLoadingState('projects', true)
-      
-      const project = state.projects.find(p => p.id === projectId)
-      if (!project) {
-        showErrorToast("خطأ في حذف المشروع", "المشروع غير موجود")
-        return
+      setLoadingState('projects', true);
+      // حذف المشروع من الباكند أولاً
+      const response = await api.projects.delete(projectId);
+      if (response && response.success) {
+        dispatch({ type: "DELETE_PROJECT", payload: projectId });
+        // Broadcast realtime update
+        const project = state.projects.find(p => p.id === projectId);
+        if (window.realtimeUpdates && project) {
+          window.realtimeUpdates.sendProjectUpdate({ action: 'delete', project });
+        }
+        showSuccessToast("تم حذف المشروع بنجاح", project ? `تم حذف مشروع \"${project.name}\"` : "تم حذف المشروع");
+      } else {
+        showErrorToast("خطأ في حذف المشروع", response?.error || "فشل الحذف في الباكند");
       }
-
-      dispatch({ type: "DELETE_PROJECT", payload: projectId })
-      
-      // Remove from localStorage
-      const existingProjects = JSON.parse(localStorage.getItem("projects") || "[]")
-      const filteredProjects = existingProjects.filter((p: any) => p.id !== projectId)
-      localStorage.setItem("projects", JSON.stringify(filteredProjects))
-      
-      // Broadcast realtime update
-      if (window.realtimeUpdates) {
-        window.realtimeUpdates.sendProjectUpdate({ action: 'delete', project })
-      }
-      
-      showSuccessToast("تم حذف المشروع بنجاح", `تم حذف مشروع "${project.name}"`)
     } catch (error) {
-      showErrorToast("خطأ في حذف المشروع", "حدث خطأ أثناء حذف المشروع")
-      console.error("Error deleting project:", error)
+      showErrorToast("خطأ في حذف المشروع", "حدث خطأ أثناء حذف المشروع");
+      console.error("Error deleting project:", error);
     } finally {
-      setLoadingState('projects', false)
+      setLoadingState('projects', false);
     }
-  }
+  };
 
   const setCurrentUser = (user: User | null) => {
     dispatch({ type: "SET_CURRENT_USER", payload: user })
