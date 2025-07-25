@@ -47,6 +47,12 @@ import { LoadingStates } from "@/components/ui/loading-skeleton"
 import { transliterateArabicToEnglish } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast"
 import { Checkbox } from "@/components/ui/checkbox"
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+} from "@/components/ui/dropdown-menu"
 
 export default function ProjectsPage() {
   return (
@@ -330,14 +336,14 @@ function ProjectsPageContent() {
         const eng = users.find(u => u.id === engineerId);
         addNotification({
           userId: engineerId,
-          title: "مشروع جديد مُعيّن لك",
-          message: `تم تعيينك في مشروع "${formData.name}" بواسطة ${currentUser?.name}`,
+          title: "مشروع جديد مسؤول عنه",
+          message: `تم تعيينك كعضو في فريق مشروع \"${formData.name}\" بواسطة ${currentUser?.name}`,
           type: "project",
           actionUrl: `/projects/${newProject.id}`,
           triggeredBy: currentUser?.id || "",
           isRead: false,
         });
-        console.log(`تم إشعار ${eng?.name || engineerId} بتعيينه في المشروع.`);
+        console.log(`تم إشعار ${eng?.name || engineerId} بأنه مسؤول عن المشروع.`);
       }
     });
   }
@@ -912,12 +918,21 @@ function ProjectsPageContent() {
                       </div>
                       {/* حقل رقم العميل */}
                       <Input
-                        placeholder="رقم العميل (اختياري)"
+                        placeholder="رقم العميل (05xxxxxxxx)"
                         value={newClientPhone}
-                        onChange={(e) => setNewClientPhone(e.target.value)}
+                        onChange={(e) => {
+                          // فقط أرقام وتبدأ بـ 05 وطولها 10
+                          const value = e.target.value.replace(/[^0-9]/g, "");
+                          setNewClientPhone(value);
+                        }}
                         type="tel"
+                        maxLength={10}
+                        pattern="05[0-9]{8}"
                         className="w-full"
                       />
+                      {newClientPhone && !/^05[0-9]{8}$/.test(newClientPhone) && (
+                        <p className="text-xs text-red-500 mt-1">رقم الجوال يجب أن يبدأ بـ 05 ويتكون من 10 أرقام</p>
+                      )}
                       {newClientInputError && (
                         <p className="text-xs text-red-500 mt-1">{newClientInputError}</p>
                       )}
@@ -1029,10 +1044,18 @@ function ProjectsPageContent() {
                     فريق العمل (يمكن اختيار أكثر من مهندس)
                     <span className="text-red-500 mr-1">*</span>
                   </Label>
-                  <div className="flex flex-col gap-2 max-h-40 overflow-y-auto border rounded p-2">
-                    {users.filter((u) => u.role === "engineer" || u.role === "admin").map((engineer, idx) => (
-                      <label key={engineer.id} className="flex items-center gap-2 cursor-pointer">
-                        <Checkbox
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" className="w-full justify-between">
+                        {formData.team.length > 0
+                          ? users.filter(u => formData.team.includes(u.id)).map(u => u.name).join("، ")
+                          : "اختر المهندسين المشاركين"}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="max-h-60 overflow-y-auto w-64">
+                      {users.filter((u) => u.role === "engineer" || u.role === "admin").map((engineer) => (
+                        <DropdownMenuCheckboxItem
+                          key={engineer.id}
                           checked={formData.team.includes(engineer.id)}
                           onCheckedChange={(checked) => {
                             setFormData((prev) => {
@@ -1042,17 +1065,15 @@ function ProjectsPageContent() {
                               return { ...prev, team: newTeam };
                             });
                           }}
-                        />
-                        <span>{engineer.name}</span>
-                        <Badge variant="outline" className="text-xs">
-                          {engineer.role === "admin" ? "مدير" : "مهندس"}
-                        </Badge>
-                        {formData.team[0] === engineer.id && (
-                          <Badge variant="outline" className="text-xs bg-blue-100 text-blue-800 ml-2">قائد المشروع</Badge>
-                        )}
-                      </label>
-                    ))}
-                  </div>
+                        >
+                          {engineer.name}
+                          {formData.team[0] === engineer.id && (
+                            <Badge variant="outline" className="text-xs bg-blue-100 text-blue-800 ml-2">قائد المشروع</Badge>
+                          )}
+                        </DropdownMenuCheckboxItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                   <p className="text-xs text-muted-foreground mt-1">أول مهندس يتم اختياره هو قائد المشروع تلقائيًا.</p>
                 </div>
                 {/* استبدل حقلي السعر الإجمالي والدفعة المقدمة ليكونا بمحاذاة علوية (top) بدلاً من bottom في نموذج إضافة مشروع جديد، وذلك بتغيير md:items-end إلى md:items-start في div الذي يحتوي الحقلين. */}
@@ -1485,6 +1506,15 @@ function ProjectsPageContent() {
                       <div className="flex justify-between">
                         <span className="text-gray-600">عدد أعضاء الفريق:</span>
                         <span>{selectedProject.team.length}</span>
+                      </div>
+                      <div className="flex flex-col gap-1 mt-2">
+                        <span className="text-gray-600">أعضاء الفريق:</span>
+                        <span>
+                          {selectedProject.team.map((id) => {
+                            const user = users.find(u => u.id === id);
+                            return user ? user.name : id;
+                          }).join("، ")}
+                        </span>
                       </div>
                     </div>
                   </CardContent>
