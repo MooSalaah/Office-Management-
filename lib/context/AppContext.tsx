@@ -864,25 +864,17 @@ export function useAppActions() {
       setLoadingState('projects', true);
       // تحديث المشروع في الباكند أولاً
       const response = await api.projects.update(project.id, project);
-      if (response && response.success) {
-        await updateProjectWithFinancialTransaction(project);
-        // إرسال تحديث فوري
+      if (response && response.success && typeof response.data === 'object' && response.data !== null && 'id' in response.data) {
+        dispatch({ type: "UPDATE_PROJECT", payload: response.data as Project });
+        if (window.realtimeUpdates) {
+          window.realtimeUpdates.sendProjectUpdate({ action: 'update', project: response.data });
+        }
+      } else if (response && response.success) {
+        // fallback: استخدم المشروع المرسل إذا لم يرجع السيرفر مشروع كامل
+        dispatch({ type: "UPDATE_PROJECT", payload: project });
         if (window.realtimeUpdates) {
           window.realtimeUpdates.sendProjectUpdate({ action: 'update', project });
         }
-        // إشعار للمهندس المسؤول إذا تم تغيير المهندس
-        if (project.assignedEngineerId && project.assignedEngineerId !== currentUser?.id) {
-          addNotification({
-            userId: project.assignedEngineerId,
-            title: "تم تحديث مشروع مُعيّن لك",
-            message: `تم تحديث مشروع "${project.name}"`,
-            type: "project",
-            actionUrl: `/projects/${project.id}`,
-            triggeredBy: currentUser?.id || "",
-            isRead: false,
-          });
-        }
-        showSuccessToast("تم تحديث المشروع بنجاح", `تم تحديث مشروع \"${project.name}\"`);
       } else {
         showErrorToast("خطأ في تحديث المشروع", response?.error || "فشل التحديث في الباكند");
       }
