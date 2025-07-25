@@ -162,7 +162,7 @@ function ProjectsPageContent() {
     type: "",
     price: "",
     downPayment: "0",
-    assignedEngineerId: "",
+    team: [] as string[], // فريق العمل
     importance: "medium" as "low" | "medium" | "high",
     status: "in-progress" as "draft" | "in-progress" | "completed" | "canceled",
     description: "",
@@ -251,7 +251,7 @@ function ProjectsPageContent() {
     if (!formData.name.trim()) missing.push("اسم المشروع");
     if (!formData.clientId) missing.push("العميل");
     if (!formData.type) missing.push("نوع المشروع");
-    if (!formData.assignedEngineerId) missing.push("المهندس المسؤول");
+    if (formData.team.length === 0) missing.push("المهندس المسؤول");
     if (!formData.price) missing.push("السعر الإجمالي");
     if (missing.length > 0) {
       setShowValidationErrors(true);
@@ -261,7 +261,9 @@ function ProjectsPageContent() {
     setMissingFields([]);
 
     const client = clients.find(c => c.id === formData.clientId)
-    const engineer = users.find(u => u.id === formData.assignedEngineerId)
+    // قائد الفريق هو أول مهندس في الفريق
+    const assignedEngineerId = formData.team[0] || "";
+    const engineer = users.find(u => u.id === assignedEngineerId)
 
     const newProject: Project = {
       id: Date.now().toString(),
@@ -270,12 +272,12 @@ function ProjectsPageContent() {
       clientId: formData.clientId,
       type: formData.type,
       status: formData.status,
-      team: [formData.assignedEngineerId],
+      team: formData.team,
       startDate: formData.startDate,
       price: Number.parseFloat(formData.price),
       downPayment: Number.parseFloat(formData.downPayment),
       remainingBalance: Number.parseFloat(formData.price) - Number.parseFloat(formData.downPayment),
-      assignedEngineerId: formData.assignedEngineerId,
+      assignedEngineerId,
       assignedEngineerName: engineer?.name || "",
       importance: formData.importance,
       description: formData.description,
@@ -320,21 +322,22 @@ function ProjectsPageContent() {
       setAlert({ type: "error", message: "حدث خطأ أثناء حفظ المشروع في قاعدة البيانات" });
     }
 
-    // Add notification to assigned engineer
-    if (engineer && engineer.id !== currentUser?.id) {
-      addNotification({
-        userId: engineer.id,
-        title: "مشروع جديد مُعيّن لك",
-        message: `تم تعيين مشروع "${formData.name}" لك`,
-        type: "project",
-        actionUrl: `/projects/${newProject.id}`,
-        triggeredBy: currentUser?.id || "",
-        isRead: false,
-      })
-    }
-
-    // إرسال تحديث فوري لجميع المستخدمين
-    realtimeUpdates.sendProjectUpdate({ action: 'create', project: newProject, userId: currentUser?.id, userName: currentUser?.name })
+    // إشعار جميع أعضاء الفريق (عدا منشئ المشروع)
+    formData.team.forEach((engineerId) => {
+      if (engineerId !== currentUser?.id) {
+        const eng = users.find(u => u.id === engineerId);
+        addNotification({
+          userId: engineerId,
+          title: "مشروع جديد مُعيّن لك",
+          message: `تم تعيينك في مشروع "${formData.name}" بواسطة ${currentUser?.name}`,
+          type: "project",
+          actionUrl: `/projects/${newProject.id}`,
+          triggeredBy: currentUser?.id || "",
+          isRead: false,
+        });
+        console.log(`تم إشعار ${eng?.name || engineerId} بتعيينه في المشروع.`);
+      }
+    });
   }
 
   const handleUpdateProject = async () => {
@@ -354,7 +357,9 @@ function ProjectsPageContent() {
     }
 
     const client = clients.find(c => c.id === formData.clientId)
-    const engineer = users.find(u => u.id === formData.assignedEngineerId)
+    // قائد الفريق هو أول مهندس في الفريق
+    const assignedEngineerId = formData.team[0] || "";
+    const engineer = users.find(u => u.id === assignedEngineerId)
 
     const updatedProject: Project = {
       ...editingProject,
@@ -363,12 +368,12 @@ function ProjectsPageContent() {
       clientId: formData.clientId,
       type: formData.type,
       status: formData.status,
-      team: [formData.assignedEngineerId],
+      team: formData.team,
       startDate: formData.startDate,
       price: Number.parseFloat(formData.price),
       downPayment: Number.parseFloat(formData.downPayment),
       remainingBalance: Number.parseFloat(formData.price) - Number.parseFloat(formData.downPayment),
-      assignedEngineerId: formData.assignedEngineerId,
+      assignedEngineerId,
       assignedEngineerName: engineer?.name || "",
       importance: formData.importance,
       description: formData.description,
@@ -492,7 +497,7 @@ function ProjectsPageContent() {
       type: project.type,
       price: project.price.toString(),
       downPayment: project.downPayment.toString(),
-      assignedEngineerId: project.assignedEngineerId,
+      team: project.team,
       importance: project.importance,
       status: project.status,
       description: project.description,
@@ -514,7 +519,7 @@ function ProjectsPageContent() {
       type: "",
       price: "",
       downPayment: "0",
-      assignedEngineerId: currentUser?.id || "",
+      team: [],
       importance: "medium",
       status: "in-progress",
       description: "",
@@ -722,7 +727,7 @@ function ProjectsPageContent() {
       }
       
       // Update form data
-      setFormData(prev => ({ ...prev, assignedEngineerId: newEngineer.id }))
+      setFormData(prev => ({ ...prev, team: [...prev.team, newEngineer.id] }))
       
       // Add notification
       addNotification({
@@ -1007,89 +1012,32 @@ function ProjectsPageContent() {
 
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="assigned-engineer" className="flex items-center">
-                    المهندس المسؤول
+                  <Label htmlFor="team" className="flex items-center">
+                    فريق العمل (يمكن اختيار أكثر من مهندس)
                     <span className="text-red-500 mr-1">*</span>
                   </Label>
-                  {!showNewEngineerInput ? (
-                    <div className="flex space-x-2 space-x-reverse">
-                      <Select
-                        value={formData.assignedEngineerId}
-                        onValueChange={(value) => setFormData((prev) => ({ ...prev, assignedEngineerId: value }))}
-                      >
-                        <SelectTrigger className={`flex-1 ${showValidationErrors && !formData.assignedEngineerId ? "border-red-500" : ""}`}>
-                          <SelectValue placeholder="اختر المهندس" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {users
-                            .filter((u) => u.role === "engineer" || u.role === "admin")
-                            .map((engineer) => (
-                              <SelectItem key={engineer.id} value={engineer.id}>
-                                <div className="flex items-center space-x-2 space-x-reverse">
-                                  <span>{engineer.name}</span>
-                                  <Badge variant="outline" className="text-xs">
-                                    {engineer.role === "admin" ? "مدير" : "مهندس"}
-                                  </Badge>
-                                </div>
-                              </SelectItem>
-                            ))}
-                        </SelectContent>
-                      </Select>
-                      {(hasPermission(currentUser?.role || "", "create", "users") || currentUser?.role === "engineer") && (
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => setShowNewEngineerInput(true)}
-                          className="shrink-0"
-                          title="إضافة مهندس جديد"
-                        >
-                          <Plus className="w-4 h-4" />
-                        </Button>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <div className="flex space-x-2 space-x-reverse">
-                        <Input
-                          placeholder="اسم المهندس الجديد"
-                          value={newEngineerName}
-                          onChange={(e) => setNewEngineerName(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && newEngineerName.trim()) {
-                              handleAddNewEngineer()
-                            }
+                  <div className="flex flex-col gap-2 max-h-40 overflow-y-auto border rounded p-2">
+                    {users.filter((u) => u.role === "engineer" || u.role === "admin").map((engineer) => (
+                      <label key={engineer.id} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.team.includes(engineer.id)}
+                          onChange={(e) => {
+                            setFormData((prev) => ({
+                              ...prev,
+                              team: e.target.checked
+                                ? [...prev.team, engineer.id]
+                                : prev.team.filter((id) => id !== engineer.id),
+                            }))
                           }}
-                          className={newEngineerInputError ? "border-red-500" : ""}
                         />
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={handleAddNewEngineer}
-                          disabled={!newEngineerName.trim()}
-                          className="shrink-0"
-                          title="حفظ المهندس"
-                        >
-                          <CheckCircle className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => {
-                            setShowNewEngineerInput(false)
-                            setNewEngineerName("")
-                          }}
-                          className="shrink-0"
-                          title="إلغاء"
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
-                      {newEngineerInputError && (
-                        <p className="text-xs text-red-500 mt-1">{newEngineerInputError}</p>
-                      )}
-                    </div>
-                  )}
-
+                        <span>{engineer.name}</span>
+                        <Badge variant="outline" className="text-xs">
+                          {engineer.role === "admin" ? "مدير" : "مهندس"}
+                        </Badge>
+                      </label>
+                    ))}
+                  </div>
                 </div>
                 {/* استبدل حقلي السعر الإجمالي والدفعة المقدمة ليكونا بمحاذاة علوية (top) بدلاً من bottom في نموذج إضافة مشروع جديد، وذلك بتغيير md:items-end إلى md:items-start في div الذي يحتوي الحقلين. */}
                 <div className="md:col-span-2 flex flex-col md:flex-row md:items-start gap-4">
