@@ -701,152 +701,212 @@ function SettingsPageContent() {
     }
   }
 
-  const handleCreateJobRole = () => {
+  const handleCreateJobRole = async () => {
     if (!hasPermission(currentUser?.role || "", "create", "roles")) {
       setAlert({ type: "error", message: "ليس لديك صلاحية لإنشاء أدوار وظيفية" })
       return
     }
 
-    const newJobRole = {
-      id: jobRoleFormData.name.toLowerCase().replace(/\s+/g, '_'),
-      name: jobRoleFormData.name,
-      description: jobRoleFormData.description,
-      permissions: jobRoleFormData.permissions,
-      modules: availableModules.filter(module => 
-        jobRoleFormData.permissions.some(permission => 
-          permission.startsWith('view_') || permission.startsWith('edit_') || permission.startsWith('checkin_') || permission.startsWith('checkout_')
-        )
-      ).map(module => module.id)
-    }
+    try {
+      const newJobRole = {
+        id: jobRoleFormData.name.toLowerCase().replace(/\s+/g, '_'),
+        name: jobRoleFormData.name,
+        description: jobRoleFormData.description,
+        permissions: jobRoleFormData.permissions,
+        modules: availableModules.filter(module => 
+          jobRoleFormData.permissions.some(permission => 
+            permission.startsWith('view_') || permission.startsWith('edit_') || permission.startsWith('checkin_') || permission.startsWith('checkout_')
+          )
+        ).map(module => module.id)
+      }
 
-    setJobRoles((prev: any) => [...prev, newJobRole])
-    
-    // Update rolePermissions dynamically
-    rolePermissions[newJobRole.id as keyof typeof rolePermissions] = {
-      name: newJobRole.name,
-      description: newJobRole.description,
-      permissions: newJobRole.permissions,
-      modules: newJobRole.modules
+      // حفظ في قاعدة البيانات
+      const response = await fetch('/api/roles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newJobRole),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'فشل حفظ الدور في قاعدة البيانات');
+      }
+
+      const result = await response.json();
+      const savedRole = result.data;
+
+      // تحديث state المحلي
+      setJobRoles((prev: any) => [...prev, savedRole])
+      
+      // Update rolePermissions dynamically
+      rolePermissions[savedRole.id as keyof typeof rolePermissions] = {
+        name: savedRole.name,
+        description: savedRole.description,
+        permissions: savedRole.permissions,
+        modules: savedRole.modules
+      }
+      
+      // Save to localStorage
+      const existingRoles = JSON.parse(localStorage.getItem("jobRoles") || "[]")
+      existingRoles.push(savedRole)
+      localStorage.setItem("jobRoles", JSON.stringify(existingRoles))
+      
+      // Save updated rolePermissions
+      localStorage.setItem("rolePermissions", JSON.stringify(rolePermissions))
+      
+      // Update current user if they have this role
+      if (currentUser && currentUser.role === savedRole.id) {
+        const updatedUser = { ...currentUser, permissions: savedRole.permissions }
+        dispatch({ type: "SET_CURRENT_USER", payload: updatedUser })
+        localStorage.setItem("currentUser", JSON.stringify(updatedUser))
+      }
+      
+      // Show success dialog with confirmation
+      setSuccessDialog("تم إنشاء الدور الوظيفي بنجاح وتم حفظ البيانات في قاعدة البيانات")
+      
+      setAlert({ type: "success", message: "تم إنشاء الدور الوظيفي بنجاح" })
+      setIsJobRoleDialogOpen(false)
+      resetJobRoleForm()
+    } catch (error) {
+      console.error('Error creating role:', error);
+      setAlert({ type: "error", message: `خطأ في إنشاء الدور: ${error instanceof Error ? error.message : 'خطأ غير معروف'}` })
     }
-    
-    // Save to localStorage
-    const existingRoles = JSON.parse(localStorage.getItem("jobRoles") || "[]")
-    existingRoles.push(newJobRole)
-    localStorage.setItem("jobRoles", JSON.stringify(existingRoles))
-    
-    // Save updated rolePermissions
-    localStorage.setItem("rolePermissions", JSON.stringify(rolePermissions))
-    
-    // Update current user if they have this role
-    if (currentUser && currentUser.role === newJobRole.id) {
-      const updatedUser = { ...currentUser, permissions: newJobRole.permissions }
-      dispatch({ type: "SET_CURRENT_USER", payload: updatedUser })
-      localStorage.setItem("currentUser", JSON.stringify(updatedUser))
-    }
-    
-    // Show success dialog with confirmation
-    setSuccessDialog("تم إنشاء الدور الوظيفي بنجاح وتم حفظ البيانات في التخزين المحلي")
-    
-    setAlert({ type: "success", message: "تم إنشاء الدور الوظيفي بنجاح" })
-    setIsJobRoleDialogOpen(false)
-    resetJobRoleForm()
   }
 
-  const handleUpdateJobRole = () => {
+  const handleUpdateJobRole = async () => {
     if (!editingJobRole) return
     
-    const updatedRole = {
-      ...editingJobRole,
-      name: jobRoleFormData.name,
-      description: jobRoleFormData.description,
-      permissions: jobRoleFormData.permissions,
-      modules: availableModules.filter(module => 
-        jobRoleFormData.permissions.some(permission => 
-          permission.startsWith('view_') || permission.startsWith('edit_') || permission.startsWith('checkin_') || permission.startsWith('checkout_')
-        )
-      ).map(module => module.id)
-    }
+    try {
+      const updatedRole = {
+        ...editingJobRole,
+        name: jobRoleFormData.name,
+        description: jobRoleFormData.description,
+        permissions: jobRoleFormData.permissions,
+        modules: availableModules.filter(module => 
+          jobRoleFormData.permissions.some(permission => 
+            permission.startsWith('view_') || permission.startsWith('edit_') || permission.startsWith('checkin_') || permission.startsWith('checkout_')
+          )
+        ).map(module => module.id)
+      }
 
-    setJobRoles((prev: any) => prev.map((role: any) => (role.id === editingJobRole.id ? updatedRole : role)))
-    
-    // Update rolePermissions dynamically
-    rolePermissions[updatedRole.id as keyof typeof rolePermissions] = {
-      name: updatedRole.name,
-      description: updatedRole.description,
-      permissions: updatedRole.permissions,
-      modules: updatedRole.modules
+      // تحديث في قاعدة البيانات
+      const response = await fetch(`/api/roles/${editingJobRole._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedRole),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'فشل تحديث الدور في قاعدة البيانات');
+      }
+
+      // تحديث state المحلي
+      setJobRoles((prev: any) => prev.map((role: any) => (role.id === editingJobRole.id ? updatedRole : role)))
+      
+      // Update rolePermissions dynamically
+      rolePermissions[updatedRole.id as keyof typeof rolePermissions] = {
+        name: updatedRole.name,
+        description: updatedRole.description,
+        permissions: updatedRole.permissions,
+        modules: updatedRole.modules
+      }
+      
+      // Update in localStorage
+      const existingRoles = JSON.parse(localStorage.getItem("jobRoles") || "[]")
+      const updatedRoles = existingRoles.map((role: any) => role.id === editingJobRole.id ? updatedRole : role)
+      localStorage.setItem("jobRoles", JSON.stringify(updatedRoles))
+      
+      // Save updated rolePermissions
+      localStorage.setItem("rolePermissions", JSON.stringify(rolePermissions))
+      
+      // Update users with this role including current user
+      const existingUsers = JSON.parse(localStorage.getItem("users") || "[]")
+      const updatedUsers = existingUsers.map((user: any) => {
+        if (user.role === updatedRole.id) {
+          return { ...user, permissions: updatedRole.permissions }
+        }
+        return user
+      })
+      localStorage.setItem("users", JSON.stringify(updatedUsers))
+      users.filter(user => user.role === updatedRole.id).forEach(user => {
+        const updatedUser = { ...user, permissions: updatedRole.permissions }
+        dispatch({ type: "UPDATE_USER", payload: updatedUser })
+        // If this is the current user, update currentUser as well
+        if (currentUser && user.id === currentUser.id) {
+          dispatch({ type: "SET_CURRENT_USER", payload: updatedUser })
+          localStorage.setItem("currentUser", JSON.stringify(updatedUser))
+        }
+      })
+      
+      // Show success dialog with confirmation
+      setSuccessDialog("تم تحديث الدور الوظيفي بنجاح وتم حفظ البيانات في قاعدة البيانات")
+      
+      setEditingJobRole(null)
+      setAlert({ type: "success", message: "تم تحديث الدور الوظيفي بنجاح" })
+      setIsJobRoleDialogOpen(false)
+      resetJobRoleForm()
+    } catch (error) {
+      console.error('Error updating role:', error);
+      setAlert({ type: "error", message: `خطأ في تحديث الدور: ${error instanceof Error ? error.message : 'خطأ غير معروف'}` })
     }
-    
-    // Update in localStorage
-    const existingRoles = JSON.parse(localStorage.getItem("jobRoles") || "[]")
-    const updatedRoles = existingRoles.map((role: any) => role.id === editingJobRole.id ? updatedRole : role)
-    localStorage.setItem("jobRoles", JSON.stringify(updatedRoles))
-    
-    // Save updated rolePermissions
-    localStorage.setItem("rolePermissions", JSON.stringify(rolePermissions))
-    
-    // Update users with this role including current user
-    const existingUsers = JSON.parse(localStorage.getItem("users") || "[]")
-    const updatedUsers = existingUsers.map((user: any) => {
-      if (user.role === updatedRole.id) {
-        return { ...user, permissions: updatedRole.permissions }
-      }
-      return user
-    })
-    localStorage.setItem("users", JSON.stringify(updatedUsers))
-    users.filter(user => user.role === updatedRole.id).forEach(user => {
-      const updatedUser = { ...user, permissions: updatedRole.permissions }
-      dispatch({ type: "UPDATE_USER", payload: updatedUser })
-      // If this is the current user, update currentUser as well
-      if (currentUser && user.id === currentUser.id) {
-        dispatch({ type: "SET_CURRENT_USER", payload: updatedUser })
-        localStorage.setItem("currentUser", JSON.stringify(updatedUser))
-      }
-    })
-    
-    // Show success dialog with confirmation
-    setSuccessDialog("تم تحديث الدور الوظيفي بنجاح وتم حفظ البيانات في التخزين المحلي")
-    
-    setEditingJobRole(null)
-    setAlert({ type: "success", message: "تم تحديث الدور الوظيفي بنجاح" })
-    setIsJobRoleDialogOpen(false)
-    resetJobRoleForm()
   }
 
-  const handleDeleteJobRole = (roleId: string) => {
-    setJobRoles((prev: any) => prev.filter((role: any) => role.id !== roleId))
-    
-    // Remove from localStorage
-    const existingRoles = JSON.parse(localStorage.getItem("jobRoles") || "[]")
-    const filteredRoles = existingRoles.filter((role: any) => role.id !== roleId)
-    localStorage.setItem("jobRoles", JSON.stringify(filteredRoles))
-    
-    // Remove from rolePermissions
-    delete rolePermissions[roleId as keyof typeof rolePermissions]
-    localStorage.setItem("rolePermissions", JSON.stringify(rolePermissions))
-    
-    // Update users with this role (set to admin)
-    const existingUsers = JSON.parse(localStorage.getItem("users") || "[]")
-    const updatedUsers = existingUsers.map((user: any) => {
-      if (user.role === roleId) {
-        return { ...user, role: "admin", permissions: ["*"] }
+  const handleDeleteJobRole = async (roleId: string) => {
+    try {
+      // حذف من قاعدة البيانات
+      const roleToDelete = jobRoles.find((role: any) => role.id === roleId);
+      if (!roleToDelete || !roleToDelete._id) {
+        throw new Error('الدور غير موجود');
       }
-      return user
-    })
-    localStorage.setItem("users", JSON.stringify(updatedUsers))
-    users.filter(user => user.role === roleId).forEach(user => {
-      const updatedUser = { ...user, role: "admin", permissions: ["*"] }
-      dispatch({ type: "UPDATE_USER", payload: updatedUser })
-      if (currentUser && user.id === currentUser.id) {
-        dispatch({ type: "SET_CURRENT_USER", payload: updatedUser })
-        localStorage.setItem("currentUser", JSON.stringify(updatedUser))
+
+      const response = await fetch(`/api/roles/${roleToDelete._id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'فشل حذف الدور من قاعدة البيانات');
       }
-    })
-    
-    // Show success dialog with confirmation
-    setSuccessDialog("تم حذف الدور الوظيفي بنجاح وتم حفظ البيانات في التخزين المحلي")
-    
-    setAlert({ type: "success", message: "تم حذف الدور الوظيفي بنجاح" })
+
+      // تحديث state المحلي
+      setJobRoles((prev: any) => prev.filter((role: any) => role.id !== roleId))
+      
+      // Remove from localStorage
+      const existingRoles = JSON.parse(localStorage.getItem("jobRoles") || "[]")
+      const filteredRoles = existingRoles.filter((role: any) => role.id !== roleId)
+      localStorage.setItem("jobRoles", JSON.stringify(filteredRoles))
+      
+      // Remove from rolePermissions
+      delete rolePermissions[roleId as keyof typeof rolePermissions]
+      localStorage.setItem("rolePermissions", JSON.stringify(rolePermissions))
+      
+      // Update users with this role (set to admin)
+      const existingUsers = JSON.parse(localStorage.getItem("users") || "[]")
+      const updatedUsers = existingUsers.map((user: any) => {
+        if (user.role === roleId) {
+          return { ...user, role: "admin", permissions: ["*"] }
+        }
+        return user
+      })
+      localStorage.setItem("users", JSON.stringify(updatedUsers))
+      users.filter(user => user.role === roleId).forEach(user => {
+        const updatedUser = { ...user, role: "admin", permissions: ["*"] }
+        dispatch({ type: "UPDATE_USER", payload: updatedUser })
+        if (currentUser && user.id === currentUser.id) {
+          dispatch({ type: "SET_CURRENT_USER", payload: updatedUser })
+          localStorage.setItem("currentUser", JSON.stringify(updatedUser))
+        }
+      })
+      
+      // Show success dialog with confirmation
+      setSuccessDialog("تم حذف الدور الوظيفي بنجاح وتم حفظ البيانات في قاعدة البيانات")
+      
+      setAlert({ type: "success", message: "تم حذف الدور الوظيفي بنجاح" })
+    } catch (error) {
+      console.error('Error deleting role:', error);
+      setAlert({ type: "error", message: `خطأ في حذف الدور: ${error instanceof Error ? error.message : 'خطأ غير معروف'}` })
+    }
   }
 
   const resetJobRoleForm = () => {

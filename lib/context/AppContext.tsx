@@ -505,6 +505,36 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     fetchTasks();
   }, []);
 
+  // جلب الأدوار من الباكند عند بدء التطبيق
+  useEffect(() => {
+    const fetchRoles = async () => {
+      try {
+        const response = await api.roles.getAll();
+        if (response && response.success && Array.isArray(response.data)) {
+          logger.info("تم جلب الأدوار من الباكند", { count: response.data.length }, 'ROLES');
+          // حفظ الأدوار في localStorage للاستخدام في الإعدادات
+          localStorage.setItem("jobRoles", JSON.stringify(response.data));
+          
+          // تحديث rolePermissions بناءً على الأدوار الجديدة
+          const rolePermissions: any = {};
+          response.data.forEach((role: any) => {
+            rolePermissions[role.id] = {
+              name: role.name,
+              description: role.description,
+              permissions: role.permissions,
+              modules: role.modules || []
+            };
+          });
+          localStorage.setItem("rolePermissions", JSON.stringify(rolePermissions));
+        }
+      } catch (error) {
+        logger.error("فشل جلب الأدوار من الباكند", { error }, 'API');
+        // في حال الفشل، تبقى الأدوار من localStorage
+      }
+    };
+    fetchRoles();
+  }, []);
+
   // Load all data from localStorage on mount
   useEffect(() => {
     const loadDataFromStorage = async () => {

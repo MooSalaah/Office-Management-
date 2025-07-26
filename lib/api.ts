@@ -177,6 +177,37 @@ class ApiClient {
 		});
 	}
 
+	// Roles API
+	async getRoles() {
+		return this.request("/api/roles");
+	}
+
+	async createRole(roleData: any) {
+		return this.request("/api/roles", {
+			method: "POST",
+			body: JSON.stringify(roleData),
+		});
+	}
+
+	async updateRole(id: string, roleData: any) {
+		return this.request(`/api/roles/${id}`, {
+			method: "PUT",
+			body: JSON.stringify(roleData),
+		});
+	}
+
+	async deleteRole(id: string) {
+		return this.request(`/api/roles/${id}`, {
+			method: "DELETE",
+		});
+	}
+
+	async seedRoles() {
+		return this.request("/api/roles/seed", {
+			method: "POST",
+		});
+	}
+
 	// Auth API
 	async login(credentials: { email: string; password: string }) {
 		return this.request("/api/users/login", {
@@ -226,6 +257,13 @@ export const api = {
 		create: (data: any) => apiClient.createUser(data),
 		update: (id: string, data: any) => apiClient.updateUser(id, data),
 		delete: (id: string) => apiClient.deleteUser(id),
+	},
+	roles: {
+		getAll: () => apiClient.getRoles(),
+		create: (data: any) => apiClient.createRole(data),
+		update: (id: string, data: any) => apiClient.updateRole(id, data),
+		delete: (id: string) => apiClient.deleteRole(id),
+		seed: () => apiClient.seedRoles(),
 	},
 	auth: {
 		login: (credentials: { email: string; password: string }) =>
