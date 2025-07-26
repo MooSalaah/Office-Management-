@@ -263,7 +263,10 @@ function ProjectsPageContent() {
     if (!formData.type) missing.push("نوع المشروع");
     if (formData.team.length === 0) missing.push("المهندس المسؤول");
     if (!formData.price) missing.push("السعر الإجمالي");
-    if (selectedTasks.some(t => !t.assigneeId)) missing.push("يجب اختيار مسؤول لكل مهمة");
+    // تحقق من المهام المختارة فقط إذا كانت موجودة
+    if (selectedTasks.length > 0 && selectedTasks.some(t => !t.assigneeId)) {
+      missing.push("يجب اختيار مسؤول لكل مهمة مختارة");
+    }
     if (missing.length > 0) {
       setShowValidationErrors(true);
       setMissingFields(missing);
@@ -1257,15 +1260,15 @@ function ProjectsPageContent() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>المهام الافتراضية للمشروع <span className="text-red-500 mr-1">*</span></Label>
+                  <Label>المهام الافتراضية للمشروع</Label>
                   <div className="border rounded p-2 bg-muted">
-                    <div className="mb-2 text-xs text-muted-foreground">اختر أنواع المهام وحدد المسؤول عن كل مهمة</div>
+                    <div className="mb-2 text-xs text-muted-foreground">اختر أنواع المهام وحدد المسؤول عن كل مهمة (اختياري)</div>
                     {taskTypes.length === 0 ? (
                       <div className="text-xs text-muted-foreground">لا توجد أنواع مهام متاحة</div>
                     ) : (
-                      <>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                         {taskTypes.map((type) => (
-                          <div key={type.id} className="flex items-center gap-2 mb-2">
+                          <div key={type.id} className="flex items-center gap-2 p-2 border rounded bg-background">
                             <Checkbox
                               checked={selectedTasks.some((t) => t.typeId === type.id)}
                               onCheckedChange={(checked) => {
@@ -1276,8 +1279,7 @@ function ProjectsPageContent() {
                                 }
                               }}
                             />
-                            <span className="text-sm font-medium">{type.name}</span>
-                            <span className="text-xs text-muted-foreground">{type.description}</span>
+                            <span className="text-sm font-medium flex-1">{type.name}</span>
                             {selectedTasks.some((t) => t.typeId === type.id) && (
                               <Select
                                 value={selectedTasks.find((t) => t.typeId === type.id)?.assigneeId || ''}
@@ -1285,8 +1287,8 @@ function ProjectsPageContent() {
                                   setSelectedTasks((prev) => prev.map((t) => t.typeId === type.id ? { ...t, assigneeId: value } : t));
                                 }}
                               >
-                                <SelectTrigger className="w-40">
-                                  <SelectValue placeholder="اختر المسؤول" />
+                                <SelectTrigger className="w-32">
+                                  <SelectValue placeholder="المسؤول" />
                                 </SelectTrigger>
                                 <SelectContent>
                                   {users.map((user) => (
@@ -1297,7 +1299,7 @@ function ProjectsPageContent() {
                             )}
                           </div>
                         ))}
-                      </>
+                      </div>
                     )}
                   </div>
                 </div>
