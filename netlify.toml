@@ -22,17 +22,8 @@
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
-# Redirects for Next.js
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
-
-# Handle Next.js routing
-[[redirects]]
-  from = "/_next/*"
-  to = "/_next/:splat"
-  status = 200
+# Redirects for Next.js - Let the plugin handle routing
+# The @netlify/plugin-nextjs will handle all routing automatically
 
 # Headers for security and caching
 [[headers]]
