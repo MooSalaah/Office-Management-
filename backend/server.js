@@ -97,6 +97,7 @@ app.use('/api/upcomingPayments', require('./routes/upcomingPayments'));
 app.use('/api/companySettings', require('./routes/companySettings'));
 app.use('/api/userSettings', require('./routes/userSettings'));
 app.use('/api/roles', require('./routes/roles'));
+app.use('/api/taskTypes', require('./routes/taskTypes'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {

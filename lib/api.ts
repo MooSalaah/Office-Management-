@@ -227,6 +227,28 @@ class ApiClient {
 	async healthCheck() {
 		return this.request("/");
 	}
+
+	// Task Types API
+	async getTaskTypes() {
+		return this.request("/api/taskTypes");
+	}
+	async createTaskType(typeData: any) {
+		return this.request("/api/taskTypes", {
+			method: "POST",
+			body: JSON.stringify(typeData),
+		});
+	}
+	async updateTaskType(id: string, typeData: any) {
+		return this.request(`/api/taskTypes/${id}`, {
+			method: "PUT",
+			body: JSON.stringify(typeData),
+		});
+	}
+	async deleteTaskType(id: string) {
+		return this.request(`/api/taskTypes/${id}`, {
+			method: "DELETE",
+		});
+	}
 }
 
 // Create and export API client instance
@@ -271,4 +293,10 @@ export const api = {
 		register: (userData: any) => apiClient.register(userData),
 	},
 	health: () => apiClient.healthCheck(),
+	taskTypes: {
+		getAll: () => apiClient.getTaskTypes(),
+		create: (data: any) => apiClient.createTaskType(data),
+		update: (id: string, data: any) => apiClient.updateTaskType(id, data),
+		delete: (id: string) => apiClient.deleteTaskType(id),
+	},
 };

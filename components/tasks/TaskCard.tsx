@@ -2,7 +2,7 @@ import { Card, CardContent } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
-import { Calendar, Trash2, Edit2, Eye, Move, User } from "lucide-react";
+import { Calendar, Trash2, Edit2, Eye, Move, User, X } from "lucide-react";
 import type { Task, User as UserType } from "@/lib/types";
 import React from "react";
 
@@ -11,6 +11,7 @@ interface TaskCardProps {
   users?: UserType[];
   canDelete?: boolean;
   canEdit?: boolean;
+  isHighlighted?: boolean;
   onDelete?: () => void;
   onEdit?: () => void;
   onDetails?: () => void;
@@ -42,7 +43,7 @@ const getPriorityText = (priority: string) => {
   }
 };
 
-const TaskCard = ({ task, users, canDelete, canEdit, onDelete, onEdit, onDetails }: TaskCardProps) => {
+const TaskCard = ({ task, users, canDelete, canEdit, isHighlighted, onDelete, onEdit, onDetails }: TaskCardProps) => {
   const handleCardClick = (e: React.MouseEvent) => {
     // Prevent card click when clicking on action buttons
     if ((e.target as HTMLElement).closest('.action-button')) {
@@ -54,7 +55,11 @@ const TaskCard = ({ task, users, canDelete, canEdit, onDelete, onEdit, onDetails
 
   return (
     <Card 
-      className={`hover:shadow-md transition-shadow cursor-pointer ${canEdit ? 'border-l-4 border-l-blue-500 hover:border-l-blue-600' : ''}`}
+      className={`hover:shadow-md transition-shadow cursor-pointer ${
+        canEdit ? 'border-l-4 border-l-blue-500 hover:border-l-blue-600' : ''
+      } ${
+        isHighlighted ? 'ring-2 ring-blue-500 ring-offset-2 bg-blue-50 dark:bg-blue-900/20' : ''
+      }`}
       onClick={handleCardClick}
     >
       <CardContent className="p-4">
@@ -76,9 +81,13 @@ const TaskCard = ({ task, users, canDelete, canEdit, onDelete, onEdit, onDetails
           <p className="text-sm text-muted-foreground line-clamp-2">{task.description}</p>
 
           {/* Project */}
-          <div className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
-            {task.projectName}
-          </div>
+          {task.projectName && (
+            <div className="flex items-center space-x-2 space-x-reverse">
+              <div className="text-xs text-muted-foreground bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded border border-blue-200 dark:border-blue-800">
+                <span className="font-medium">المشروع:</span> {task.projectName}
+              </div>
+            </div>
+          )}
 
           {/* Task Footer */}
           <div className="flex items-center justify-between pt-2 border-t">
@@ -113,6 +122,21 @@ const TaskCard = ({ task, users, canDelete, canEdit, onDelete, onEdit, onDetails
               
               {/* Action Buttons */}
               <div className="flex items-center space-x-1 space-x-reverse">
+                {isHighlighted && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      // Remove highlight by refreshing the page without the highlight parameter
+                      window.location.href = '/tasks'
+                    }}
+                    className="action-button h-6 w-6 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                    title="إزالة التمييز"
+                  >
+                    <X className="w-3 h-3" />
+                  </Button>
+                )}
                 {canEdit && (
                   <Button
                     variant="ghost"

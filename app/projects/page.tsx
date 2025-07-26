@@ -54,6 +54,7 @@ import {
   DropdownMenuContent,
   DropdownMenuCheckboxItem,
 } from "@/components/ui/dropdown-menu"
+import { MultiSelect } from '@/components/ui/select';
 
 export default function ProjectsPage() {
   return (
@@ -162,6 +163,8 @@ function ProjectsPageContent() {
   const [newTypeInputError, setNewTypeInputError] = useState("");
   const [newEngineerInputError, setNewEngineerInputError] = useState("");
   const [newClientPhone, setNewClientPhone] = useState("");
+  const [taskTypes, setTaskTypes] = useState<TaskType[]>([]);
+  const [selectedTasks, setSelectedTasks] = useState<{ typeId: string; assigneeId: string }[]>([]);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -260,6 +263,7 @@ function ProjectsPageContent() {
     if (!formData.type) missing.push("نوع المشروع");
     if (formData.team.length === 0) missing.push("المهندس المسؤول");
     if (!formData.price) missing.push("السعر الإجمالي");
+    if (selectedTasks.some(t => !t.assigneeId)) missing.push("يجب اختيار مسؤول لكل مهمة");
     if (missing.length > 0) {
       setShowValidationErrors(true);
       setMissingFields(missing);
@@ -294,83 +298,38 @@ function ProjectsPageContent() {
       updatedAt: new Date().toISOString(),
     }
 
+    // Prepare tasks for backend
+    const tasks = selectedTasks.map(t => {
+      const type = taskTypes.find(tt => tt.id === t.typeId);
+      const user = users.find(u => u.id === t.assigneeId);
+      return {
+        typeId: t.typeId,
+        assigneeId: t.assigneeId,
+        assigneeName: user?.name || '',
+        typeName: type?.name || '',
+        typeDescription: type?.description || ''
+      };
+    });
+
     try {
-      // Save to backend database
       const response = await fetch('/api/projects', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(newProject),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...newProject, tasks, createdByName: currentUser?.name || '' }),
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to save project to database');
+      const data = await response.json();
+      if (data.success && data.data) {
+        dispatch({ type: "ADD_PROJECT", payload: data.data });
+        showSuccessToast("تم إنشاء المشروع بنجاح", `تم إنشاء المشروع "${data.data.name}" بنجاح`);
+        setIsDialogOpen(false);
+        resetForm();
+        setSelectedTasks([]);
+      } else {
+        setAlert({ type: "error", message: data.error || "فشل حفظ المشروع في قاعدة البيانات" });
       }
-
-      const result = await response.json();
-      logger.info('Project saved to database', { result }, 'PROJECTS');
-
-      // Update local state
-      dispatch({ type: "ADD_PROJECT", payload: newProject })
-      
-      // Save to localStorage
-      const existingProjects = JSON.parse(localStorage.getItem("projects") || "[]")
-      existingProjects.push(newProject)
-      localStorage.setItem("projects", JSON.stringify(existingProjects))
-      
-      // إرسال تحديث فوري لجميع المستخدمين
-      realtimeUpdates.sendProjectUpdate({ action: 'create', project: newProject, userId: currentUser?.id, userName: currentUser?.name })
-      
-      setIsDialogOpen(false)
-      resetForm()
     } catch (error) {
-      console.error('Error creating project:', error);
       setAlert({ type: "error", message: "حدث خطأ أثناء حفظ المشروع في قاعدة البيانات" });
     }
-
-    // أضف دالة مساعدة لإشعار أعضاء الفريق
-    function notifyProjectTeam({ team, currentUser, users, addNotification, projectName, projectId, action, actorName }: {
-      team: string[];
-      currentUser: any;
-      users: any[];
-      addNotification: Function;
-      projectName: string;
-      projectId: string;
-      action: 'create' | 'update';
-      actorName: string;
-    }) {
-      const title = action === 'create' ? 'مشروع جديد مسؤول عنه' : 'تم تعديل مشروع أنت مسؤول عنه';
-      const message = action === 'create'
-        ? `تم تعيينك كعضو في فريق مشروع "${projectName}" بواسطة ${actorName}`
-        : `تم تعديل تفاصيل مشروع "${projectName}" بواسطة ${actorName}`;
-      team.forEach((engineerId) => {
-        if (engineerId !== currentUser?.id) {
-          const eng = users.find(u => u.id === engineerId);
-          addNotification({
-            userId: engineerId,
-            title,
-            message,
-            type: "project",
-            actionUrl: `/projects/${projectId}`,
-            triggeredBy: currentUser?.id || "",
-            isRead: false,
-          });
-          logger.info(`تم إشعار ${eng?.name || engineerId} (${action === 'create' ? 'إضافة' : 'تعديل'}) المشروع`, { engineerId, engineerName: eng?.name, action }, 'PROJECTS');
-        }
-      });
-    }
-    // إشعار جميع أعضاء الفريق (عدا منشئ المشروع)
-    notifyProjectTeam({
-      team: formData.team,
-      currentUser,
-      users,
-      addNotification,
-      projectName: formData.name,
-      projectId: newProject.id,
-      action: 'create',
-      actorName: currentUser?.name || '',
-    });
   }
 
   const handleUpdateProject = async () => {
@@ -799,6 +758,13 @@ function ProjectsPageContent() {
       setNewEngineerName("")
     }
   }
+
+  useEffect(() => {
+    // Fetch task types from API
+    api.taskTypes.getAll().then((res) => {
+      if (res.success && Array.isArray(res.data)) setTaskTypes(res.data);
+    });
+  }, []);
 
   return (
     <div className="max-w-screen-xl mx-auto space-y-6">
@@ -1286,6 +1252,51 @@ function ProjectsPageContent() {
                     onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label>المهام الافتراضية للمشروع <span className="text-red-500 mr-1">*</span></Label>
+                  <div className="border rounded p-2 bg-muted">
+                    <div className="mb-2 text-xs text-muted-foreground">اختر أنواع المهام وحدد المسؤول عن كل مهمة</div>
+                    {taskTypes.length === 0 ? (
+                      <div className="text-xs text-muted-foreground">لا توجد أنواع مهام متاحة</div>
+                    ) : (
+                      <>
+                        {taskTypes.map((type) => (
+                          <div key={type.id} className="flex items-center gap-2 mb-2">
+                            <Checkbox
+                              checked={selectedTasks.some((t) => t.typeId === type.id)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedTasks((prev) => [...prev, { typeId: type.id, assigneeId: '' }]);
+                                } else {
+                                  setSelectedTasks((prev) => prev.filter((t) => t.typeId !== type.id));
+                                }
+                              }}
+                            />
+                            <span className="text-sm font-medium">{type.name}</span>
+                            <span className="text-xs text-muted-foreground">{type.description}</span>
+                            {selectedTasks.some((t) => t.typeId === type.id) && (
+                              <Select
+                                value={selectedTasks.find((t) => t.typeId === type.id)?.assigneeId || ''}
+                                onValueChange={(value) => {
+                                  setSelectedTasks((prev) => prev.map((t) => t.typeId === type.id ? { ...t, assigneeId: value } : t));
+                                }}
+                              >
+                                <SelectTrigger className="w-40">
+                                  <SelectValue placeholder="اختر المسؤول" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {users.map((user) => (
+                                    <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            )}
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                </div>
               </div>
               <div className="flex justify-end space-x-2 space-x-reverse">
                 <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
@@ -1566,6 +1577,92 @@ function ProjectsPageContent() {
                 </Card>
               </div>
 
+              {/* Project Tasks */}
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="font-medium">مهام المشروع</h4>
+                    <Badge variant="outline" className="text-xs">
+                      {tasks.filter(t => t.projectId === selectedProject.id).length} مهمة
+                    </Badge>
+                  </div>
+                  <div className="space-y-3">
+                    {tasks.filter(task => task.projectId === selectedProject.id).length > 0 ? (
+                      tasks.filter(task => task.projectId === selectedProject.id).map((task) => (
+                        <div key={task.id} className="flex items-center justify-between p-3 border rounded-lg bg-muted/50">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h5 className="font-medium text-sm">{task.title}</h5>
+                              <Badge 
+                                variant={
+                                  task.status === "completed" ? "default" :
+                                  task.status === "in-progress" ? "secondary" : "outline"
+                                }
+                                className="text-xs"
+                              >
+                                {task.status === "completed" ? "مكتملة" :
+                                 task.status === "in-progress" ? "قيد التنفيذ" : "قيد الانتظار"}
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground mb-1">{task.description}</p>
+                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                              <span>المسؤول: {task.assigneeName}</span>
+                              {task.createdByName && <span>المنشئ: {task.createdByName}</span>}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                // Navigate to tasks page with this task highlighted
+                                window.location.href = `/tasks?highlight=${task.id}`;
+                              }}
+                            >
+                              عرض
+                            </Button>
+                            {task.status !== "completed" && (
+                              <Button
+                                variant="default"
+                                size="sm"
+                                onClick={async () => {
+                                  const updatedTask = { ...task, status: "completed" as const };
+                                  try {
+                                    const response = await fetch(`/api/tasks?id=${task.id}`, {
+                                      method: 'PUT',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify(updatedTask),
+                                    });
+                                    if (response.ok) {
+                                      dispatch({ type: "UPDATE_TASK", payload: updatedTask });
+                                      // Update project progress
+                                      const projectTasks = tasks.filter(t => t.projectId === selectedProject.id);
+                                      const completedTasks = projectTasks.filter(t => t.status === "completed").length;
+                                      const newProgress = projectTasks.length > 0 ? Math.round((completedTasks / projectTasks.length) * 100) : 0;
+                                      const updatedProject = { ...selectedProject, progress: newProgress };
+                                      setSelectedProject(updatedProject);
+                                      dispatch({ type: "UPDATE_PROJECT", payload: updatedProject });
+                                    }
+                                  } catch (error) {
+                                    console.error('Error updating task:', error);
+                                  }
+                                }}
+                              >
+                                إكمال
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-6 text-muted-foreground">
+                        <p>لا توجد مهام مرتبطة بهذا المشروع</p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
               {/* Progress */}
               <Card>
                 <CardContent className="p-4">
@@ -1615,7 +1712,7 @@ function ProjectsPageContent() {
                         dir={typeof document !== 'undefined' ? document.dir : 'rtl'}
                       />
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">يمكنك تحريك الشريط لتغيير نسبة الإنجاز</p>
+                    <p className="text-xs text-muted-foreground mt-1">يمكنك تحريك الشريط لتغيير نسبة الإنجاز أو إكمال المهام أعلاه</p>
                     
                     {/* Progress Bar */}
                     <div className="relative">

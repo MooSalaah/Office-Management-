@@ -170,3 +170,12 @@ export interface UserSettings {
 		browserNotifications?: boolean;
 	};
 }
+
+export interface TaskType {
+  id: string;
+  name: string;
+  description?: string;
+  isDefault?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}

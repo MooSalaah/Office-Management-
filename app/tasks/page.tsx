@@ -48,6 +48,26 @@ function TasksPageContent() {
   const { currentUser, tasks, projects, users } = state
   const { toast } = useToast()
 
+  // Get highlight parameter from URL for task highlighting
+  const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null)
+  
+  // Project filter state
+  const [projectFilter, setProjectFilter] = useState<string>("all")
+  
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search)
+      const highlight = urlParams.get('highlight')
+      if (highlight) {
+        setHighlightedTaskId(highlight)
+        // Remove highlight from URL after setting it
+        const newUrl = new URL(window.location.href)
+        newUrl.searchParams.delete('highlight')
+        window.history.replaceState({}, '', newUrl.toString())
+      }
+    }
+  }, [])
+
   // استقبال التحديثات الحية
   const taskUpdates = useRealtimeUpdatesByType('task')
   const userUpdates = useRealtimeUpdatesByType('user')
@@ -475,12 +495,21 @@ function TasksPageContent() {
   // استخدام التحسينات الجديدة للبحث والفلترة
   const searchedTasks = useTaskSearch(tasks, searchTerm)
   
-  // Filter by user role - المدير يرى جميع المهام، المستخدم يرى مهامه المخصصة له فقط
+  // Filter by user role and project - المدير يرى جميع المهام، المستخدم يرى مهامه المخصصة له فقط
   const filteredTasks = searchedTasks.filter((task) => {
-    if (currentUser?.role === "admin") {
-      return true // المدير يرى جميع المهام
+    // Filter by user role
+    let userFilter = true
+    if (currentUser?.role !== "admin") {
+      userFilter = task.assigneeId === currentUser?.id // المستخدم يرى مهامه المخصصة له فقط
     }
-    return task.assigneeId === currentUser?.id // المستخدم يرى مهامه المخصصة له فقط (وليس المهام التي أنشأها)
+    
+    // Filter by project
+    let projectFilter = true
+    if (projectFilter !== "all") {
+      projectFilter = task.projectId === projectFilter
+    }
+    
+    return userFilter && projectFilter
   })
 
   // إضافة فحص للمهام المتأخرة
@@ -940,17 +969,50 @@ function TasksPageContent() {
         )}
       </div>
 
-      {/* Search */}
+      {/* Search and Filters */}
       <Card>
         <CardContent className="p-4">
-          <div className="relative">
-            <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <Input
-              placeholder="البحث في المهام..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pr-10"
-            />
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Input
+                  placeholder="البحث في المهام..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pr-10"
+                />
+              </div>
+            </div>
+            <div className="sm:w-48">
+              <Select value={projectFilter} onValueChange={setProjectFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="فلترة حسب المشروع" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">جميع المشاريع</SelectItem>
+                  {projects.map((project) => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {highlightedTaskId && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setHighlightedTaskId(null)
+                  window.location.href = '/tasks'
+                }}
+                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+              >
+                <X className="w-4 h-4 mr-1" />
+                إزالة التمييز
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -1006,6 +1068,7 @@ function TasksPageContent() {
                                     setSelectedTask(task)
                                     setIsDetailsDialogOpen(true)
                                   }}
+                                  isHighlighted={highlightedTaskId === task.id}
                                 />
                               </SwipeToDelete>
                             </div>

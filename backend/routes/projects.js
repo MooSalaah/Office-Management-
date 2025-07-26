@@ -4,6 +4,8 @@ const Project = require('../models/Project');
 const jwt = require('jsonwebtoken');
 const logger = require('../logger');
 const fetch = require('node-fetch');
+const Task = require('../models/Task');
+const TaskType = require('../models/TaskType');
 require('dotenv').config();
 
 // JWT middleware
@@ -42,38 +44,57 @@ router.get('/:id', async (req, res) => {
 // Create new project (public for testing)
 router.post('/', async (req, res) => {
   try {
-    const project = new Project(req.body);
+    const { tasks, ...projectData } = req.body;
+    const project = new Project(projectData);
     const newProject = await project.save();
-    
-    // Create notification for project assignment
-    if (newProject.assignedEngineerId && newProject.assignedEngineerId !== newProject.createdBy) {
-      try {
-        const Notification = require('../models/Notification');
-        const notification = new Notification({
-          userId: newProject.assignedEngineerId,
-          title: "مشروع جديد مسند إليك",
-          message: `تم إسناد مشروع جديد إليك: "${newProject.name}"`,
-          type: "project",
-          isRead: false,
-          actionUrl: `/projects`,
+    // Create tasks for the project
+    let createdTasks = [];
+    if (Array.isArray(tasks) && tasks.length > 0) {
+      for (const t of tasks) {
+        // Get task type info
+        const type = await TaskType.findById(t.typeId);
+        if (!type) continue;
+        // Get assignee info
+        const assignee = t.assigneeId;
+        // Create task
+        const task = new Task({
+          id: Date.now().toString() + Math.floor(Math.random()*10000),
+          title: type.name,
+          description: type.description,
+          assigneeId: assignee,
+          assigneeName: t.assigneeName || '',
+          projectId: newProject.id,
+          projectName: newProject.name,
+          priority: 'medium',
+          status: 'todo',
+          dueDate: '',
+          createdBy: newProject.createdBy,
+          createdByName: projectData.createdByName || '',
           createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+          updatedAt: new Date().toISOString(),
         });
-        await notification.save();
-        logger.info('Notification created for project assignment', { 
-          projectId: newProject.id, 
-          engineerId: newProject.assignedEngineerId,
-          notificationId: notification._id 
-        }, 'PROJECTS');
-      } catch (notificationError) {
-        logger.error('Failed to create notification for project assignment', { 
-          error: notificationError.message,
-          projectId: newProject.id 
-        }, 'PROJECTS');
+        const savedTask = await task.save();
+        createdTasks.push(savedTask);
+        // Send notification to assignee
+        if (assignee) {
+          try {
+            const Notification = require('../models/Notification');
+            const notification = new Notification({
+              userId: assignee,
+              title: `مهمة جديدة في مشروع: ${newProject.name}`,
+              message: `تم إسناد مهمة "${type.name}" إليك في المشروع "${newProject.name}"`,
+              type: "task",
+              isRead: false,
+              actionUrl: `/tasks`,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            });
+            await notification.save();
+          } catch (notificationError) {}
+        }
       }
     }
-    
-    res.status(201).json({ success: true, data: newProject });
+    res.status(201).json({ success: true, data: newProject, tasks: createdTasks });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
   }
