@@ -51,6 +51,7 @@ import { DeleteDialog } from "@/components/ui/delete-dialog"
 import { transliterateArabicToEnglish } from "@/lib/utils"
 import { ConnectionTest } from "@/components/ui/connection-test"
 import { logger } from "@/lib/logger"
+import { Checkbox } from "@/components/ui/checkbox"
 
 export default function SettingsPage() {
   return (
@@ -148,6 +149,17 @@ function SettingsPageContent() {
   })
   const [editingJobRole, setEditingJobRole] = useState<any | null>(null)
   const [jobRoleToDelete, setJobRoleToDelete] = useState<string | null>(null)
+  
+  // Task Types Management
+  const [taskTypes, setTaskTypes] = useState<any[]>([])
+  const [isTaskTypeDialogOpen, setIsTaskTypeDialogOpen] = useState(false)
+  const [editingTaskType, setEditingTaskType] = useState<any | null>(null)
+  const [taskTypeToDelete, setTaskTypeToDelete] = useState<string | null>(null)
+  const [taskTypeFormData, setTaskTypeFormData] = useState({
+    name: "",
+    description: "",
+    isDefault: false
+  })
 
   // Available permissions for selection
   const availablePermissions = [
@@ -468,6 +480,20 @@ function SettingsPageContent() {
       } catch (err) {}
     }
     fetchRoles();
+  }, []);
+
+  // جلب أنواع المهام من backend
+  useEffect(() => {
+    async function fetchTaskTypes() {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/taskTypes`);
+        const data = await res.json();
+        if (data.success && Array.isArray(data.data)) {
+          setTaskTypes(data.data);
+        }
+      } catch (err) {}
+    }
+    fetchTaskTypes();
   }, []);
 
   // حفظ إعدادات المكتب في backend
@@ -915,6 +941,141 @@ function SettingsPageContent() {
       description: "",
       permissions: [],
     })
+  }
+
+  // Task Types Management Functions
+  const handleCreateTaskType = async () => {
+    if (!hasPermission(currentUser?.role || "", "create", "taskTypes")) {
+      setAlert({ type: "error", message: "ليس لديك صلاحية لإنشاء أنواع المهام" })
+      return
+    }
+
+    try {
+      const response = await fetch('/api/taskTypes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(taskTypeFormData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'فشل حفظ نوع المهمة في قاعدة البيانات');
+      }
+
+      const result = await response.json();
+      const savedTaskType = result.data;
+
+      setTaskTypes((prev: any) => [...prev, savedTaskType])
+      setAlert({ type: "success", message: "تم إنشاء نوع المهمة بنجاح" })
+      setIsTaskTypeDialogOpen(false)
+      resetTaskTypeForm()
+    } catch (error) {
+      console.error('Error creating task type:', error);
+      setAlert({ type: "error", message: `خطأ في إنشاء نوع المهمة: ${error instanceof Error ? error.message : 'خطأ غير معروف'}` })
+    }
+  }
+
+  const handleUpdateTaskType = async () => {
+    if (!editingTaskType || !hasPermission(currentUser?.role || "", "edit", "taskTypes")) {
+      setAlert({ type: "error", message: "ليس لديك صلاحية لتعديل أنواع المهام" })
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/taskTypes/${editingTaskType._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(taskTypeFormData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'فشل تحديث نوع المهمة في قاعدة البيانات');
+      }
+
+      const result = await response.json();
+      const updatedTaskType = result.data;
+
+      setTaskTypes((prev: any) => prev.map((tt: any) => 
+        tt._id === editingTaskType._id ? updatedTaskType : tt
+      ))
+
+      setAlert({ type: "success", message: "تم تحديث نوع المهمة بنجاح" })
+      setIsTaskTypeDialogOpen(false)
+      resetTaskTypeForm()
+    } catch (error) {
+      console.error('Error updating task type:', error);
+      setAlert({ type: "error", message: `خطأ في تحديث نوع المهمة: ${error instanceof Error ? error.message : 'خطأ غير معروف'}` })
+    }
+  }
+
+  const handleDeleteTaskType = async (taskTypeId: string) => {
+    if (!hasPermission(currentUser?.role || "", "delete", "taskTypes")) {
+      setAlert({ type: "error", message: "ليس لديك صلاحية لحذف أنواع المهام" })
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/taskTypes/${taskTypeId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'فشل حذف نوع المهمة من قاعدة البيانات');
+      }
+
+      setTaskTypes((prev: any) => prev.filter((tt: any) => tt._id !== taskTypeId))
+      setAlert({ type: "success", message: "تم حذف نوع المهمة بنجاح" })
+      setTaskTypeToDelete(null)
+    } catch (error) {
+      console.error('Error deleting task type:', error);
+      setAlert({ type: "error", message: `خطأ في حذف نوع المهمة: ${error instanceof Error ? error.message : 'خطأ غير معروف'}` })
+    }
+  }
+
+  const handleSeedTaskTypes = async () => {
+    if (!hasPermission(currentUser?.role || "", "create", "taskTypes")) {
+      setAlert({ type: "error", message: "ليس لديك صلاحية لإضافة أنواع المهام الافتراضية" })
+      return
+    }
+
+    try {
+      const response = await fetch('/api/taskTypes/seed', {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'فشل إضافة أنواع المهام الافتراضية');
+      }
+
+      const result = await response.json();
+      setTaskTypes(result.data)
+      setAlert({ type: "success", message: "تم إضافة أنواع المهام الافتراضية بنجاح" })
+    } catch (error) {
+      console.error('Error seeding task types:', error);
+      setAlert({ type: "error", message: `خطأ في إضافة أنواع المهام الافتراضية: ${error instanceof Error ? error.message : 'خطأ غير معروف'}` })
+    }
+  }
+
+  const resetTaskTypeForm = () => {
+    setTaskTypeFormData({
+      name: "",
+      description: "",
+      isDefault: false
+    })
+    setEditingTaskType(null)
+  }
+
+  const openEditTaskTypeDialog = (taskType: any) => {
+    setEditingTaskType(taskType)
+    setTaskTypeFormData({
+      name: taskType.name,
+      description: taskType.description,
+      isDefault: taskType.isDefault
+    })
+    setIsTaskTypeDialogOpen(true)
   }
 
   const openEditUserDialog = (user: UserType) => {
@@ -1970,6 +2131,156 @@ function SettingsPageContent() {
         type="client"
         error={deleteError}
       />
+
+      {/* Task Types Management */}
+      {isAdmin && (
+        <Card className="bg-card text-card-foreground border border-border">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center text-foreground">
+                <Settings className="w-5 h-5 mr-2" />
+                إدارة أنواع المهام
+              </CardTitle>
+              <CardDescription className="text-muted-foreground">
+                إدارة أنواع المهام الافتراضية والمخصصة للمشاريع
+              </CardDescription>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={handleSeedTaskTypes}>
+                إضافة المهام الافتراضية
+              </Button>
+              <Dialog open={isTaskTypeDialogOpen} onOpenChange={setIsTaskTypeDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button onClick={resetTaskTypeForm}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    إضافة نوع مهمة
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>
+                      {editingTaskType ? "تعديل نوع المهمة" : "إضافة نوع مهمة جديد"}
+                    </DialogTitle>
+                    <DialogDescription>
+                      {editingTaskType ? "تعديل معلومات نوع المهمة" : "إضافة نوع مهمة جديد للمشاريع"}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="task-type-name">اسم نوع المهمة</Label>
+                      <Input
+                        id="task-type-name"
+                        value={taskTypeFormData.name}
+                        onChange={(e) => setTaskTypeFormData((prev) => ({ ...prev, name: e.target.value }))}
+                        placeholder="مثال: رسم مخططات معمارية"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="task-type-description">الوصف</Label>
+                      <Textarea
+                        id="task-type-description"
+                        value={taskTypeFormData.description}
+                        onChange={(e) => setTaskTypeFormData((prev) => ({ ...prev, description: e.target.value }))}
+                        placeholder="وصف مختصر لنوع المهمة"
+                      />
+                    </div>
+                    <div className="flex items-center space-x-2 space-x-reverse">
+                      <Checkbox
+                        id="task-type-default"
+                        checked={taskTypeFormData.isDefault}
+                        onCheckedChange={(checked) => 
+                          setTaskTypeFormData((prev) => ({ ...prev, isDefault: checked as boolean }))
+                        }
+                      />
+                      <Label htmlFor="task-type-default">نوع مهمة افتراضي</Label>
+                    </div>
+                  </div>
+                  <div className="flex justify-end space-x-2 space-x-reverse">
+                    <Button variant="outline" onClick={() => setIsTaskTypeDialogOpen(false)}>
+                      إلغاء
+                    </Button>
+                    <Button onClick={editingTaskType ? handleUpdateTaskType : handleCreateTaskType}>
+                      {editingTaskType ? "تحديث" : "حفظ"}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {taskTypes.map((taskType: any) => (
+                <Card key={taskType._id} className="p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h4 className="font-medium">{taskType.name}</h4>
+                      <p className="text-sm text-muted-foreground mt-1">{taskType.description}</p>
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {taskType.isDefault && (
+                          <Badge variant="secondary" className="text-xs">
+                            افتراضي
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex space-x-1 space-x-reverse">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => openEditTaskTypeDialog(taskType)}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-red-600" 
+                        onClick={() => setTaskTypeToDelete(taskType._id)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+            {taskTypes.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                <p>لا توجد أنواع مهام مضافة</p>
+                <p className="text-sm mt-1">اضغط على "إضافة المهام الافتراضية" لإضافة الأنواع الأساسية</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Task Type Delete Confirmation Dialog */}
+      {taskTypeToDelete && (
+        <Dialog open={!!taskTypeToDelete} onOpenChange={() => setTaskTypeToDelete(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>تأكيد الحذف</DialogTitle>
+              <DialogDescription>
+                هل أنت متأكد أنك تريد حذف هذا النوع من المهام؟ لا يمكن التراجع عن هذا الإجراء.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setTaskTypeToDelete(null)}>
+                إلغاء
+              </Button>
+              <Button 
+                variant="destructive" 
+                onClick={() => { 
+                  handleDeleteTaskType(taskTypeToDelete!); 
+                  setTaskTypeToDelete(null); 
+                }}
+              >
+                حذف
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Connection Test Section - Only for admin */}
       {isAdmin && (

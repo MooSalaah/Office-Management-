@@ -249,6 +249,12 @@ class ApiClient {
 			method: "DELETE",
 		});
 	}
+	
+	async seedTaskTypes() {
+		return this.request("/api/taskTypes/seed", {
+			method: "POST",
+		});
+	}
 }
 
 // Create and export API client instance
@@ -298,5 +304,6 @@ export const api = {
 		create: (data: any) => apiClient.createTaskType(data),
 		update: (id: string, data: any) => apiClient.updateTaskType(id, data),
 		delete: (id: string) => apiClient.deleteTaskType(id),
+		seed: () => apiClient.seedTaskTypes(),
 	},
 };

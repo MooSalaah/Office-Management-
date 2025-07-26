@@ -49,4 +49,75 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+// Seed default task types
+router.post('/seed', async (req, res) => {
+  try {
+    const defaultTaskTypes = [
+      {
+        name: "رسم مخططات معمارية",
+        description: "رسم المخططات المعمارية الأساسية للمشروع",
+        isDefault: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        name: "قرار مساحي",
+        description: "إعداد القرار المساحي للمشروع",
+        isDefault: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        name: "عمل فكرة مخطط معماري",
+        description: "تطوير الفكرة الأولية للمخطط المعماري",
+        isDefault: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        name: "مخطط سلامة",
+        description: "إعداد مخطط السلامة للمشروع",
+        isDefault: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        name: "رفع الرخصة",
+        description: "رفع طلب الرخصة البلدية",
+        isDefault: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        name: "مخطط انشائي",
+        description: "إعداد المخططات الإنشائية",
+        isDefault: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        name: "منظور 3D",
+        description: "إنشاء منظور ثلاثي الأبعاد للمشروع",
+        isDefault: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+    ];
+
+    // Clear existing default task types
+    await TaskType.deleteMany({ isDefault: true });
+
+    // Insert new default task types
+    const insertedTaskTypes = await TaskType.insertMany(defaultTaskTypes);
+    
+    res.json({ 
+      success: true, 
+      message: 'Default task types seeded successfully',
+      data: insertedTaskTypes
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router; 
