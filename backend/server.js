@@ -22,6 +22,7 @@ app.use(cors({
     'Authorization', 
     'X-Requested-With',
     'Cache-Control',
+    'Pragma',
     'Accept',
     'Origin',
     'Access-Control-Request-Method',
@@ -32,6 +33,12 @@ app.use(cors({
 
 // Add preflight handling for all routes
 app.options('*', cors());
+
+// Log all requests for debugging
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+  next();
+});
 
 // Middlewares
 app.use(express.json({ limit: '10mb' }));
