@@ -15,6 +15,9 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  // إعدادات Netlify
+  trailingSlash: true,
+  output: 'export',
   // تحسينات الأداء
   experimental: {
     optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
