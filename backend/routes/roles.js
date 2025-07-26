@@ -89,10 +89,47 @@ router.post('/seed', async (req, res) => {
 // Create new role
 router.post('/', async (req, res) => {
   try {
-    const role = new Role(req.body);
+    console.log('=== CREATE ROLE REQUEST ===');
+    console.log('Request body:', JSON.stringify(req.body, null, 2));
+    
+    const { name, description, permissions } = req.body;
+    
+    // Validate required fields
+    if (!name || !permissions) {
+      console.log('Missing required fields:', { name, permissions });
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Missing required fields: name, permissions' 
+      });
+    }
+    
+    // Check if role with same name already exists
+    const existingRole = await Role.findOne({ name });
+    if (existingRole) {
+      console.log('Role already exists:', name);
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Role with this name already exists' 
+      });
+    }
+    
+    const roleData = {
+      name,
+      description: description || '',
+      permissions: Array.isArray(permissions) ? permissions : [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    
+    console.log('Creating role with data:', JSON.stringify(roleData, null, 2));
+    
+    const role = new Role(roleData);
     const newRole = await role.save();
+    
+    console.log('Role created successfully:', newRole._id);
     res.status(201).json({ success: true, data: newRole });
   } catch (err) {
+    console.error('Error creating role:', err);
     res.status(400).json({ success: false, error: err.message });
   }
 });
@@ -100,14 +137,59 @@ router.post('/', async (req, res) => {
 // Update role
 router.put('/:id', async (req, res) => {
   try {
+    console.log('=== UPDATE ROLE REQUEST ===');
+    console.log('Role ID:', req.params.id);
+    console.log('Request body:', JSON.stringify(req.body, null, 2));
+    
+    const { name, description, permissions } = req.body;
+    
+    // Validate required fields
+    if (!name || !permissions) {
+      console.log('Missing required fields:', { name, permissions });
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Missing required fields: name, permissions' 
+      });
+    }
+    
+    // Check if role exists
+    const existingRole = await Role.findById(req.params.id);
+    if (!existingRole) {
+      console.log('Role not found:', req.params.id);
+      return res.status(404).json({ success: false, error: 'Role not found' });
+    }
+    
+    // Check if name is being changed and if new name already exists
+    if (name !== existingRole.name) {
+      const roleWithSameName = await Role.findOne({ name, _id: { $ne: req.params.id } });
+      if (roleWithSameName) {
+        console.log('Role with new name already exists:', name);
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Role with this name already exists' 
+        });
+      }
+    }
+    
+    const updateData = {
+      name,
+      description: description || '',
+      permissions: Array.isArray(permissions) ? permissions : [],
+      updatedAt: new Date().toISOString()
+    };
+    
+    console.log('Updating role with data:', JSON.stringify(updateData, null, 2));
+    
     const updatedRole = await Role.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      updateData,
       { new: true }
     );
-    if (!updatedRole) return res.status(404).json({ success: false, error: 'Role not found' });
+    
+    console.log('Role updated successfully:', updatedRole._id);
     res.json({ success: true, data: updatedRole });
   } catch (err) {
+    console.error('Error updating role:', err);
     res.status(400).json({ success: false, error: err.message });
   }
 });

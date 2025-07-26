@@ -16,11 +16,21 @@ app.use(cors({
     'http://localhost:3006'
   ],
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'X-Requested-With',
+    'Cache-Control',
+    'Accept',
+    'Origin',
+    'Access-Control-Request-Method',
+    'Access-Control-Request-Headers'
+  ],
+  exposedHeaders: ['Content-Length', 'X-Requested-With']
 }));
 
-// Add preflight handling
+// Add preflight handling for all routes
 app.options('*', cors());
 
 // Middlewares
@@ -109,12 +119,13 @@ app.use('/api/userSettings', require('./routes/userSettings'));
 app.use('/api/roles', require('./routes/roles'));
 app.use('/api/taskTypes', require('./routes/taskTypes'));
 
-// Error handling middleware
+// Add error handling middleware
 app.use((err, req, res, next) => {
-  logger.error('Error in middleware', { error: err.message, stack: err.stack }, 'MIDDLEWARE');
-  res.status(500).json({
-    success: false,
-    error: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message
+  console.error('Global error handler:', err);
+  res.status(500).json({ 
+    success: false, 
+    error: 'Internal server error',
+    message: err.message 
   });
 });
 
