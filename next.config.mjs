@@ -157,7 +157,7 @@ const nextConfig = {
   },
   // إعدادات البيئة
   env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'https://engineering-office-backend.onrender.com',
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com',
   },
   // تحسين التحديثات المباشرة
   async headers() {
