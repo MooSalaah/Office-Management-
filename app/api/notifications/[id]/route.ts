@@ -1,36 +1,53 @@
-import { NextRequest, NextResponse } from "next/server";
-
-// Mock database for notifications (in production, use MongoDB)
-let notifications: any[] = [];
+import { NextRequest, NextResponse } from 'next/server';
 
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = params;
-    const updates = await request.json();
+    const body = await request.json();
+    const notificationId = params.id;
+
+    // Connect to MongoDB and update notification
+    const { MongoClient, ObjectId } = require('mongodb');
+    const uri = process.env.MONGODB_URI;
     
-    const notificationIndex = notifications.findIndex(n => n.id === id);
-    if (notificationIndex === -1) {
-      return NextResponse.json(
-        { success: false, error: "Notification not found" },
-        { status: 404 }
-      );
+    if (!uri) {
+      console.error('MONGODB_URI not found in environment variables');
+      return NextResponse.json({ success: false, error: 'Database connection not configured' }, { status: 500 });
     }
+
+    const client = new MongoClient(uri);
+    await client.connect();
     
-    // Update notification
-    notifications[notificationIndex] = { ...notifications[notificationIndex], ...updates };
+    const database = client.db('test');
+    const notifications = database.collection('notifications');
+    
+    // Update notification in database
+    const result = await notifications.updateOne(
+      { _id: new ObjectId(notificationId) },
+      { $set: body }
+    );
+    
+    await client.close();
+    
+    if (result.matchedCount === 0) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Notification not found' 
+      }, { status: 404 });
+    }
     
     return NextResponse.json({ 
       success: true, 
-      data: notifications[notificationIndex] 
+      message: 'Notification updated successfully' 
     });
   } catch (error) {
-    return NextResponse.json(
-      { success: false, error: "Failed to update notification" },
-      { status: 500 }
-    );
+    console.error('Error updating notification:', error);
+    return NextResponse.json({ 
+      success: false, 
+      error: 'Failed to update notification' 
+    }, { status: 500 });
   }
 }
 
@@ -39,28 +56,44 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = params;
+    const notificationId = params.id;
+
+    // Connect to MongoDB and delete notification
+    const { MongoClient, ObjectId } = require('mongodb');
+    const uri = process.env.MONGODB_URI;
     
-    const notificationIndex = notifications.findIndex(n => n.id === id);
-    if (notificationIndex === -1) {
-      return NextResponse.json(
-        { success: false, error: "Notification not found" },
-        { status: 404 }
-      );
+    if (!uri) {
+      console.error('MONGODB_URI not found in environment variables');
+      return NextResponse.json({ success: false, error: 'Database connection not configured' }, { status: 500 });
     }
+
+    const client = new MongoClient(uri);
+    await client.connect();
     
-    // Delete notification
-    const deletedNotification = notifications.splice(notificationIndex, 1)[0];
+    const database = client.db('test');
+    const notifications = database.collection('notifications');
+    
+    // Delete notification from database
+    const result = await notifications.deleteOne({ _id: new ObjectId(notificationId) });
+    
+    await client.close();
+    
+    if (result.deletedCount === 0) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Notification not found' 
+      }, { status: 404 });
+    }
     
     return NextResponse.json({ 
       success: true, 
-      message: "Notification deleted",
-      data: deletedNotification
+      message: 'Notification deleted successfully' 
     });
   } catch (error) {
-    return NextResponse.json(
-      { success: false, error: "Failed to delete notification" },
-      { status: 500 }
-    );
+    console.error('Error deleting notification:', error);
+    return NextResponse.json({ 
+      success: false, 
+      error: 'Failed to delete notification' 
+    }, { status: 500 });
   }
 } 

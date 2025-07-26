@@ -468,6 +468,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     fetchClients();
   }, []);
 
+  // جلب الإشعارات من الباكند عند بدء التطبيق
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        const response = await fetch('/api/notifications');
+        if (response.ok) {
+          const result = await response.json();
+          if (result && result.success && Array.isArray(result.data)) {
+            logger.info("تم جلب الإشعارات من الباكند", { count: result.data.length }, 'NOTIFICATIONS');
+            dispatch({ type: "LOAD_NOTIFICATIONS", payload: result.data });
+          }
+        }
+      } catch (error) {
+        logger.error("فشل جلب الإشعارات من الباكند", { error }, 'API');
+        // في حال الفشل، تبقى الإشعارات من localStorage أو mockNotifications
+      }
+    };
+    fetchNotifications();
+  }, []);
+
   // Load all data from localStorage on mount
   useEffect(() => {
     const loadDataFromStorage = async () => {
