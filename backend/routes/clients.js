@@ -44,6 +44,43 @@ router.post('/', async (req, res) => {
   try {
     const client = new Client(req.body);
     const newClient = await client.save();
+    
+    // Create notification for new client (notify admin and sales team)
+    try {
+      const Notification = require('../models/Notification');
+      const User = require('../models/User');
+      
+      // Get admin and sales users
+      const adminUsers = await User.find({ role: 'admin' });
+      const salesUsers = await User.find({ role: 'engineer' }); // Engineers might handle client relations
+      
+      const usersToNotify = [...adminUsers, ...salesUsers];
+      
+      for (const user of usersToNotify) {
+        const notification = new Notification({
+          userId: user.id,
+          title: "عميل جديد",
+          message: `تم إضافة عميل جديد: "${newClient.name}"`,
+          type: "system",
+          isRead: false,
+          actionUrl: `/clients`,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+        await notification.save();
+      }
+      
+      logger.info('Notifications created for new client', { 
+        clientId: newClient.id, 
+        notificationsCount: usersToNotify.length 
+      }, 'CLIENTS');
+    } catch (notificationError) {
+      logger.error('Failed to create notifications for new client', { 
+        error: notificationError.message,
+        clientId: newClient.id 
+      }, 'CLIENTS');
+    }
+    
     // Broadcast update to all clients
     try {
       const broadcastResponse = await fetch(`${req.protocol}://${req.get('host')}/api/realtime/broadcast`, {

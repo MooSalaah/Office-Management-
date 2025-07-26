@@ -48,8 +48,28 @@ export async function PUT(request: NextRequest) {
 			);
 		}
 
+		// First, get the task to find its MongoDB _id
+		const getResponse = await fetch(`${BACKEND_URL}/api/tasks`);
+		const getData = await getResponse.json();
+		
+		if (!getData.success) {
+			return NextResponse.json(
+				{ success: false, error: "Failed to fetch tasks" },
+				{ status: 500 }
+			);
+		}
+
+		// Find the task by its id field
+		const task = getData.data.find((t: any) => t.id === id);
+		if (!task) {
+			return NextResponse.json(
+				{ success: false, error: "Task not found" },
+				{ status: 404 }
+			);
+		}
+
 		const taskData = await request.json();
-		const response = await fetch(`${BACKEND_URL}/api/tasks/${id}`, {
+		const response = await fetch(`${BACKEND_URL}/api/tasks/${task._id}`, {
 			method: "PUT",
 			headers: {
 				"Content-Type": "application/json",
@@ -78,7 +98,28 @@ export async function DELETE(request: NextRequest) {
 			);
 		}
 
-		const response = await fetch(`${BACKEND_URL}/api/tasks/${id}`, {
+		// First, get the task to find its MongoDB _id
+		const getResponse = await fetch(`${BACKEND_URL}/api/tasks`);
+		const getData = await getResponse.json();
+		
+		if (!getData.success) {
+			return NextResponse.json(
+				{ success: false, error: "Failed to fetch tasks" },
+				{ status: 500 }
+			);
+		}
+
+		// Find the task by its id field
+		const task = getData.data.find((t: any) => t.id === id);
+		if (!task) {
+			return NextResponse.json(
+				{ success: false, error: "Task not found" },
+				{ status: 404 }
+			);
+		}
+
+		// Delete using MongoDB _id
+		const response = await fetch(`${BACKEND_URL}/api/tasks/${task._id}`, {
 			method: "DELETE",
 		});
 		const data = await response.json();

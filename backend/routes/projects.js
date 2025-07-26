@@ -45,24 +45,32 @@ router.post('/', async (req, res) => {
     const project = new Project(req.body);
     const newProject = await project.save();
     
-    // Broadcast update to all clients
-    try {
-      const broadcastResponse = await fetch(`${req.protocol}://${req.get('host')}/api/realtime/broadcast`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          type: 'project',
-          action: 'create',
-          data: newProject,
-          userId: 'system',
-          timestamp: Date.now()
-        })
-      });
-      logger.info('Broadcast response', { response: await broadcastResponse.json() }, 'PROJECTS');
-    } catch (broadcastError) {
-      logger.error('Broadcast error', { error: broadcastError.message }, 'PROJECTS');
+    // Create notification for project assignment
+    if (newProject.assignedEngineerId && newProject.assignedEngineerId !== newProject.createdBy) {
+      try {
+        const Notification = require('../models/Notification');
+        const notification = new Notification({
+          userId: newProject.assignedEngineerId,
+          title: "مشروع جديد مسند إليك",
+          message: `تم إسناد مشروع جديد إليك: "${newProject.name}"`,
+          type: "project",
+          isRead: false,
+          actionUrl: `/projects`,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+        await notification.save();
+        logger.info('Notification created for project assignment', { 
+          projectId: newProject.id, 
+          engineerId: newProject.assignedEngineerId,
+          notificationId: notification._id 
+        }, 'PROJECTS');
+      } catch (notificationError) {
+        logger.error('Failed to create notification for project assignment', { 
+          error: notificationError.message,
+          projectId: newProject.id 
+        }, 'PROJECTS');
+      }
     }
     
     res.status(201).json({ success: true, data: newProject });
@@ -74,12 +82,44 @@ router.post('/', async (req, res) => {
 // Update project (public for testing)
 router.put('/:id', async (req, res) => {
   try {
+    // Get the original project to compare assigned engineer
+    const originalProject = await Project.findById(req.params.id);
+    if (!originalProject) return res.status(404).json({ success: false, error: 'Project not found' });
+    
     const updatedProject = await Project.findByIdAndUpdate(
       req.params.id,
       req.body,
       { new: true }
     );
-    if (!updatedProject) return res.status(404).json({ success: false, error: 'Project not found' });
+    
+    // Create notification if assigned engineer changed
+    if (originalProject.assignedEngineerId !== updatedProject.assignedEngineerId && updatedProject.assignedEngineerId) {
+      try {
+        const Notification = require('../models/Notification');
+        const notification = new Notification({
+          userId: updatedProject.assignedEngineerId,
+          title: "مشروع مسند إليك",
+          message: `تم إسناد مشروع إليك: "${updatedProject.name}"`,
+          type: "project",
+          isRead: false,
+          actionUrl: `/projects`,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+        await notification.save();
+        logger.info('Notification created for project reassignment', { 
+          projectId: updatedProject.id, 
+          engineerId: updatedProject.assignedEngineerId,
+          notificationId: notification._id 
+        }, 'PROJECTS');
+      } catch (notificationError) {
+        logger.error('Failed to create notification for project reassignment', { 
+          error: notificationError.message,
+          projectId: updatedProject.id 
+        }, 'PROJECTS');
+      }
+    }
+    
     res.json({ success: true, data: updatedProject });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });

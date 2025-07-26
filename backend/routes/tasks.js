@@ -44,6 +44,35 @@ router.post('/', async (req, res) => {
   try {
     const task = new Task(req.body);
     const newTask = await task.save();
+    
+    // Create notification for task assignment
+    if (newTask.assigneeId && newTask.assigneeId !== newTask.createdBy) {
+      try {
+        const Notification = require('../models/Notification');
+        const notification = new Notification({
+          userId: newTask.assigneeId,
+          title: "مهمة جديدة مسندة إليك",
+          message: `تم إسناد مهمة جديدة إليك: "${newTask.title}"`,
+          type: "task",
+          isRead: false,
+          actionUrl: `/tasks`,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+        await notification.save();
+        logger.info('Notification created for task assignment', { 
+          taskId: newTask.id, 
+          assigneeId: newTask.assigneeId,
+          notificationId: notification._id 
+        }, 'TASKS');
+      } catch (notificationError) {
+        logger.error('Failed to create notification for task assignment', { 
+          error: notificationError.message,
+          taskId: newTask.id 
+        }, 'TASKS');
+      }
+    }
+    
     // Broadcast update to all clients
     try {
       const broadcastResponse = await fetch(`${req.protocol}://${req.get('host')}/api/realtime/broadcast`, {
@@ -70,12 +99,44 @@ router.post('/', async (req, res) => {
 // Update task (public for testing)
 router.put('/:id', async (req, res) => {
   try {
+    // Get the original task to compare assignee
+    const originalTask = await Task.findById(req.params.id);
+    if (!originalTask) return res.status(404).json({ success: false, error: 'Task not found' });
+    
     const updatedTask = await Task.findByIdAndUpdate(
       req.params.id,
       req.body,
       { new: true }
     );
-    if (!updatedTask) return res.status(404).json({ success: false, error: 'Task not found' });
+    
+    // Create notification if assignee changed
+    if (originalTask.assigneeId !== updatedTask.assigneeId && updatedTask.assigneeId) {
+      try {
+        const Notification = require('../models/Notification');
+        const notification = new Notification({
+          userId: updatedTask.assigneeId,
+          title: "مهمة مسندة إليك",
+          message: `تم إسناد مهمة إليك: "${updatedTask.title}"`,
+          type: "task",
+          isRead: false,
+          actionUrl: `/tasks`,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+        await notification.save();
+        logger.info('Notification created for task reassignment', { 
+          taskId: updatedTask.id, 
+          assigneeId: updatedTask.assigneeId,
+          notificationId: notification._id 
+        }, 'TASKS');
+      } catch (notificationError) {
+        logger.error('Failed to create notification for task reassignment', { 
+          error: notificationError.message,
+          taskId: updatedTask.id 
+        }, 'TASKS');
+      }
+    }
+    
     // Broadcast update to all clients
     try {
       const broadcastResponse = await fetch(`${req.protocol}://${req.get('host')}/api/realtime/broadcast`, {

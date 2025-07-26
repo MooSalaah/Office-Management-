@@ -12,6 +12,7 @@ const TaskSchema = new mongoose.Schema({
   status: { type: String, default: 'todo' },
   dueDate: { type: String },
   createdBy: { type: String },
+  createdByName: { type: String },
   createdAt: { type: String },
   updatedAt: { type: String },
 });

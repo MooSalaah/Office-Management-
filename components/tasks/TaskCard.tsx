@@ -101,7 +101,7 @@ const TaskCard = ({ task, users, canDelete, canEdit, onDelete, onEdit, onDetails
               <div className="flex items-center space-x-2 space-x-reverse">
                 <User className="w-3 h-3 text-muted-foreground" />
                 <span className="text-xs text-muted-foreground">
-                  أنشأت بواسطة: {users.find(u => u.id === task.createdBy)?.name || "غير معروف"}
+                  أنشأت بواسطة: {task.createdByName || users.find(u => u.id === task.createdBy)?.name || "غير معروف"}
                 </span>
               </div>
             )}

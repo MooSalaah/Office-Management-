@@ -59,15 +59,16 @@ export interface Client {
 export interface Task {
 	id: string;
 	title: string;
-	description: string;
+	description?: string;
 	assigneeId: string;
 	assigneeName: string;
-	projectId: string;
-	projectName: string;
-	priority: "high" | "medium" | "low";
+	projectId?: string;
+	projectName?: string;
+	priority: "low" | "medium" | "high";
 	status: "todo" | "in-progress" | "completed";
 	dueDate: string;
 	createdBy: string;
+	createdByName?: string;
 	createdAt: string;
 	updatedAt: string;
 }

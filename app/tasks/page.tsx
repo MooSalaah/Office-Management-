@@ -308,6 +308,7 @@ function TasksPageContent() {
       status: "todo",
       dueDate: formData.dueDate,
       createdBy: currentUser?.id || "",
+      createdByName: currentUser?.name || "",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
