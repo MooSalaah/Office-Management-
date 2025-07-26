@@ -320,6 +320,7 @@ function ProjectsPageContent() {
     });
 
     try {
+      console.log('بيانات المشروع المرسلة للسيرفر:', { project: newProject, tasks, createdByName: currentUser?.name || '' });
       const response = await fetch('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -337,10 +338,12 @@ function ProjectsPageContent() {
         resetForm();
         setSelectedTasks([]);
       } else {
+        console.error('خطأ من السيرفر عند حفظ المشروع:', data.error);
         setAlert({ type: "error", message: data.error || "فشل حفظ المشروع في قاعدة البيانات" });
       }
     } catch (error) {
-      setAlert({ type: "error", message: "حدث خطأ أثناء حفظ المشروع في قاعدة البيانات" });
+      console.error('خطأ أثناء حفظ المشروع:', error);
+      setAlert({ type: "error", message: "حدث خطأ أثناء حفظ المشروع في قاعدة البيانات: " + (error?.message || error) });
     }
   }
 
