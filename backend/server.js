@@ -51,12 +51,23 @@ app.get('/health', (req, res) => {
 const connectDB = async () => {
   try {
     const mongoURI = process.env.MONGODB_URI;
+    console.log('🔍 Checking MongoDB URI...');
+    console.log('Environment variables:', {
+      NODE_ENV: process.env.NODE_ENV,
+      PORT: process.env.PORT,
+      MONGODB_URI: mongoURI ? 'EXISTS' : 'NOT FOUND',
+      JWT_SECRET: process.env.JWT_SECRET ? 'EXISTS' : 'NOT FOUND',
+      CORS_ORIGIN: process.env.CORS_ORIGIN
+    });
+    
     if (!mongoURI) {
       logger.warn('⚠️ MONGODB_URI not found, using fallback', undefined, 'DATABASE');
+      console.log('❌ MONGODB_URI is missing!');
       // Don't exit, just log warning
       return;
     }
 
+    console.log('🔗 Attempting to connect to MongoDB...');
     await mongoose.connect(mongoURI, {
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
@@ -69,6 +80,7 @@ const connectDB = async () => {
     });
 
     logger.info('✅ MongoDB connected successfully', undefined, 'DATABASE');
+    console.log('✅ MongoDB connected successfully!');
     
     // Monitor connection events
     mongoose.connection.on('error', (err) => {
