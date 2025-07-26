@@ -166,5 +166,6 @@ export interface UserSettings {
 		projectNotifications: boolean;
 		financeNotifications: boolean;
 		systemNotifications: boolean;
+		browserNotifications?: boolean;
 	};
 }

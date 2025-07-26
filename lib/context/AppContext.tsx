@@ -865,9 +865,109 @@ export function useAppActions() {
       id: Date.now().toString(),
       createdAt: new Date().toISOString(),
     };
+    
+    // تحقق من إعدادات الإشعارات للمستخدم
+    const userSettings = state.userSettings;
+    if (userSettings) {
+      const notificationType = notification.type;
+      const notificationKey = `${notificationType}Notifications` as keyof typeof userSettings.notificationSettings;
+      const isEnabled = userSettings.notificationSettings?.[notificationKey] !== false;
+      
+      if (!isEnabled) {
+        logger.info(`Notification disabled for user ${notification.userId}`, { 
+          type: notificationType, 
+          userId: notification.userId 
+        }, 'NOTIFICATIONS');
+        return;
+      }
+    }
+    
+    // إضافة الإشعار إلى state
     dispatch({ type: "ADD_NOTIFICATION", payload: newNotification });
-    if (window.realtimeUpdates) {
-      window.realtimeUpdates.broadcastUpdate('notification', newNotification);
+    
+    // حفظ الإشعار في قاعدة البيانات
+    try {
+      const response = await fetch('/api/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newNotification),
+      });
+      
+      if (!response.ok) {
+        logger.error('Failed to save notification to database', { 
+          status: response.status, 
+          notification: newNotification 
+        }, 'NOTIFICATIONS');
+      } else {
+        logger.info('Notification saved to database', { 
+          id: newNotification.id, 
+          type: newNotification.type 
+        }, 'NOTIFICATIONS');
+      }
+    } catch (error) {
+      logger.error('Error saving notification to database', { error }, 'NOTIFICATIONS');
+    }
+    
+    // إرسال تحديث فوري
+    if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
+      (window as any).realtimeUpdates.broadcastUpdate('notification', newNotification);
+    }
+    
+    // عرض إشعار المتصفح إذا كان مسموحاً
+    if (userSettings?.notificationSettings?.browserNotifications) {
+      showBrowserNotification(newNotification);
+    }
+  };
+
+  const markNotificationAsRead = async (notificationId: string) => {
+    // تحديث الإشعار في state
+    const updatedNotification = state.notifications.find(n => n.id === notificationId);
+    if (updatedNotification && !updatedNotification.isRead) {
+      const notification = { ...updatedNotification, isRead: true };
+      dispatch({ type: "UPDATE_NOTIFICATION", payload: notification });
+      
+      // حفظ التحديث في قاعدة البيانات
+      try {
+        const response = await fetch(`/api/notifications/${notificationId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ isRead: true }),
+        });
+        
+        if (!response.ok) {
+          logger.error('Failed to update notification in database', { 
+            status: response.status, 
+            notificationId 
+          }, 'NOTIFICATIONS');
+        } else {
+          logger.info('Notification marked as read in database', { notificationId }, 'NOTIFICATIONS');
+        }
+      } catch (error) {
+        logger.error('Error updating notification in database', { error, notificationId }, 'NOTIFICATIONS');
+      }
+    }
+  };
+
+  const deleteNotification = async (notificationId: string) => {
+    // حذف الإشعار من state
+    dispatch({ type: "DELETE_NOTIFICATION", payload: notificationId });
+    
+    // حذف الإشعار من قاعدة البيانات
+    try {
+      const response = await fetch(`/api/notifications/${notificationId}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        logger.error('Failed to delete notification from database', { 
+          status: response.status, 
+          notificationId 
+        }, 'NOTIFICATIONS');
+      } else {
+        logger.info('Notification deleted from database', { notificationId }, 'NOTIFICATIONS');
+      }
+    } catch (error) {
+      logger.error('Error deleting notification from database', { error, notificationId }, 'NOTIFICATIONS');
     }
   };
 
@@ -1302,8 +1402,8 @@ export function useAppActions() {
     
     // Notification management
     addNotification,
-    // markNotificationAsRead, // مؤقتًا احذفها من return
-    // deleteNotification, // مؤقتًا احذفها من return
+    markNotificationAsRead,
+    deleteNotification,
     
     // User management
     setCurrentUser,
