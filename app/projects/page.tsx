@@ -36,7 +36,7 @@ import {
 import { useApp, useAppActions } from "@/lib/context/AppContext"
 import { realtimeUpdates, useRealtimeUpdatesByType } from "@/lib/realtime-updates"
 import { hasPermission } from "@/lib/auth"
-import type { Project } from "@/lib/types"
+import type { Project, TaskType } from "@/lib/types"
 import { useRouter, useSearchParams } from "next/navigation"
 import { formatCurrency } from "@/lib/utils"
 import { ArabicNumber } from "@/components/ui/ArabicNumber"
@@ -315,7 +315,11 @@ function ProjectsPageContent() {
       const response = await fetch('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...newProject, tasks, createdByName: currentUser?.name || '' }),
+        body: JSON.stringify({ 
+          project: newProject, 
+          tasks, 
+          createdByName: currentUser?.name || '' 
+        }),
       });
       const data = await response.json();
       if (data.success && data.data) {

@@ -44,9 +44,11 @@ router.get('/:id', async (req, res) => {
 // Create new project (public for testing)
 router.post('/', async (req, res) => {
   try {
-    const { tasks, ...projectData } = req.body;
-    const project = new Project(projectData);
-    const newProject = await project.save();
+    const { project, tasks, createdByName } = req.body;
+    const projectData = project || req.body; // Fallback for backward compatibility
+    
+    const newProject = await new Project(projectData).save();
+    
     // Create tasks for the project
     let createdTasks = [];
     if (Array.isArray(tasks) && tasks.length > 0) {
@@ -54,14 +56,13 @@ router.post('/', async (req, res) => {
         // Get task type info
         const type = await TaskType.findById(t.typeId);
         if (!type) continue;
-        // Get assignee info
-        const assignee = t.assigneeId;
+        
         // Create task
         const task = new Task({
           id: Date.now().toString() + Math.floor(Math.random()*10000),
           title: type.name,
           description: type.description,
-          assigneeId: assignee,
+          assigneeId: t.assigneeId,
           assigneeName: t.assigneeName || '',
           projectId: newProject.id,
           projectName: newProject.name,
@@ -69,18 +70,19 @@ router.post('/', async (req, res) => {
           status: 'todo',
           dueDate: '',
           createdBy: newProject.createdBy,
-          createdByName: projectData.createdByName || '',
+          createdByName: createdByName || '',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         });
         const savedTask = await task.save();
         createdTasks.push(savedTask);
+        
         // Send notification to assignee
-        if (assignee) {
+        if (t.assigneeId) {
           try {
             const Notification = require('../models/Notification');
             const notification = new Notification({
-              userId: assignee,
+              userId: t.assigneeId,
               title: `مهمة جديدة في مشروع: ${newProject.name}`,
               message: `تم إسناد مهمة "${type.name}" إليك في المشروع "${newProject.name}"`,
               type: "task",
@@ -90,12 +92,19 @@ router.post('/', async (req, res) => {
               updatedAt: new Date().toISOString()
             });
             await notification.save();
-          } catch (notificationError) {}
+          } catch (notificationError) {
+            logger.error('Failed to create notification for task assignment', {
+              error: notificationError.message,
+              taskId: savedTask.id
+            }, 'PROJECTS');
+          }
         }
       }
     }
+    
     res.status(201).json({ success: true, data: newProject, tasks: createdTasks });
   } catch (err) {
+    logger.error('Error creating project', { error: err.message }, 'PROJECTS');
     res.status(400).json({ success: false, error: err.message });
   }
 });
