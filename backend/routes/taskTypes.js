@@ -5,9 +5,12 @@ const TaskType = require('../models/TaskType');
 // Get all task types
 router.get('/', async (req, res) => {
   try {
+    console.log('=== GET TASK TYPES REQUEST ===');
     const types = await TaskType.find();
+    console.log(`Found ${types.length} task types`);
     res.json({ success: true, data: types });
   } catch (err) {
+    console.error('Error getting task types:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });

@@ -7,11 +7,21 @@ require('dotenv').config();
 const app = express();
 const port = process.env.PORT || 5000;
 
-// Basic CORS configuration
+// Enhanced CORS configuration
 app.use(cors({
-  origin: 'https://theofficemanagemet.netlify.app',
-  credentials: true
+  origin: [
+    'https://theofficemanagemet.netlify.app',
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:3006'
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
+
+// Add preflight handling
+app.options('*', cors());
 
 // Middlewares
 app.use(express.json({ limit: '10mb' }));

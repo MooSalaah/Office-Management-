@@ -44,18 +44,34 @@ router.get('/:id', async (req, res) => {
 // Create new project (public for testing)
 router.post('/', async (req, res) => {
   try {
+    console.log('=== PROJECT CREATION REQUEST ===');
+    console.log('Request body:', JSON.stringify(req.body, null, 2));
+    
     const { project, tasks, createdByName } = req.body;
     const projectData = project || req.body; // Fallback for backward compatibility
     
+    console.log('Project data:', JSON.stringify(projectData, null, 2));
+    console.log('Tasks data:', JSON.stringify(tasks, null, 2));
+    console.log('Created by name:', createdByName);
+    
     const newProject = await new Project(projectData).save();
+    console.log('Project saved successfully:', newProject.id);
     
     // Create tasks for the project
     let createdTasks = [];
     if (Array.isArray(tasks) && tasks.length > 0) {
+      console.log(`Creating ${tasks.length} tasks for project ${newProject.id}`);
+      
       for (const t of tasks) {
+        console.log('Processing task:', JSON.stringify(t, null, 2));
+        
         // Get task type info
         const type = await TaskType.findById(t.typeId);
-        if (!type) continue;
+        if (!type) {
+          console.log(`TaskType not found for ID: ${t.typeId}`);
+          continue;
+        }
+        console.log('Found task type:', type.name);
         
         // Create task
         const task = new Task({
@@ -76,6 +92,7 @@ router.post('/', async (req, res) => {
         });
         const savedTask = await task.save();
         createdTasks.push(savedTask);
+        console.log('Task created successfully:', savedTask.id);
         
         // Send notification to assignee
         if (t.assigneeId) {
@@ -92,6 +109,7 @@ router.post('/', async (req, res) => {
               updatedAt: new Date().toISOString()
             });
             await notification.save();
+            console.log('Notification created for task assignment');
           } catch (notificationError) {
             logger.error('Failed to create notification for task assignment', {
               error: notificationError.message,
@@ -100,10 +118,14 @@ router.post('/', async (req, res) => {
           }
         }
       }
+    } else {
+      console.log('No tasks to create');
     }
     
+    console.log(`Project creation completed. Created ${createdTasks.length} tasks.`);
     res.status(201).json({ success: true, data: newProject, tasks: createdTasks });
   } catch (err) {
+    console.error('Error creating project:', err);
     logger.error('Error creating project', { error: err.message }, 'PROJECTS');
     res.status(400).json({ success: false, error: err.message });
   }
