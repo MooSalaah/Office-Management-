@@ -25,7 +25,7 @@ import {
   companySettings,
 } from "../data"
 import { getCurrentUser, initializeDefaultRoles, updateUserPermissionsByRole } from "../auth"
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/components/ui/use-toast"
 import { realtimeUpdates } from "../realtime-updates"
 import { api } from "../api";
 import { logger } from "../logger";

@@ -66,8 +66,8 @@ export default function ProjectsPage() {
 
 function ProjectsPageContent() {
   const { state, dispatch } = useApp()
-  const { addNotification, createProjectWithDownPayment, updateProjectWithDownPayment, deleteProject, createClient } = useAppActions()
-  const { currentUser, projects, clients, users } = state
+  const { addNotification, createProjectWithDownPayment, updateProjectWithDownPayment, deleteProject, createClient, showSuccessToast } = useAppActions()
+  const { currentUser, projects, clients, users, tasks } = state
   const { toast } = useToast()
 
   // استقبال التحديثات الحية
@@ -1279,13 +1279,13 @@ function ProjectsPageContent() {
                     {taskTypes.length === 0 ? (
                       <div className="text-xs text-muted-foreground">لا توجد أنواع مهام متاحة</div>
                     ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full">
                         {taskTypes.map((type) => {
                           const isSelected = selectedTasks.some((t) => t.typeId === type._id);
                           const selectedTask = selectedTasks.find((t) => t.typeId === type._id);
                           
                           return (
-                            <div key={type._id} className="flex items-center gap-3 p-3 border rounded bg-background hover:bg-muted/50 transition-colors">
+                            <div key={type._id} className="flex items-center gap-3 p-3 border rounded bg-background hover:bg-muted/50 transition-colors w-full">
                               <Checkbox
                                 checked={isSelected}
                                 onCheckedChange={(checked) => {
@@ -1410,6 +1410,10 @@ function ProjectsPageContent() {
                     <img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-4 h-4 opacity-80 mr-1 block dark:hidden" loading="lazy" />
                     <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline w-4 h-4 opacity-80 hidden dark:block" loading="lazy" />
                   </span>
+                </div>
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>المهام: {tasks.filter(t => t.projectId === project.id).length}</span>
+                  <span>المهندس: {project.assignedEngineerName}</span>
                 </div>
                 {/* Click to view details */}
                 <div 
