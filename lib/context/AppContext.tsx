@@ -472,7 +472,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const fetchNotifications = async () => {
       try {
-        const response = await fetch('/api/notifications');
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com'}/api/notifications`);
         if (response.ok) {
           const result = await response.json();
           if (result && result.success && Array.isArray(result.data)) {
@@ -486,6 +486,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     };
     fetchNotifications();
+  }, []);
+
+  // جلب المهام من الباكند عند بدء التطبيق
+  useEffect(() => {
+    const fetchTasks = async () => {
+      try {
+        const response = await api.tasks.getAll();
+        if (response && response.success && Array.isArray(response.data)) {
+          logger.info("تم جلب المهام من الباكند", { count: response.data.length }, 'TASKS');
+          dispatch({ type: "LOAD_TASKS", payload: response.data });
+        }
+      } catch (error) {
+        logger.error("فشل جلب المهام من الباكند", { error }, 'API');
+        // في حال الفشل، تبقى المهام من localStorage أو mockTasks
+      }
+    };
+    fetchTasks();
   }, []);
 
   // Load all data from localStorage on mount
