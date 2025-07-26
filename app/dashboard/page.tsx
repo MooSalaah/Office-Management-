@@ -91,7 +91,7 @@ function ProjectCard({ project }: { project: Project }) {
 // Project Dialog Component
 function ProjectDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { state, dispatch } = useApp()
-  const { createProjectWithDownPayment, addNotification } = useAppActions()
+  const { createProjectWithDownPayment, addNotification, createClient } = useAppActions()
   const [formData, setFormData] = useState({
     name: "",
     clientId: "",
@@ -140,17 +140,9 @@ function ProjectDialog({ open, onClose }: { open: boolean; onClose: () => void }
         createdAt: new Date().toISOString(),
       };
       try {
-        // حفظ العميل في قاعدة البيانات
-        const response = await fetch('/api/clients', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newClient),
-        });
-        if (!response.ok) throw new Error('Failed to save client to database');
-        const result = await response.json();
-        // أضف للـ state
-        dispatch({ type: "ADD_CLIENT", payload: result.data || newClient });
-        setFormData(prev => ({ ...prev, clientId: (result.data?.id || newClient.id) }));
+        // استخدام وظيفة AppContext
+        await createClient(newClient);
+        setFormData(prev => ({ ...prev, clientId: newClient.id }));
         setShowNewClientInput(false);
         setNewClientName("");
         addNotification({
@@ -162,8 +154,6 @@ function ProjectDialog({ open, onClose }: { open: boolean; onClose: () => void }
           actionUrl: `/clients`,
           triggeredBy: state.currentUser?.id || "",
         });
-        // بث تحديث فوري لجميع المستخدمين
-        realtimeUpdates.sendClientUpdate({ action: 'create', client: result.data || newClient, userId: state.currentUser?.id, userName: state.currentUser?.name });
       } catch (error) {
         setNewClientInputError("حدث خطأ أثناء حفظ العميل في قاعدة البيانات");
       }

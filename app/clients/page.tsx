@@ -57,7 +57,7 @@ export default function ClientsPage() {
 
 function ClientsPageContent() {
   const { state, dispatch } = useApp()
-  const { addNotification, broadcastClientUpdate, showSuccessToast } = useAppActions()
+  const { addNotification, createClient, updateClient, deleteClient, showSuccessToast } = useAppActions()
   const { currentUser, clients, projects } = state
   const router = useRouter()
 
@@ -227,34 +227,9 @@ function ClientsPageContent() {
     }
 
     try {
-      // Save to backend database
-      const response = await fetch('/api/clients', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(newClient),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to save client to database');
-      }
-
-      const result = await response.json();
-      logger.info('Client saved to database', { result }, 'CLIENTS');
-
-      // Update local state
-      dispatch({ type: "ADD_CLIENT", payload: newClient })
+      // استخدام وظيفة AppContext
+      await createClient(newClient)
       
-      // Save to localStorage as backup
-      const existingClients = JSON.parse(localStorage.getItem("clients") || "[]")
-      existingClients.push(newClient)
-      localStorage.setItem("clients", JSON.stringify(existingClients))
-      
-      // Broadcast realtime update
-      broadcastClientUpdate('create', { client: newClient, userId: currentUser?.id, userName: currentUser?.name })
-      
-      showSuccessToast("تم إنشاء العميل بنجاح", `تم إنشاء العميل "${newClient.name}" بنجاح`)
       setIsDialogOpen(false)
       resetForm()
 
@@ -271,12 +246,12 @@ function ClientsPageContent() {
         })
       }
     } catch (error) {
-      console.error('Error creating client:', error);
+      logger.error('Error creating client:', { error }, 'CLIENTS');
       setAlert({ type: "error", message: "حدث خطأ أثناء حفظ العميل في قاعدة البيانات" });
     }
   }
 
-  const handleUpdateClient = () => {
+  const handleUpdateClient = async () => {
     if (!editingClient || !hasPermission(currentUser?.role || "", "edit", "clients")) {
       setAlert({ type: "error", message: "ليس لديك صلاحية لتعديل العملاء" })
       return
@@ -302,17 +277,9 @@ function ClientsPageContent() {
       avatar: formData.avatar,
     }
 
-    dispatch({ type: "UPDATE_CLIENT", payload: updatedClient })
+    // استخدام وظيفة AppContext
+    await updateClient(updatedClient)
     
-    // Update in localStorage
-    const existingClients = JSON.parse(localStorage.getItem("clients") || "[]")
-    const updatedClients = existingClients.map((c: any) => c.id === editingClient.id ? updatedClient : c)
-    localStorage.setItem("clients", JSON.stringify(updatedClients))
-    
-    // Broadcast realtime update
-    broadcastClientUpdate('update', { client: updatedClient, userId: currentUser?.id, userName: currentUser?.name })
-    
-    showSuccessToast("تم تحديث العميل بنجاح", `تم تحديث العميل "${updatedClient.name}" بنجاح`)
     setIsDialogOpen(false)
     setEditingClient(null)
     resetForm()
@@ -360,17 +327,9 @@ function ClientsPageContent() {
         return
       }
 
-      dispatch({ type: "DELETE_CLIENT", payload: clientToDelete })
+      // استخدام وظيفة AppContext
+      await deleteClient(clientToDelete)
 
-      // Remove from localStorage
-      const existingClients = JSON.parse(localStorage.getItem("clients") || "[]")
-      const filteredClients = existingClients.filter((c: any) => c.id !== clientToDelete)
-      localStorage.setItem("clients", JSON.stringify(filteredClients))
-
-      // Broadcast realtime update
-      broadcastClientUpdate('delete', { ...client })
-
-      showSuccessToast("تم حذف العميل بنجاح", `تم حذف العميل "${client.name}" بنجاح`)
       setDeleteDialogOpen(false)
       setClientToDelete(null)
       setDeleteError("")

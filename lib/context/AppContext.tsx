@@ -452,6 +452,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     fetchProjects();
   }, []);
 
+  // جلب العملاء من الباكند عند بدء التطبيق
+  useEffect(() => {
+    const fetchClients = async () => {
+      try {
+        const response = await api.clients.getAll();
+        if (response && response.success && Array.isArray(response.data)) {
+          dispatch({ type: "LOAD_CLIENTS", payload: response.data });
+        }
+      } catch (error) {
+        logger.error("فشل جلب العملاء من الباكند", { error }, 'API');
+        // في حال الفشل، تبقى العملاء من localStorage أو mockClients
+      }
+    };
+    fetchClients();
+  }, []);
+
   // Load all data from localStorage on mount
   useEffect(() => {
     const loadDataFromStorage = async () => {
@@ -1207,10 +1223,32 @@ export function useAppActions() {
   const createClient = async (client: Client) => {
     try {
       setLoadingState('clients', true)
-      dispatch({ type: "ADD_CLIENT", payload: client })
+      
+      // حفظ في قاعدة البيانات
+      const response = await api.clients.create(client);
+      if (!response.success) {
+        throw new Error(response.error || 'فشل حفظ العميل في قاعدة البيانات');
+      }
+      
+      // تحديث state
+      dispatch({ type: "ADD_CLIENT", payload: response.data || client })
+      
+      // حفظ في localStorage كنسخة احتياطية
       saveDataToStorage()
+      
+      // إرسال تحديث فوري
+      if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
+        (window as any).realtimeUpdates.sendClientUpdate({ 
+          action: 'create', 
+          client: response.data || client, 
+          userId: state.currentUser?.id, 
+          userName: state.currentUser?.name 
+        });
+      }
+      
       showSuccessToast("تم إنشاء العميل بنجاح", `تم إنشاء عميل "${client.name}"`)
     } catch (error) {
+      logger.error("خطأ في إنشاء العميل", { error }, 'CLIENTS');
       showErrorToast("خطأ في إنشاء العميل", "حدث خطأ أثناء إنشاء العميل")
     } finally {
       setLoadingState('clients', false)
@@ -1220,10 +1258,32 @@ export function useAppActions() {
   const updateClient = async (client: Client) => {
     try {
       setLoadingState('clients', true)
-      dispatch({ type: "UPDATE_CLIENT", payload: client })
+      
+      // تحديث في قاعدة البيانات
+      const response = await api.clients.update(client.id, client);
+      if (!response.success) {
+        throw new Error(response.error || 'فشل تحديث العميل في قاعدة البيانات');
+      }
+      
+      // تحديث state
+      dispatch({ type: "UPDATE_CLIENT", payload: response.data || client })
+      
+      // حفظ في localStorage كنسخة احتياطية
       saveDataToStorage()
+      
+      // إرسال تحديث فوري
+      if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
+        (window as any).realtimeUpdates.sendClientUpdate({ 
+          action: 'update', 
+          client: response.data || client, 
+          userId: state.currentUser?.id, 
+          userName: state.currentUser?.name 
+        });
+      }
+      
       showSuccessToast("تم تحديث العميل بنجاح", `تم تحديث عميل "${client.name}"`)
     } catch (error) {
+      logger.error("خطأ في تحديث العميل", { error }, 'CLIENTS');
       showErrorToast("خطأ في تحديث العميل", "حدث خطأ أثناء تحديث العميل")
     } finally {
       setLoadingState('clients', false)
@@ -1246,10 +1306,28 @@ export function useAppActions() {
         return
       }
 
+      // حذف من قاعدة البيانات
+      const response = await api.clients.delete(clientId);
+      if (!response.success) {
+        throw new Error(response.error || 'فشل حذف العميل من قاعدة البيانات');
+      }
+
       dispatch({ type: "DELETE_CLIENT", payload: clientId })
       saveDataToStorage()
+      
+      // إرسال تحديث فوري
+      if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
+        (window as any).realtimeUpdates.sendClientUpdate({ 
+          action: 'delete', 
+          client: client, 
+          userId: state.currentUser?.id, 
+          userName: state.currentUser?.name 
+        });
+      }
+      
       showSuccessToast("تم حذف العميل بنجاح", `تم حذف عميل "${client.name}"`)
     } catch (error) {
+      logger.error("خطأ في حذف العميل", { error }, 'CLIENTS');
       showErrorToast("خطأ في حذف العميل", "حدث خطأ أثناء حذف العميل")
     } finally {
       setLoadingState('clients', false)

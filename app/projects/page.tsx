@@ -65,7 +65,7 @@ export default function ProjectsPage() {
 
 function ProjectsPageContent() {
   const { state, dispatch } = useApp()
-  const { addNotification, createProjectWithDownPayment, updateProjectWithDownPayment, deleteProject } = useAppActions()
+  const { addNotification, createProjectWithDownPayment, updateProjectWithDownPayment, deleteProject, createClient } = useAppActions()
   const { currentUser, projects, clients, users } = state
   const { toast } = useToast()
 
@@ -625,18 +625,9 @@ function ProjectsPageContent() {
       createdAt: new Date().toISOString(),
     };
     try {
-      // حفظ العميل في قاعدة البيانات
-      const response = await fetch('/api/clients', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newClient),
-      });
-      if (!response.ok) throw new Error('Failed to save client to database');
-      const result = await response.json();
-      dispatch({ type: "ADD_CLIENT", payload: result.data || newClient });
-      setFormData(prev => ({ ...prev, clientId: (result.data?.id || newClient.id) }));
-      // بث تحديث فوري لجميع المستخدمين
-      realtimeUpdates.sendClientUpdate({ action: 'create', client: result.data || newClient, userId: currentUser?.id, userName: currentUser?.name });
+      // استخدام وظيفة AppContext
+      await createClient(newClient);
+      setFormData(prev => ({ ...prev, clientId: newClient.id }));
       // Add notification to all users except the creator
       users.forEach(user => {
         if (user.id !== currentUser?.id) {
