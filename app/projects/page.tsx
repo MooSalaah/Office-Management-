@@ -288,9 +288,9 @@ function ProjectsPageContent() {
       status: formData.status,
       team: formData.team,
       startDate: formData.startDate,
-      price: Number.parseFloat(formData.price),
-      downPayment: Number.parseFloat(formData.downPayment),
-      remainingBalance: Number.parseFloat(formData.price) - Number.parseFloat(formData.downPayment),
+      price: Number.parseFloat(formData.price) || 0,
+      downPayment: Number.parseFloat(formData.downPayment) || 0,
+      remainingBalance: (Number.parseFloat(formData.price) || 0) - (Number.parseFloat(formData.downPayment) || 0),
       assignedEngineerId,
       assignedEngineerName: engineer?.name || "",
       importance: formData.importance,
@@ -369,9 +369,9 @@ function ProjectsPageContent() {
       status: formData.status,
       team: formData.team,
       startDate: formData.startDate,
-      price: Number.parseFloat(formData.price),
-      downPayment: Number.parseFloat(formData.downPayment),
-      remainingBalance: Number.parseFloat(formData.price) - Number.parseFloat(formData.downPayment),
+      price: Number.parseFloat(formData.price) || 0,
+      downPayment: Number.parseFloat(formData.downPayment) || 0,
+      remainingBalance: (Number.parseFloat(formData.price) || 0) - (Number.parseFloat(formData.downPayment) || 0),
       assignedEngineerId,
       assignedEngineerName: engineer?.name || "",
       importance: formData.importance,
@@ -1261,44 +1261,53 @@ function ProjectsPageContent() {
                 </div>
                 <div className="space-y-2">
                   <Label>المهام الافتراضية للمشروع</Label>
-                  <div className="border rounded p-2 bg-muted">
-                    <div className="mb-2 text-xs text-muted-foreground">اختر أنواع المهام وحدد المسؤول عن كل مهمة (اختياري)</div>
+                  <div className="border rounded p-4 bg-muted w-full">
+                    <div className="mb-3 text-xs text-muted-foreground">اختر أنواع المهام وحدد المسؤول عن كل مهمة (اختياري)</div>
                     {taskTypes.length === 0 ? (
                       <div className="text-xs text-muted-foreground">لا توجد أنواع مهام متاحة</div>
                     ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {taskTypes.map((type) => (
-                          <div key={type.id} className="flex items-center gap-2 p-2 border rounded bg-background">
-                            <Checkbox
-                              checked={selectedTasks.some((t) => t.typeId === type.id)}
-                              onCheckedChange={(checked) => {
-                                if (checked) {
-                                  setSelectedTasks((prev) => [...prev, { typeId: type.id, assigneeId: '' }]);
-                                } else {
-                                  setSelectedTasks((prev) => prev.filter((t) => t.typeId !== type.id));
-                                }
-                              }}
-                            />
-                            <span className="text-sm font-medium flex-1">{type.name}</span>
-                            {selectedTasks.some((t) => t.typeId === type.id) && (
-                              <Select
-                                value={selectedTasks.find((t) => t.typeId === type.id)?.assigneeId || ''}
-                                onValueChange={(value) => {
-                                  setSelectedTasks((prev) => prev.map((t) => t.typeId === type.id ? { ...t, assigneeId: value } : t));
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {taskTypes.map((type) => {
+                          const isSelected = selectedTasks.some((t) => t.typeId === type.id);
+                          const selectedTask = selectedTasks.find((t) => t.typeId === type.id);
+                          
+                          return (
+                            <div key={type.id} className="flex items-center gap-3 p-3 border rounded bg-background hover:bg-muted/50 transition-colors">
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setSelectedTasks((prev) => [...prev, { typeId: type.id, assigneeId: '' }]);
+                                  } else {
+                                    setSelectedTasks((prev) => prev.filter((t) => t.typeId !== type.id));
+                                  }
                                 }}
-                              >
-                                <SelectTrigger className="w-32">
-                                  <SelectValue placeholder="المسؤول" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {users.map((user) => (
-                                    <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            )}
-                          </div>
-                        ))}
+                              />
+                              <span className="text-sm font-medium flex-1">{type.name}</span>
+                              {isSelected && (
+                                <Select
+                                  value={selectedTask?.assigneeId || ''}
+                                  onValueChange={(value) => {
+                                    setSelectedTasks((prev) => 
+                                      prev.map((t) => 
+                                        t.typeId === type.id ? { ...t, assigneeId: value } : t
+                                      )
+                                    );
+                                  }}
+                                >
+                                  <SelectTrigger className="w-36">
+                                    <SelectValue placeholder="اختر المسؤول" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {users.map((user) => (
+                                      <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
