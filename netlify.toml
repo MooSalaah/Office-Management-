@@ -1,6 +1,6 @@
 [build]
   command = "npm run build"
-  publish = "out"
+  publish = ".next"
 
 [build.environment]
   NODE_VERSION = "18"
@@ -18,9 +18,9 @@
   NEXT_PUBLIC_API_URL = "https://office-management-fsy7.onrender.com"
   NODE_ENV = "production"
 
-# تم تعطيل Netlify Next.js plugin لأننا نستخدم static export
-# [[plugins]]
-# package = "@netlify/plugin-nextjs"
+# Netlify Next.js plugin
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
 
 # Redirects for Next.js
 [[redirects]]
