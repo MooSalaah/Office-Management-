@@ -47,6 +47,7 @@ import { LoadingStates } from "@/components/ui/loading-skeleton"
 import { transliterateArabicToEnglish } from "@/lib/utils";
 import { useToast } from "@/components/ui/use-toast"
 import { Checkbox } from "@/components/ui/checkbox"
+import { logger } from "@/lib/logger"
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -83,26 +84,24 @@ function ProjectsPageContent() {
       if (handledProjectUpdateIdsRef.current.has(updateId)) return;
       handledProjectUpdateIdsRef.current.add(updateId);
       
-      console.log('=== PROJECT UPDATE RECEIVED ===');
-      console.log('Project update:', lastUpdate);
-      console.log('Current projects count:', state.projects.length);
+      logger.debug('=== PROJECT UPDATE RECEIVED ===', { lastUpdate, projectsCount: state.projects.length }, 'PROJECTS');
       
       if (lastUpdate.action === 'create') {
         const exists = state.projects.some(p => p.id === lastUpdate.project.id);
-        console.log('Project exists in state:', exists);
+        logger.debug('Project exists in state', { exists, projectId: lastUpdate.project.id }, 'PROJECTS');
         if (!exists) {
-          console.log('Adding project to state...');
+          logger.debug('Adding project to state', { projectId: lastUpdate.project.id }, 'PROJECTS');
           dispatch({ type: "ADD_PROJECT", payload: lastUpdate.project });
-          console.log('Project added to state successfully');
+          logger.debug('Project added to state successfully', { projectId: lastUpdate.project.id }, 'PROJECTS');
         }
       } else if (lastUpdate.action === 'update') {
-        console.log('Updating project in state...');
+        logger.debug('Updating project in state', { projectId: lastUpdate.project.id }, 'PROJECTS');
         dispatch({ type: "UPDATE_PROJECT", payload: lastUpdate.project });
-        console.log('Project updated in state successfully');
+        logger.debug('Project updated in state successfully', { projectId: lastUpdate.project.id }, 'PROJECTS');
       } else if (lastUpdate.action === 'delete') {
-        console.log('Deleting project from state...');
+        logger.debug('Deleting project from state', { projectId: lastUpdate.project.id }, 'PROJECTS');
         dispatch({ type: "DELETE_PROJECT", payload: lastUpdate.project.id });
-        console.log('Project deleted from state successfully');
+        logger.debug('Project deleted from state successfully', { projectId: lastUpdate.project.id }, 'PROJECTS');
       }
       
       if (lastUpdate.userId && lastUpdate.userId !== currentUser?.id && lastUpdate.userName) {
@@ -310,7 +309,7 @@ function ProjectsPageContent() {
       }
 
       const result = await response.json();
-      console.log('Project saved to database:', result);
+      logger.info('Project saved to database', { result }, 'PROJECTS');
 
       // Update local state
       dispatch({ type: "ADD_PROJECT", payload: newProject })
@@ -330,21 +329,47 @@ function ProjectsPageContent() {
       setAlert({ type: "error", message: "حدث خطأ أثناء حفظ المشروع في قاعدة البيانات" });
     }
 
+    // أضف دالة مساعدة لإشعار أعضاء الفريق
+    function notifyProjectTeam({ team, currentUser, users, addNotification, projectName, projectId, action, actorName }: {
+      team: string[];
+      currentUser: any;
+      users: any[];
+      addNotification: Function;
+      projectName: string;
+      projectId: string;
+      action: 'create' | 'update';
+      actorName: string;
+    }) {
+      const title = action === 'create' ? 'مشروع جديد مسؤول عنه' : 'تم تعديل مشروع أنت مسؤول عنه';
+      const message = action === 'create'
+        ? `تم تعيينك كعضو في فريق مشروع "${projectName}" بواسطة ${actorName}`
+        : `تم تعديل تفاصيل مشروع "${projectName}" بواسطة ${actorName}`;
+      team.forEach((engineerId) => {
+        if (engineerId !== currentUser?.id) {
+          const eng = users.find(u => u.id === engineerId);
+          addNotification({
+            userId: engineerId,
+            title,
+            message,
+            type: "project",
+            actionUrl: `/projects/${projectId}`,
+            triggeredBy: currentUser?.id || "",
+            isRead: false,
+          });
+          logger.info(`تم إشعار ${eng?.name || engineerId} (${action === 'create' ? 'إضافة' : 'تعديل'}) المشروع`, { engineerId, engineerName: eng?.name, action }, 'PROJECTS');
+        }
+      });
+    }
     // إشعار جميع أعضاء الفريق (عدا منشئ المشروع)
-    formData.team.forEach((engineerId) => {
-      if (engineerId !== currentUser?.id) {
-        const eng = users.find(u => u.id === engineerId);
-        addNotification({
-          userId: engineerId,
-          title: "مشروع جديد مسؤول عنه",
-          message: `تم تعيينك كعضو في فريق مشروع \"${formData.name}\" بواسطة ${currentUser?.name}`,
-          type: "project",
-          actionUrl: `/projects/${newProject.id}`,
-          triggeredBy: currentUser?.id || "",
-          isRead: false,
-        });
-        console.log(`تم إشعار ${eng?.name || engineerId} بأنه مسؤول عن المشروع.`);
-      }
+    notifyProjectTeam({
+      team: formData.team,
+      currentUser,
+      users,
+      addNotification,
+      projectName: formData.name,
+      projectId: newProject.id,
+      action: 'create',
+      actorName: currentUser?.name || '',
     });
   }
 
@@ -403,7 +428,7 @@ function ProjectsPageContent() {
       }
 
       const result = await response.json();
-      console.log('Project updated in database:', result);
+      logger.info('Project updated in database', { result }, 'PROJECTS');
 
       // Update local state
       dispatch({ type: "UPDATE_PROJECT", payload: updatedProject })
@@ -436,6 +461,18 @@ function ProjectsPageContent() {
       console.error('Error updating project:', error);
       setAlert({ type: "error", message: "حدث خطأ أثناء تحديث المشروع في قاعدة البيانات" });
     }
+
+    // داخل handleUpdateProject بعد setEditingProject(null) مباشرة
+    notifyProjectTeam({
+      team: formData.team,
+      currentUser,
+      users,
+      addNotification,
+      projectName: formData.name,
+      projectId: editingProject.id,
+      action: 'update',
+      actorName: currentUser?.name || '',
+    });
   }
 
   const handleDeleteProject = (projectId: string) => {
@@ -475,7 +512,7 @@ function ProjectsPageContent() {
       }
 
       const result = await response.json();
-      console.log('Project deleted from database:', result);
+      logger.info('Project deleted from database', { result }, 'PROJECTS');
 
       // Update local state
       dispatch({ type: "DELETE_PROJECT", payload: projectToDelete })
@@ -488,6 +525,23 @@ function ProjectsPageContent() {
       // إرسال تحديث فوري لجميع المستخدمين
       realtimeUpdates.sendProjectUpdate({ action: 'delete', project: project, userId: currentUser?.id, userName: currentUser?.name })
       
+      // إشعار أعضاء الفريق بعد نجاح الحذف
+      if (project && Array.isArray(project.team)) {
+        project.team.forEach((engineerId: string) => {
+          if (engineerId !== currentUser?.id) {
+            const eng = users.find(u => u.id === engineerId);
+            addNotification({
+              userId: engineerId,
+              title: "تم حذف مشروع كنت مسؤول عنه",
+              message: `تم حذف مشروع \"${project.name}\" بواسطة ${currentUser?.name}`,
+              type: "project",
+              triggeredBy: currentUser?.id || "",
+              isRead: false,
+            });
+            logger.info(`تم إشعار ${eng?.name || engineerId} بحذف المشروع`, { engineerId, engineerName: eng?.name }, 'PROJECTS');
+          }
+        });
+      }
       setDeleteDialogOpen(false)
       setProjectToDelete(null)
       setDeleteError("")
@@ -719,7 +773,7 @@ function ProjectsPageContent() {
         }
 
         const result = await response.json();
-        console.log('Engineer saved to database:', result);
+        logger.info('Engineer saved to database', { result }, 'PROJECTS');
 
         // Add to users list
         dispatch({ type: "ADD_USER", payload: newEngineer })

@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const logger = require('../logger');
 
 // Store connected clients for broadcasting
 const clients = new Set();
@@ -30,10 +31,10 @@ router.get('/', (req, res) => {
   // Handle client disconnect
   req.on('close', () => {
     clients.delete(res);
-    console.log(`Client disconnected. Total clients: ${clients.size}`);
+    logger.info(`Client disconnected. Total clients: ${clients.size}`, { clientsCount: clients.size }, 'REALTIME');
   });
 
-  console.log(`Client connected. Total clients: ${clients.size}`);
+  logger.info(`Client connected. Total clients: ${clients.size}`, { clientsCount: clients.size }, 'REALTIME');
 });
 
 // Polling endpoint for updates since a specific timestamp
@@ -88,7 +89,12 @@ router.post('/broadcast', (req, res) => {
     });
 
     // Log broadcast for debugging
-    console.log(`📡 Broadcasted ${update.type} ${update.action} to ${broadcastCount} clients`);
+    logger.info(`📡 Broadcasted ${update.type} ${update.action} to ${broadcastCount} clients`, { 
+      type: update.type, 
+      action: update.action, 
+      broadcastCount, 
+      clientsCount: clients.size 
+    }, 'REALTIME');
 
     res.json({
       success: true,

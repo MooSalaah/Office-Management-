@@ -1,4 +1,6 @@
 // API helper for connecting to backend server
+import { logger } from "./logger";
+
 const API_BASE_URL =
 	process.env.NEXT_PUBLIC_API_URL ||
 	"https://office-management-fsy7.onrender.com";
@@ -43,12 +45,14 @@ class ApiClient {
 			const data = await response.json();
 			return data;
 		} catch (error) {
-			console.error(`API request failed for ${endpoint}:`, error);
+			logger.error(`API request failed for ${endpoint}`, { error, endpoint }, 'API');
 
 			// Retry logic for network errors
 			if (retryCount < this.retryAttempts && this.isRetryableError(error)) {
-				console.log(
-					`Retrying request (${retryCount + 1}/${this.retryAttempts})...`
+				logger.info(
+					`Retrying request (${retryCount + 1}/${this.retryAttempts})...`,
+					{ retryCount: retryCount + 1, maxRetries: this.retryAttempts, endpoint },
+					'API'
 				);
 				await this.delay(this.retryDelay * (retryCount + 1));
 				return this.request(endpoint, options, retryCount + 1);

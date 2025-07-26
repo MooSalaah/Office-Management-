@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Client = require('../models/Client');
 const jwt = require('jsonwebtoken');
+const logger = require('../logger');
 require('dotenv').config();
 const fetch = require('node-fetch');
 
@@ -56,9 +57,9 @@ router.post('/', async (req, res) => {
           timestamp: Date.now()
         })
       });
-      console.log('Broadcast response:', await broadcastResponse.json());
+      logger.info('Broadcast response', { response: await broadcastResponse.json() }, 'CLIENTS');
     } catch (broadcastError) {
-      console.error('Broadcast error:', broadcastError);
+      logger.error('Broadcast error', { error: broadcastError.message }, 'CLIENTS');
     }
     res.status(201).json({ success: true, data: newClient });
   } catch (err) {
@@ -88,9 +89,9 @@ router.put('/:id', async (req, res) => {
           timestamp: Date.now()
         })
       });
-      console.log('Broadcast response:', await broadcastResponse.json());
+      logger.info('Broadcast response', { response: await broadcastResponse.json() }, 'CLIENTS');
     } catch (broadcastError) {
-      console.error('Broadcast error:', broadcastError);
+      logger.error('Broadcast error', { error: broadcastError.message }, 'CLIENTS');
     }
     res.json({ success: true, data: updatedClient });
   } catch (err) {
@@ -116,9 +117,9 @@ router.delete('/:id', async (req, res) => {
           timestamp: Date.now()
         })
       });
-      console.log('Broadcast response:', await broadcastResponse.json());
+      logger.info('Broadcast response', { response: await broadcastResponse.json() }, 'CLIENTS');
     } catch (broadcastError) {
-      console.error('Broadcast error:', broadcastError);
+      logger.error('Broadcast error', { error: broadcastError.message }, 'CLIENTS');
     }
     res.json({ success: true, message: 'Client deleted' });
   } catch (err) {

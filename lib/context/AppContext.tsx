@@ -28,14 +28,15 @@ import { getCurrentUser, initializeDefaultRoles, updateUserPermissionsByRole } f
 import { useToast } from "@/hooks/use-toast"
 import { realtimeUpdates } from "../realtime-updates"
 import { api } from "../api";
+import { logger } from "../logger";
 
 // تعريف اختياري لـ window.realtimeUpdates لتفادي أخطاء linter
 // @ts-ignore
-interface Window { realtimeUpdates?: any }
+interface Window { realtimeUpdates?: unknown }
 
 declare global {
   interface Window {
-    realtimeUpdates?: any;
+    realtimeUpdates?: unknown;
   }
 }
 
@@ -90,8 +91,8 @@ type AppAction =
   | { type: "UPDATE_COMPANY_SETTINGS"; payload: CompanySettings }
   | { type: "UPDATE_USER_SETTINGS"; payload: UserSettings }
   | { type: "UPDATE_COMPANY_LOGO"; payload: string }
-  | { type: "UPDATE_COMPANY_INFO"; payload: any }
-  | { type: "UPDATE_NOTIFICATION_SETTINGS"; payload: any }
+  | { type: "UPDATE_COMPANY_INFO"; payload: Record<string, unknown> }
+  | { type: "UPDATE_NOTIFICATION_SETTINGS"; payload: Record<string, unknown> }
   | { type: "TOGGLE_DARK_MODE"; payload: boolean }
   | { type: "LOAD_USERS"; payload: User[] }
   | { type: "LOAD_PROJECTS"; payload: Project[] }
@@ -425,14 +426,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     // Realtime functionality temporarily disabled for SSR compatibility
     // استمع لتحديثات الإشعارات الفورية (عند تفعيلها)
     if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
-      (window as any).realtimeUpdates.on('notification', (notification: any) => {
+              (window as any).realtimeUpdates.on('notification', (notification: Notification) => {
         // تحقق إذا كان الإشعار موجود مسبقاً
         if (!state.notifications.some(n => n.id === notification.id)) {
           dispatch({ type: 'ADD_NOTIFICATION', payload: notification })
         }
       })
     }
-    console.log('Realtime updates disabled for SSR compatibility');
+    logger.info('Realtime updates disabled for SSR compatibility', undefined, 'REALTIME');
   }, [state.currentUser?.id, state.notifications])
 
   // جلب المشاريع من الباكند عند بدء التطبيق
@@ -444,7 +445,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           dispatch({ type: "LOAD_PROJECTS", payload: response.data });
         }
       } catch (error) {
-        console.error("فشل جلب المشاريع من الباكند:", error);
+        logger.error("فشل جلب المشاريع من الباكند", { error }, 'API');
         // في حال الفشل، تبقى المشاريع من localStorage أو mockProjects
       }
     };
@@ -470,9 +471,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const usersData = localStorage.getItem("users")
         if (usersData) {
           const users = JSON.parse(usersData)
-          console.log("Loading users from localStorage:", users)
+          logger.debug("Loading users from localStorage", { users }, 'STORAGE');
           // Replace all users with localStorage data
-          users.forEach((user: any) => {
+          users.forEach((user: User) => {
             // Update user permissions based on current role
             const updatedUser = updateUserPermissionsByRole(user)
             const existingUser = state.users.find(u => u.id === user.id)
@@ -490,7 +491,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const projectsData = localStorage.getItem("projects")
         if (projectsData) {
           const projects = JSON.parse(projectsData)
-          console.log("Loading projects from localStorage:", projects)
+          logger.debug("Loading projects from localStorage", { projects }, 'STORAGE');
           // Replace all projects with localStorage data to ensure consistency
           dispatch({ type: "LOAD_PROJECTS", payload: projects })
         }
@@ -499,7 +500,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const clientsData = localStorage.getItem("clients")
         if (clientsData) {
           const clients = JSON.parse(clientsData)
-          console.log("Loading clients from localStorage:", clients)
+          logger.debug("Loading clients from localStorage", { clients }, 'STORAGE');
           // Replace all clients with localStorage data to ensure consistency
           dispatch({ type: "LOAD_CLIENTS", payload: clients })
         }
@@ -508,7 +509,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const tasksData = localStorage.getItem("tasks")
         if (tasksData) {
           const tasks = JSON.parse(tasksData)
-          console.log("Loading tasks from localStorage:", tasks)
+          logger.debug("Loading tasks from localStorage", { tasks }, 'STORAGE');
           // Replace all tasks with localStorage data to ensure consistency
           dispatch({ type: "LOAD_TASKS", payload: tasks })
         }
@@ -517,7 +518,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const transactionsData = localStorage.getItem("transactions")
         if (transactionsData && state.transactions.length === mockTransactions.length) {
           const transactions = JSON.parse(transactionsData)
-          transactions.forEach((transaction: any) => {
+          transactions.forEach((transaction: Transaction) => {
             // Check if transaction already exists
             const existingTransaction = state.transactions.find(t => t.id === transaction.id)
             if (!existingTransaction) {
@@ -530,9 +531,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const notificationsData = localStorage.getItem("notifications")
         if (notificationsData) {
           const notifications = JSON.parse(notificationsData)
-          console.log("Loading notifications from localStorage:", notifications)
+          logger.debug("Loading notifications from localStorage", { notifications }, 'STORAGE');
           // Replace all notifications with localStorage data
-          notifications.forEach((notification: any) => {
+          notifications.forEach((notification: Notification) => {
             // Check if notification already exists
             const existingNotification = state.notifications.find(n => n.id === notification.id)
             if (!existingNotification) {
@@ -545,7 +546,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const attendanceData = localStorage.getItem("attendanceRecords")
         if (attendanceData) {
           const attendanceRecords = JSON.parse(attendanceData)
-          console.log("Loading attendance records from localStorage:", attendanceRecords)
+          logger.debug("Loading attendance records from localStorage", { attendanceRecords }, 'STORAGE');
           // Replace all attendance records with localStorage data to ensure consistency
           dispatch({ type: "LOAD_ATTENDANCE", payload: attendanceRecords })
         }
@@ -554,7 +555,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const paymentsData = localStorage.getItem("upcomingPayments")
         if (paymentsData) {
           const upcomingPayments = JSON.parse(paymentsData)
-          upcomingPayments.forEach((payment: any) => {
+          upcomingPayments.forEach((payment: UpcomingPayment) => {
             // Check if payment already exists
             const existingPayment = state.upcomingPayments.find(p => p.id === payment.id)
             if (!existingPayment) {
@@ -603,7 +604,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           localStorage.setItem("jobRoles", JSON.stringify(jobRoles))
         }
       } catch (error) {
-        console.error("Error loading data from localStorage:", error)
+        logger.error("Error loading data from localStorage", { error }, 'STORAGE');
       } finally {
         setIsAuthLoading(false)
       }
@@ -723,13 +724,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   // عند أي تغيير في البيانات، إذا online أرسل broadcast، إذا offline أضف لقائمة الانتظار:
-  const broadcastOrQueue = (type: string, data: any, isOnline: boolean, setPendingUpdates: any) => {
+  const broadcastOrQueue = (type: string, data: unknown, isOnline: boolean, setPendingUpdates: React.Dispatch<React.SetStateAction<unknown[]>>) => {
     if (isOnline) {
       if (window.realtimeUpdates) {
         window.realtimeUpdates.broadcastUpdate(type, data)
       }
     } else {
-      setPendingUpdates((prev: any[]) => [...prev, { type, data }])
+              setPendingUpdates((prev: unknown[]) => [...prev, { type, data }])
     }
   }
 
@@ -748,7 +749,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // استقبل التحديثات من الخادم وحدث الحالة فورياً:
   useEffect(() => {
     if (window.realtimeUpdates) {
-      window.realtimeUpdates.subscribe('*', (data: any) => {
+      window.realtimeUpdates.subscribe('*', (data: unknown) => {
         // مثال: إذا كان التحديث لمستخدم
         if (data && data.id) {
           dispatch({ type: 'UPDATE_USER', payload: data })
@@ -1038,9 +1039,9 @@ export function useAppActions() {
         localStorage.setItem("currentUser", JSON.stringify(state.currentUser))
       }
       
-      console.log("All data saved to localStorage successfully")
+      logger.debug("All data saved to localStorage successfully", undefined, 'STORAGE');
     } catch (error) {
-      console.error("Error saving data to localStorage:", error)
+      logger.error("Error saving data to localStorage", { error }, 'STORAGE');
       showErrorToast("خطأ في حفظ البيانات", "حدث خطأ أثناء حفظ البيانات")
     }
   }
@@ -1213,7 +1214,7 @@ export function useAppActions() {
   }
 
   // Realtime broadcast functions
-  const broadcastProjectUpdate = async (action: 'create' | 'update' | 'delete', data: any) => {
+  const broadcastProjectUpdate = async (action: 'create' | 'update' | 'delete', data: Project) => {
     try {
       realtimeUpdates.sendProjectUpdate({ action, ...data })
     } catch (error) {

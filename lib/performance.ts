@@ -242,14 +242,14 @@ export const useGroupedData = <T>(data: T[], groupBy: keyof T) => {
 };
 
 // تحسين أداء التخزين المؤقت
-export const useCachedValue = <T>(value: T, dependencies: any[]) => {
+export const useCachedValue = <T>(value: T, dependencies: unknown[]) => {
 	return useMemo(() => value, dependencies);
 };
 
 // تحسين أداء الدوال
-export const useCachedCallback = <T extends (...args: any[]) => any>(
+export const useCachedCallback = <T extends (...args: unknown[]) => unknown>(
 	callback: T,
-	dependencies: any[]
+	dependencies: unknown[]
 ) => {
 	return useCallback(callback, dependencies);
 };

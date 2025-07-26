@@ -50,6 +50,7 @@ import { realtimeUpdates } from "@/lib/realtime-updates"
 import { DeleteDialog } from "@/components/ui/delete-dialog"
 import { transliterateArabicToEnglish } from "@/lib/utils"
 import { ConnectionTest } from "@/components/ui/connection-test"
+import { logger } from "@/lib/logger"
 
 export default function SettingsPage() {
   return (
@@ -316,14 +317,14 @@ function SettingsPageContent() {
         }
 
         const result = await response.json();
-        console.log('Profile updated in database:', result);
+        logger.info('Profile updated in database', { result }, 'SETTINGS');
 
         // Save to localStorage
         const existingUsers = JSON.parse(localStorage.getItem("users") || "[]")
         const updatedUsers = existingUsers.map((u: any) => u.id === currentUser.id ? updatedUser : u)
         localStorage.setItem("users", JSON.stringify(updatedUsers))
         localStorage.setItem("currentUser", JSON.stringify(updatedUser))
-        console.log("Profile updated and saved to localStorage:", updatedUser)
+        logger.debug("Profile updated and saved to localStorage", { updatedUser }, 'SETTINGS')
         
         // Update state
         dispatch({ type: "UPDATE_USER", payload: updatedUser })

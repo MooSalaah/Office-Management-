@@ -1,522 +1,419 @@
-// Advanced caching utilities for performance optimization
+import { useMemo, useRef, useEffect, useState, useCallback } from "react";
+import { AdvancedCache, apiCache, uiCache, dataCache, cacheUtils } from "./caching";
 
-// Cache strategies
-export const CacheStrategies = {
-	// Cache First - Serve from cache, fallback to network
-	cacheFirst: async (
-		request: Request,
-		cacheName: string
-	): Promise<Response> => {
-		const cache = await caches.open(cacheName);
-		const cachedResponse = await cache.match(request);
+// Hook for caching expensive computations
+export function useCachedComputation<T>(
+  key: string,
+  computation: () => T,
+  dependencies: unknown[],
+  ttl?: number
+): T {
+  return useMemo(() => {
+    const cacheKey = `${key}-${JSON.stringify(dependencies)}`;
+    return cacheUtils.cachedComputation(cacheKey, computation, ttl);
+  }, dependencies);
+}
 
-		if (cachedResponse) {
-			return cachedResponse;
-		}
+// Hook for caching API calls
+export function useCachedApiCall<T>(
+  key: string,
+  apiCall: () => Promise<T>,
+  dependencies: unknown[],
+  ttl?: number
+): { data: T | null; loading: boolean; error: Error | null; refetch: () => void } {
+  const [data, setData] = useState<T | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  const cacheKey = useMemo(() => `${key}-${JSON.stringify(dependencies)}`, dependencies);
 
-		try {
-			const networkResponse = await fetch(request);
-			if (networkResponse.ok) {
-				cache.put(request, networkResponse.clone());
-			}
-			return networkResponse;
-		} catch (error) {
-			throw new Error("Network request failed");
-		}
-	},
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const result = await cacheUtils.cachedApiCall(cacheKey, apiCall, ttl);
+      setData(result);
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error('Unknown error'));
+    } finally {
+      setLoading(false);
+    }
+  }, [cacheKey, apiCall, ttl]);
 
-	// Network First - Try network, fallback to cache
-	networkFirst: async (
-		request: Request,
-		cacheName: string
-	): Promise<Response> => {
-		const cache = await caches.open(cacheName);
+  const refetch = useCallback(() => {
+    apiCache.delete(cacheKey);
+    fetchData();
+  }, [cacheKey, fetchData]);
 
-		try {
-			const networkResponse = await fetch(request);
-			if (networkResponse.ok) {
-				cache.put(request, networkResponse.clone());
-			}
-			return networkResponse;
-		} catch (error) {
-			const cachedResponse = await cache.match(request);
-			if (cachedResponse) {
-				return cachedResponse;
-			}
-			throw new Error("Network request failed and no cache available");
-		}
-	},
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
-	// Stale While Revalidate - Serve from cache, update in background
-	staleWhileRevalidate: async (
-		request: Request,
-		cacheName: string
-	): Promise<Response> => {
-		const cache = await caches.open(cacheName);
-		const cachedResponse = await cache.match(request);
+  return { data, loading, error, refetch };
+}
 
-		const fetchPromise = fetch(request).then(async (networkResponse) => {
-			if (networkResponse.ok) {
-				cache.put(request, networkResponse.clone());
-			}
-			return networkResponse;
-		});
+// Hook for caching search results
+export function useCachedSearch<T>(
+  items: T[],
+  searchTerm: string,
+  searchFields: (keyof T)[],
+  ttl: number = 2 * 60 * 1000
+): T[] {
+  return useCachedComputation(
+    'search',
+    () => {
+      if (!searchTerm.trim()) return items;
 
-		if (cachedResponse) {
-			return cachedResponse;
-		}
+      const searchLower = searchTerm.toLowerCase();
+      return items.filter((item) => {
+        return searchFields.some((field) => {
+          const value = item[field];
+          if (typeof value === "string") {
+            return value.toLowerCase().includes(searchLower);
+          }
+          return false;
+        });
+      });
+    },
+    [items, searchTerm, searchFields.join(',')],
+    ttl
+  );
+}
 
-		return fetchPromise;
-	},
+// Hook for caching filtered results
+export function useCachedFilter<T>(
+  items: T[],
+  filterValue: string,
+  filterField: keyof T,
+  ttl: number = 1 * 60 * 1000
+): T[] {
+  return useCachedComputation(
+    'filter',
+    () => {
+      if (filterValue === "all") return items;
 
-	// Network Only - Always fetch from network
-	networkOnly: async (request: Request): Promise<Response> => {
-		return fetch(request);
-	},
+      return items.filter((item) => {
+        const fieldValue = item[filterField];
+        return String(fieldValue) === filterValue;
+      });
+    },
+    [items, filterValue, String(filterField)],
+    ttl
+  );
+}
 
-	// Cache Only - Only serve from cache
-	cacheOnly: async (request: Request, cacheName: string): Promise<Response> => {
-		const cache = await caches.open(cacheName);
-		const cachedResponse = await cache.match(request);
+// Hook for caching sorted results
+export function useCachedSort<T>(
+  items: T[],
+  sortBy: keyof T | null,
+  sortOrder: "asc" | "desc",
+  ttl: number = 1 * 60 * 1000
+): T[] {
+  return useCachedComputation(
+    'sort',
+    () => {
+      if (!sortBy) return items;
 
-		if (cachedResponse) {
-			return cachedResponse;
-		}
+      return [...items].sort((a, b) => {
+        const aValue = a[sortBy];
+        const bValue = b[sortBy];
 
-		throw new Error("No cached response available");
-	},
-};
+        if (typeof aValue === "string" && typeof bValue === "string") {
+          return sortOrder === "asc"
+            ? aValue.localeCompare(bValue)
+            : bValue.localeCompare(aValue);
+        }
+
+        if (typeof aValue === "number" && typeof bValue === "number") {
+          return sortOrder === "asc" ? aValue - bValue : bValue - aValue;
+        }
+
+        return 0;
+      });
+    },
+    [items, String(sortBy), sortOrder],
+    ttl
+  );
+}
+
+// Hook for caching statistics
+export function useCachedStats<T, R>(
+  items: T[],
+  statsCalculator: (items: T[]) => R,
+  ttl: number = 5 * 60 * 1000
+): R {
+  return useCachedComputation(
+    'stats',
+    () => statsCalculator(items),
+    [items.length, items.length > 0 ? 'has-items' : 'empty'],
+    ttl
+  );
+}
+
+// Hook for caching grouped data
+export function useCachedGroup<T>(
+  items: T[],
+  groupBy: keyof T,
+  ttl: number = 2 * 60 * 1000
+): Record<string, T[]> {
+  return useCachedComputation(
+    'group',
+    () => {
+      const groups: Record<string, T[]> = {};
+
+      items.forEach((item) => {
+        const key = String(item[groupBy]);
+        if (!groups[key]) {
+          groups[key] = [];
+        }
+        groups[key].push(item);
+      });
+
+      return groups;
+    },
+    [items, String(groupBy)],
+    ttl
+  );
+}
+
+// Hook for caching paginated data
+export function useCachedPagination<T>(
+  items: T[],
+  page: number,
+  pageSize: number,
+  ttl: number = 1 * 60 * 1000
+): { items: T[]; totalPages: number; totalItems: number } {
+  return useCachedComputation(
+    'pagination',
+    () => {
+      const startIndex = (page - 1) * pageSize;
+      const endIndex = startIndex + pageSize;
+      const paginatedItems = items.slice(startIndex, endIndex);
+      const totalPages = Math.ceil(items.length / pageSize);
+
+      return {
+        items: paginatedItems,
+        totalPages,
+        totalItems: items.length,
+      };
+    },
+    [items, page, pageSize],
+    ttl
+  );
+}
+
+// Hook for caching with automatic invalidation
+export function useCachedWithInvalidation<T>(
+  key: string,
+  fetcher: () => Promise<T>,
+  dependencies: unknown[],
+  ttl?: number
+): { data: T | null; loading: boolean; error: Error | null; invalidate: () => void } {
+  const [data, setData] = useState<T | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  const cacheKey = useMemo(() => `${key}-${JSON.stringify(dependencies)}`, dependencies);
+
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const result = await cacheUtils.cachedDataWithRefresh(cacheKey, fetcher, ttl);
+      setData(result);
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error('Unknown error'));
+    } finally {
+      setLoading(false);
+    }
+  }, [cacheKey, fetcher, ttl]);
+
+  const invalidate = useCallback(() => {
+    dataCache.delete(cacheKey);
+    fetchData();
+  }, [cacheKey, fetchData]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  return { data, loading, error, invalidate };
+}
+
+// Hook for caching multiple related data
+export function useCachedMultiple<T extends Record<string, unknown>>(
+  keys: (keyof T)[],
+  fetchers: Record<keyof T, () => Promise<T[keyof T]>>,
+  ttl?: number
+): { data: Partial<T>; loading: boolean; errors: Partial<Record<keyof T, Error>>; refetch: (key?: keyof T) => void } {
+  const [data, setData] = useState<Partial<T>>({});
+  const [loading, setLoading] = useState(true);
+  const [errors, setErrors] = useState<Partial<Record<keyof T, Error>>>({});
+
+  const fetchAll = useCallback(async () => {
+    setLoading(true);
+    setErrors({});
+
+    const results = await Promise.allSettled(
+      keys.map(async (key) => {
+        const cacheKey = `multiple-${String(key)}`;
+        return {
+          key,
+          data: await cacheUtils.cachedApiCall(cacheKey, fetchers[key], ttl)
+        };
+      })
+    );
+
+    const newData: Partial<T> = {};
+    const newErrors: Partial<Record<keyof T, Error>> = {};
+
+    results.forEach((result, index) => {
+      const key = keys[index];
+      if (result.status === 'fulfilled') {
+        newData[key] = result.value.data;
+      } else {
+        newErrors[key] = result.reason instanceof Error ? result.reason : new Error('Unknown error');
+      }
+    });
+
+    setData(newData);
+    setErrors(newErrors);
+    setLoading(false);
+  }, [keys, fetchers, ttl]);
+
+  const refetch = useCallback((specificKey?: keyof T) => {
+    if (specificKey) {
+      const cacheKey = `multiple-${String(specificKey)}`;
+      apiCache.delete(cacheKey);
+    } else {
+      keys.forEach(key => {
+        const cacheKey = `multiple-${String(key)}`;
+        apiCache.delete(cacheKey);
+      });
+    }
+    fetchAll();
+  }, [keys, fetchAll]);
+
+  useEffect(() => {
+    fetchAll();
+  }, [fetchAll]);
+
+  return { data, loading, errors, refetch };
+}
+
+// Hook for caching with optimistic updates
+export function useCachedOptimistic<T>(
+  key: string,
+  fetcher: () => Promise<T>,
+  dependencies: unknown[],
+  ttl?: number
+): { 
+  data: T | null; 
+  loading: boolean; 
+  error: Error | null; 
+  updateOptimistically: (updater: (current: T) => T) => void;
+  commitUpdate: () => void;
+  rollbackUpdate: () => void;
+} {
+  const [data, setData] = useState<T | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  const [optimisticData, setOptimisticData] = useState<T | null>(null);
+  const [originalData, setOriginalData] = useState<T | null>(null);
+  const cacheKey = useMemo(() => `${key}-${JSON.stringify(dependencies)}`, dependencies);
+
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const result = await cacheUtils.cachedApiCall(cacheKey, fetcher, ttl);
+      setData(result);
+      setOriginalData(result);
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error('Unknown error'));
+    } finally {
+      setLoading(false);
+    }
+  }, [cacheKey, fetcher, ttl]);
+
+  const updateOptimistically = useCallback((updater: (current: T) => T) => {
+    if (data) {
+      const updated = updater(data);
+      setOptimisticData(updated);
+      setData(updated);
+    }
+  }, [data]);
+
+  const commitUpdate = useCallback(() => {
+    if (optimisticData) {
+      apiCache.set(cacheKey, optimisticData, ttl);
+      setOriginalData(optimisticData);
+      setOptimisticData(null);
+    }
+  }, [optimisticData, cacheKey, ttl]);
+
+  const rollbackUpdate = useCallback(() => {
+    if (originalData) {
+      setData(originalData);
+      setOptimisticData(null);
+    }
+  }, [originalData]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  return { 
+    data, 
+    loading, 
+    error, 
+    updateOptimistically, 
+    commitUpdate, 
+    rollbackUpdate 
+  };
+}
 
 // Cache management utilities
-export const CacheManagement = {
-	// Cache versioning
-	versionCache: async (cacheName: string, version: string) => {
-		const versionedCacheName = `${cacheName}-v${version}`;
-		const cache = await caches.open(versionedCacheName);
+export const cacheManagement = {
+  // Invalidate all caches
+  clearAll: () => cacheUtils.clearAll(),
 
-		return {
-			cache,
-			name: versionedCacheName,
-		};
-	},
+  // Invalidate specific cache by pattern
+  invalidateByPattern: (pattern: string) => cacheUtils.invalidateByPattern(pattern),
 
-	// Cache cleanup
-	cleanupCache: async (
-		cacheName: string,
-		maxAge: number = 7 * 24 * 60 * 60 * 1000
-	) => {
-		const cache = await caches.open(cacheName);
-		const keys = await cache.keys();
+  // Get cache statistics
+  getStats: () => cacheUtils.getAllStats(),
 
-		for (const request of keys) {
-			const response = await cache.match(request);
-			if (response) {
-				const date = response.headers.get("date");
-				if (date) {
-					const responseDate = new Date(date).getTime();
-					const now = Date.now();
+  // Preload data into cache
+  preload: async <T>(key: string, fetcher: () => Promise<T>, ttl?: number) => {
+    const result = await fetcher();
+    apiCache.set(key, result, ttl);
+    return result;
+  },
 
-					if (now - responseDate > maxAge) {
-						await cache.delete(request);
-					}
-				}
-			}
-		}
-	},
+  // Warm up cache with multiple items
+  warmUp: async <T extends Record<string, unknown>>(
+    items: Record<keyof T, { key: string; fetcher: () => Promise<T[keyof T]>; ttl?: number }>
+  ) => {
+    const promises = Object.entries(items).map(async ([_, item]) => {
+      const result = await item.fetcher();
+      apiCache.set(item.key, result, item.ttl);
+      return result;
+    });
 
-	// Cache size monitoring
-	getCacheSize: async (cacheName: string): Promise<number> => {
-		const cache = await caches.open(cacheName);
-		const keys = await cache.keys();
-		let totalSize = 0;
-
-		for (const request of keys) {
-			const response = await cache.match(request);
-			if (response) {
-				const contentLength = response.headers.get("content-length");
-				if (contentLength) {
-					totalSize += parseInt(contentLength);
-				}
-			}
-		}
-
-		return totalSize;
-	},
-
-	// Cache statistics
-	getCacheStats: async (cacheName: string) => {
-		const cache = await caches.open(cacheName);
-		const keys = await cache.keys();
-
-		const stats = {
-			totalEntries: keys.length,
-			totalSize: 0,
-			oldestEntry: null as Date | null,
-			newestEntry: null as Date | null,
-		};
-
-		for (const request of keys) {
-			const response = await cache.match(request);
-			if (response) {
-				const contentLength = response.headers.get("content-length");
-				if (contentLength) {
-					stats.totalSize += parseInt(contentLength);
-				}
-
-				const date = response.headers.get("date");
-				if (date) {
-					const responseDate = new Date(date);
-					if (!stats.oldestEntry || responseDate < stats.oldestEntry) {
-						stats.oldestEntry = responseDate;
-					}
-					if (!stats.newestEntry || responseDate > stats.newestEntry) {
-						stats.newestEntry = responseDate;
-					}
-				}
-			}
-		}
-
-		return stats;
-	},
+    return Promise.all(promises);
+  },
 };
 
-// Memory cache utilities
-export const MemoryCache = {
-	// LRU Cache implementation
-	createLRUCache: <K, V>(maxSize: number = 100) => {
-		const cache = new Map<K, V>();
-		const accessOrder: K[] = [];
-
-		return {
-			get: (key: K): V | undefined => {
-				if (cache.has(key)) {
-					// Move to end of access order
-					const index = accessOrder.indexOf(key);
-					if (index > -1) {
-						accessOrder.splice(index, 1);
-					}
-					accessOrder.push(key);
-					return cache.get(key);
-				}
-				return undefined;
-			},
-
-			set: (key: K, value: V): void => {
-				if (cache.has(key)) {
-					// Update existing entry
-					cache.set(key, value);
-					const index = accessOrder.indexOf(key);
-					if (index > -1) {
-						accessOrder.splice(index, 1);
-					}
-					accessOrder.push(key);
-				} else {
-					// Add new entry
-					if (cache.size >= maxSize) {
-						// Remove least recently used
-						const lruKey = accessOrder.shift();
-						if (lruKey) {
-							cache.delete(lruKey);
-						}
-					}
-					cache.set(key, value);
-					accessOrder.push(key);
-				}
-			},
-
-			has: (key: K): boolean => {
-				return cache.has(key);
-			},
-
-			delete: (key: K): boolean => {
-				const deleted = cache.delete(key);
-				if (deleted) {
-					const index = accessOrder.indexOf(key);
-					if (index > -1) {
-						accessOrder.splice(index, 1);
-					}
-				}
-				return deleted;
-			},
-
-			clear: (): void => {
-				cache.clear();
-				accessOrder.length = 0;
-			},
-
-			size: (): number => {
-				return cache.size;
-			},
-
-			keys: (): K[] => {
-				return Array.from(cache.keys());
-			},
-
-			values: (): V[] => {
-				return Array.from(cache.values());
-			},
-		};
-	},
-
-	// TTL Cache implementation
-	createTTLCache: <K, V>(defaultTTL: number = 5 * 60 * 1000) => {
-		const cache = new Map<K, { value: V; expiry: number }>();
-
-		return {
-			get: (key: K): V | undefined => {
-				const entry = cache.get(key);
-				if (entry && Date.now() < entry.expiry) {
-					return entry.value;
-				}
-				if (entry) {
-					cache.delete(key);
-				}
-				return undefined;
-			},
-
-			set: (key: K, value: V, ttl?: number): void => {
-				const expiry = Date.now() + (ttl || defaultTTL);
-				cache.set(key, { value, expiry });
-			},
-
-			has: (key: K): boolean => {
-				const entry = cache.get(key);
-				if (entry && Date.now() < entry.expiry) {
-					return true;
-				}
-				if (entry) {
-					cache.delete(key);
-				}
-				return false;
-			},
-
-			delete: (key: K): boolean => {
-				return cache.delete(key);
-			},
-
-			clear: (): void => {
-				cache.clear();
-			},
-
-			size: (): number => {
-				// Clean expired entries
-				for (const [key, entry] of cache.entries()) {
-					if (Date.now() >= entry.expiry) {
-						cache.delete(key);
-					}
-				}
-				return cache.size;
-			},
-
-			cleanup: (): void => {
-				for (const [key, entry] of cache.entries()) {
-					if (Date.now() >= entry.expiry) {
-						cache.delete(key);
-					}
-				}
-			},
-		};
-	},
-};
-
-// API cache utilities
-export const APICache = {
-	// Cache API responses
-	cacheResponse: async (
-		url: string,
-		response: Response,
-		ttl: number = 5 * 60 * 1000
-	) => {
-		const cache = await caches.open("api-cache");
-		const request = new Request(url);
-
-		// Add cache headers
-		const headers = new Headers(response.headers);
-		headers.set("cache-control", `max-age=${ttl}`);
-		headers.set("date", new Date().toISOString());
-
-		const cachedResponse = new Response(response.body, {
-			status: response.status,
-			statusText: response.statusText,
-			headers,
-		});
-
-		await cache.put(request, cachedResponse);
-	},
-
-	// Get cached API response
-	getCachedResponse: async (url: string): Promise<Response | null> => {
-		const cache = await caches.open("api-cache");
-		const request = new Request(url);
-		const response = await cache.match(request);
-
-		if (response) {
-			const cacheControl = response.headers.get("cache-control");
-			if (cacheControl) {
-				const maxAge = parseInt(cacheControl.split("=")[1]);
-				const date = response.headers.get("date");
-				if (date) {
-					const responseDate = new Date(date).getTime();
-					const now = Date.now();
-
-					if (now - responseDate < maxAge * 1000) {
-						return response;
-					}
-				}
-			}
-		}
-
-		return null;
-	},
-
-	// Cache with TTL
-	cacheWithTTL: async (url: string, data: any, ttl: number = 5 * 60 * 1000) => {
-		const cache = await caches.open("api-cache");
-		const request = new Request(url);
-
-		const response = new Response(JSON.stringify(data), {
-			headers: {
-				"content-type": "application/json",
-				"cache-control": `max-age=${ttl}`,
-				date: new Date().toISOString(),
-			},
-		});
-
-		await cache.put(request, response);
-	},
-};
-
-// React cache utilities
-export const ReactCache = {
-	// Cache hook for API calls
-	useAPICache: <T>(
-		url: string,
-		fetcher: () => Promise<T>,
-		ttl: number = 5 * 60 * 1000
-	) => {
-		const [data, setData] = React.useState<T | null>(null);
-		const [loading, setLoading] = React.useState(true);
-		const [error, setError] = React.useState<Error | null>(null);
-
-		React.useEffect(() => {
-			const fetchData = async () => {
-				try {
-					// Try to get cached response
-					const cachedResponse = await APICache.getCachedResponse(url);
-
-					if (cachedResponse) {
-						const cachedData = await cachedResponse.json();
-						setData(cachedData);
-						setLoading(false);
-						return;
-					}
-
-					// Fetch from network
-					const result = await fetcher();
-					setData(result);
-
-					// Cache the response
-					await APICache.cacheWithTTL(url, result, ttl);
-
-					setLoading(false);
-				} catch (err) {
-					setError(err as Error);
-					setLoading(false);
-				}
-			};
-
-			fetchData();
-		}, [url, ttl]);
-
-		return { data, loading, error };
-	},
-
-	// Cache hook for expensive computations
-	useComputationCache: <T>(key: string, computation: () => T, deps: any[]) => {
-		return React.useMemo(() => {
-			const cache = MemoryCache.createTTLCache<string, T>();
-			const cachedResult = cache.get(key);
-
-			if (cachedResult !== undefined) {
-				return cachedResult;
-			}
-
-			const result = computation();
-			cache.set(key, result);
-			return result;
-		}, deps);
-	},
-
-	// Cache hook for search results
-	useSearchCache: <T>(
-		searchTerm: string,
-		items: T[],
-		searchFn: (term: string, items: T[]) => T[]
-	) => {
-		return React.useMemo(() => {
-			const cache = MemoryCache.createTTLCache<string, T[]>();
-			const cacheKey = `search-${searchTerm}-${items.length}`;
-
-			const cachedResult = cache.get(cacheKey);
-			if (cachedResult !== undefined) {
-				return cachedResult;
-			}
-
-			const result = searchFn(searchTerm, items);
-			cache.set(cacheKey, result);
-			return result;
-		}, [searchTerm, items]);
-	},
-};
-
-// Cache monitoring utilities
-export const CacheMonitoring = {
-	// Monitor cache hit rate
-	monitorCacheHitRate: (cacheName: string) => {
-		let hits = 0;
-		let misses = 0;
-
-		return {
-			hit: () => {
-				hits++;
-				console.log(
-					`Cache ${cacheName} hit rate: ${(
-						(hits / (hits + misses)) *
-						100
-					).toFixed(2)}%`
-				);
-			},
-			miss: () => {
-				misses++;
-				console.log(
-					`Cache ${cacheName} hit rate: ${(
-						(hits / (hits + misses)) *
-						100
-					).toFixed(2)}%`
-				);
-			},
-			getStats: () => ({
-				hits,
-				misses,
-				hitRate: hits / (hits + misses),
-			}),
-		};
-	},
-
-	// Monitor cache performance
-	monitorCachePerformance: (cacheName: string) => {
-		return {
-			startTimer: () => {
-				return performance.now();
-			},
-			endTimer: (startTime: number, operation: string) => {
-				const endTime = performance.now();
-				const duration = endTime - startTime;
-				console.log(
-					`Cache ${cacheName} ${operation} time: ${duration.toFixed(2)}ms`
-				);
-				return duration;
-			},
-		};
-	},
+export default {
+  useCachedComputation,
+  useCachedApiCall,
+  useCachedSearch,
+  useCachedFilter,
+  useCachedSort,
+  useCachedStats,
+  useCachedGroup,
+  useCachedPagination,
+  useCachedWithInvalidation,
+  useCachedMultiple,
+  useCachedOptimistic,
+  cacheManagement,
 };

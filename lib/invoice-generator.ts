@@ -1,4 +1,5 @@
 import { getCurrentUser } from "./auth";
+import { Transaction, Project, Client, CompanySettings } from './types';
 
 export interface InvoiceData {
 	companyName: string;
@@ -261,10 +262,10 @@ export class InvoiceGenerator {
 	}
 
 	static generateInvoiceFromTransaction(
-		transaction: any,
-		project: any,
-		client: any,
-		companySettings: any
+		transaction: Transaction,
+		project: Project,
+		client: Client,
+		companySettings: CompanySettings
 	): string {
 		const invoiceData: InvoiceData = {
 			companyName: companySettings.name || "الركن الجديد للاستشارات الهندسية",

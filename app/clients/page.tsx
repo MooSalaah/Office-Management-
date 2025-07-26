@@ -45,6 +45,7 @@ import { DeleteDialog } from "@/components/ui/delete-dialog"
 import { useRealtimeUpdatesByType } from "@/lib/realtime-updates"
 import { useRouter } from "next/navigation"
 import { toast } from "@/components/ui/use-toast"
+import { logger } from "@/lib/logger"
 
 export default function ClientsPage() {
   return (
@@ -119,22 +120,20 @@ function ClientsPageContent() {
       if (handledClientUpdateIdsRef.current.has(updateId)) return;
       handledClientUpdateIdsRef.current.add(updateId);
       
-      console.log('=== CLIENT UPDATE RECEIVED ===');
-      console.log('Client update:', lastUpdate);
-      console.log('Current clients count:', state.clients.length);
+      logger.debug('=== CLIENT UPDATE RECEIVED ===', { lastUpdate, clientsCount: state.clients.length }, 'CLIENTS');
       
       if (lastUpdate.action === 'create') {
         const exists = state.clients.some(c => c.id === lastUpdate.client.id);
-        console.log('Client exists in state:', exists);
+        logger.debug('Client exists in state', { exists, clientId: lastUpdate.client.id }, 'CLIENTS');
         if (!exists) {
-          console.log('Adding client to state...');
+          logger.debug('Adding client to state', { clientId: lastUpdate.client.id }, 'CLIENTS');
           dispatch({ type: "ADD_CLIENT", payload: lastUpdate.client });
-          console.log('Client added to state successfully');
+          logger.debug('Client added to state successfully', { clientId: lastUpdate.client.id }, 'CLIENTS');
         }
       } else if (lastUpdate.action === 'update') {
-        console.log('Updating client in state...');
+        logger.debug('Updating client in state', { clientId: lastUpdate.client.id }, 'CLIENTS');
         dispatch({ type: "UPDATE_CLIENT", payload: lastUpdate.client });
-        console.log('Client updated in state successfully');
+        logger.debug('Client updated in state successfully', { clientId: lastUpdate.client.id }, 'CLIENTS');
         // تحديث جميع المشاريع المرتبطة بهذا العميل
         const updatedProjects = state.projects.map((p) =>
           p.clientId === lastUpdate.client.id ? { ...p, client: lastUpdate.client.name } : p
@@ -142,11 +141,11 @@ function ClientsPageContent() {
         updatedProjects.forEach((project) => {
           dispatch({ type: "UPDATE_PROJECT", payload: project });
         });
-        console.log('Updated all related projects with new client name');
+        logger.debug('Updated all related projects with new client name', { clientId: lastUpdate.client.id }, 'CLIENTS');
       } else if (lastUpdate.action === 'delete') {
-        console.log('Deleting client from state...');
+        logger.debug('Deleting client from state', { clientId: lastUpdate.client.id }, 'CLIENTS');
         dispatch({ type: "DELETE_CLIENT", payload: lastUpdate.client.id });
-        console.log('Client deleted from state successfully');
+        logger.debug('Client deleted from state successfully', { clientId: lastUpdate.client.id }, 'CLIENTS');
       }
       
       if (lastUpdate.userId && lastUpdate.userId !== currentUser?.id && lastUpdate.userName) {
@@ -242,7 +241,7 @@ function ClientsPageContent() {
       }
 
       const result = await response.json();
-      console.log('Client saved to database:', result);
+      logger.info('Client saved to database', { result }, 'CLIENTS');
 
       // Update local state
       dispatch({ type: "ADD_CLIENT", payload: newClient })

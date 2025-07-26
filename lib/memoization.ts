@@ -3,13 +3,13 @@ import React, { useMemo, useCallback, memo } from "react";
 // Memoization utilities for performance optimization
 
 // Memoized hooks
-export const useMemoizedValue = <T>(value: T, deps: any[]): T => {
+export const useMemoizedValue = <T>(value: T, deps: unknown[]): T => {
 	return useMemo(() => value, deps);
 };
 
-export const useMemoizedCallback = <T extends (...args: any[]) => any>(
+export const useMemoizedCallback = <T extends (...args: unknown[]) => unknown>(
 	callback: T,
-	deps: any[]
+	deps: unknown[]
 ): T => {
 	return useCallback(callback, deps);
 };
@@ -17,7 +17,7 @@ export const useMemoizedCallback = <T extends (...args: any[]) => any>(
 // Memoized calculations
 export const useMemoizedCalculation = <T>(
 	calculation: () => T,
-	deps: any[]
+	deps: unknown[]
 ): T => {
 	return useMemo(calculation, deps);
 };
@@ -26,7 +26,7 @@ export const useMemoizedCalculation = <T>(
 export const useMemoizedFilter = <T>(
 	items: T[],
 	filterFn: (item: T) => boolean,
-	deps: any[]
+	deps: unknown[]
 ): T[] => {
 	return useMemo(() => items.filter(filterFn), [items, ...deps]);
 };
@@ -35,7 +35,7 @@ export const useMemoizedFilter = <T>(
 export const useMemoizedSort = <T>(
 	items: T[],
 	sortFn: (a: T, b: T) => number,
-	deps: any[]
+	deps: unknown[]
 ): T[] => {
 	return useMemo(() => [...items].sort(sortFn), [items, ...deps]);
 };
@@ -44,7 +44,7 @@ export const useMemoizedSort = <T>(
 export const useMemoizedMap = <T, U>(
 	items: T[],
 	mapFn: (item: T) => U,
-	deps: any[]
+	deps: unknown[]
 ): U[] => {
 	return useMemo(() => items.map(mapFn), [items, ...deps]);
 };
@@ -54,7 +54,7 @@ export const useMemoizedReduce = <T, U>(
 	items: T[],
 	reduceFn: (acc: U, item: T) => U,
 	initialValue: U,
-	deps: any[]
+	deps: unknown[]
 ): U => {
 	return useMemo(() => items.reduce(reduceFn, initialValue), [items, ...deps]);
 };
@@ -63,7 +63,7 @@ export const useMemoizedReduce = <T, U>(
 export const useMemoizedGroup = <T>(
 	items: T[],
 	groupBy: (item: T) => string,
-	deps: any[]
+	deps: unknown[]
 ): Record<string, T[]> => {
 	return useMemo(() => {
 		const groups: Record<string, T[]> = {};
@@ -79,11 +79,11 @@ export const useMemoizedGroup = <T>(
 };
 
 // Memoized statistics
-export const useMemoizedStats = <T>(
+export const useMemoizedStats = <T, R>(
 	items: T[],
-	statsFn: (items: T[]) => any,
-	deps: any[]
-): any => {
+	statsFn: (items: T[]) => R,
+	deps: unknown[]
+): R => {
 	return useMemo(() => statsFn(items), [items, ...deps]);
 };
 
@@ -92,7 +92,7 @@ export const useMemoizedSearch = <T>(
 	items: T[],
 	searchTerm: string,
 	searchFields: (keyof T)[],
-	deps: any[]
+	deps: unknown[]
 ): T[] => {
 	return useMemo(() => {
 		if (!searchTerm.trim()) return items;
@@ -115,7 +115,7 @@ export const useMemoizedPagination = <T>(
 	items: T[],
 	page: number,
 	pageSize: number,
-	deps: any[]
+	deps: unknown[]
 ): { items: T[]; totalPages: number; totalItems: number } => {
 	return useMemo(() => {
 		const startIndex = (page - 1) * pageSize;
@@ -134,7 +134,7 @@ export const useMemoizedPagination = <T>(
 // Memoized formatters
 export const useMemoizedFormatter = <T>(
 	formatter: (value: T) => string,
-	deps: any[]
+	deps: unknown[]
 ): ((value: T) => string) => {
 	return useCallback(formatter, deps);
 };
@@ -142,7 +142,7 @@ export const useMemoizedFormatter = <T>(
 // Memoized validators
 export const useMemoizedValidator = <T>(
 	validator: (value: T) => boolean | string,
-	deps: any[]
+	deps: unknown[]
 ): ((value: T) => boolean | string) => {
 	return useCallback(validator, deps);
 };
@@ -150,7 +150,7 @@ export const useMemoizedValidator = <T>(
 // Memoized event handlers
 export const useMemoizedEventHandler = <T extends Event>(
 	handler: (event: T) => void,
-	deps: any[]
+	deps: unknown[]
 ): ((event: T) => void) => {
 	return useCallback(handler, deps);
 };
@@ -158,7 +158,7 @@ export const useMemoizedEventHandler = <T extends Event>(
 // Memoized API calls
 export const useMemoizedApiCall = <T>(
 	apiCall: () => Promise<T>,
-	deps: any[]
+	deps: unknown[]
 ): (() => Promise<T>) => {
 	return useCallback(apiCall, deps);
 };
@@ -167,7 +167,7 @@ export const useMemoizedApiCall = <T>(
 export const useMemoizedSelector = <T, U>(
 	selector: (state: T) => U,
 	state: T,
-	deps: any[]
+	deps: unknown[]
 ): U => {
 	return useMemo(() => selector(state), [state, ...deps]);
 };
@@ -176,7 +176,7 @@ export const useMemoizedSelector = <T, U>(
 export const useMemoizedTransformer = <T, U>(
 	transformer: (value: T) => U,
 	value: T,
-	deps: any[]
+	deps: unknown[]
 ): U => {
 	return useMemo(() => transformer(value), [value, ...deps]);
 };
@@ -247,7 +247,7 @@ export function useMemoizedCache<T>(
 export function useMemoizedCacheWithDeps<T>(
 	key: string,
 	fetcher: () => T,
-	deps: any[],
+	deps: unknown[],
 	ttl: number = 5 * 60 * 1000
 ): T {
 	const cacheKey = `${key}-${JSON.stringify(deps)}`;
@@ -269,7 +269,7 @@ export function useMemoizedCacheWithDeps<T>(
 // Memoized expensive operations
 export function useMemoizedExpensiveOperation<T>(
 	operation: () => T,
-	deps: any[],
+	deps: unknown[],
 	ttl: number = 10 * 60 * 1000 // 10 minutes for expensive operations
 ): T {
 	return useMemoizedCacheWithDeps("expensive-operation", operation, deps, ttl);
@@ -409,11 +409,11 @@ export function useMemoizedSortResults<T>(
 }
 
 // Memoized statistics
-export function useMemoizedStatistics<T>(
+export function useMemoizedStatistics<T, R>(
 	items: T[],
-	statsCalculator: (items: T[]) => any,
+	statsCalculator: (items: T[]) => R,
 	ttl: number = 5 * 60 * 1000 // 5 minutes for statistics
-): any {
+): R {
 	const cacheKey = `stats-${items.length}-${
 		items.length > 0 ? "items" : "empty"
 	}`;

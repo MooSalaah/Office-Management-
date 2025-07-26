@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from "react";
-import { broadcastUpdate, useRealtime as useSSERealtime } from "./realtime";
+import { broadcastUpdate, useRealtime as useSSERealtime, RealtimeDataType, RealtimeUpdate } from "./realtime";
+import { Project, Task, Client, Transaction, Notification, User, AttendanceRecord } from './types';
 
 // نظام التحديثات الحية باستخدام SSE (Server-Sent Events)
 export class RealtimeUpdates {
 	private static instance: RealtimeUpdates;
-	private listeners: Map<string, Set<(data: any) => void>> = new Map();
+	private listeners: Map<string, Set<(data: RealtimeDataType) => void>> = new Map();
 
 	static getInstance(): RealtimeUpdates {
 		if (!RealtimeUpdates.instance) {
@@ -18,7 +19,7 @@ export class RealtimeUpdates {
 	}
 
 	// إرسال تحديث لجميع المستخدمين عبر SSE
-	async broadcastUpdate(type: string, data: any) {
+	async broadcastUpdate(type: string, data: RealtimeDataType) {
 		try {
 			await broadcastUpdate({
 				type: type as any,
@@ -37,7 +38,7 @@ export class RealtimeUpdates {
 	}
 
 	// إضافة مستمع للتحديثات
-	subscribe(type: string, callback: (data: any) => void) {
+	subscribe(type: string, callback: (data: RealtimeDataType) => void) {
 		if (!this.listeners.has(type)) {
 			this.listeners.set(type, new Set());
 		}
@@ -67,7 +68,7 @@ export class RealtimeUpdates {
 		// استخدام SSE من realtime.ts
 		const { realtimeManager } = require("./realtime");
 		if (realtimeManager) {
-			realtimeManager.subscribe(type, (update: any) => {
+			realtimeManager.subscribe(type, (update: RealtimeUpdate) => {
 				// إرسال التحديث لجميع المستمعين المحليين
 				this.notifyListeners(type, update.data);
 			});
@@ -75,7 +76,7 @@ export class RealtimeUpdates {
 	}
 
 	// إشعار المستمعين
-	private notifyListeners(type: string, data: any) {
+	private notifyListeners(type: string, data: RealtimeDataType) {
 		const typeListeners = this.listeners.get(type);
 		if (typeListeners) {
 			typeListeners.forEach((callback) => {
@@ -121,37 +122,37 @@ export class RealtimeUpdates {
 	}
 
 	// إرسال إشعار فوري
-	sendNotification(notification: any) {
+	sendNotification(notification: Notification) {
 		this.broadcastUpdate("notification", notification);
 	}
 
 	// إرسال تحديث مهمة
-	sendTaskUpdate(task: any) {
+	sendTaskUpdate(task: Task) {
 		this.broadcastUpdate("task", task);
 	}
 
 	// إرسال تحديث مشروع
-	sendProjectUpdate(project: any) {
+	sendProjectUpdate(project: Project) {
 		this.broadcastUpdate("project", project);
 	}
 
 	// إرسال تحديث معاملة مالية
-	sendTransactionUpdate(transaction: any) {
+	sendTransactionUpdate(transaction: Transaction) {
 		this.broadcastUpdate("transaction", transaction);
 	}
 
 	// إرسال تحديث مستخدم
-	sendUserUpdate(user: any) {
+	sendUserUpdate(user: User) {
 		this.broadcastUpdate("user", user);
 	}
 
 	// إرسال تحديث عميل
-	sendClientUpdate(client: any) {
+	sendClientUpdate(client: Client) {
 		this.broadcastUpdate("client", client);
 	}
 
 	// إرسال تحديث حضور
-	sendAttendanceUpdate(attendance: any) {
+	sendAttendanceUpdate(attendance: AttendanceRecord) {
 		this.broadcastUpdate("attendance", attendance);
 	}
 
@@ -184,7 +185,7 @@ export const realtimeUpdates = RealtimeUpdates.getInstance();
 
 // Hook لاستخدام التحديثات الحية
 export function useRealtimeUpdates() {
-	const [updates, setUpdates] = useState<any[]>([]);
+	const [updates, setUpdates] = useState<RealtimeDataType[]>([]);
 
 	useEffect(() => {
 		const unsubscribe = realtimeUpdates.subscribe("*", (data) => {
@@ -199,15 +200,13 @@ export function useRealtimeUpdates() {
 
 // Hook للتحديثات الحية حسب النوع
 export function useRealtimeUpdatesByType(type: string) {
-	const [updates, setUpdates] = useState<any[]>([]);
+	const [updates, setUpdates] = useState<RealtimeDataType[]>([]);
 	const processedUpdatesRef = useRef<Set<string>>(new Set());
 
 	useEffect(() => {
 		const unsubscribe = realtimeUpdates.subscribe(type, (data) => {
 			// منع إضافة نفس التحديث أكثر من مرة
-			const updateId = `${data.type}_${data.data?.id || ""}_${data.timestamp}_${
-				data.userId
-			}`;
+			const updateId = `${type}_${data.id || ""}_${Date.now()}`;
 			if (processedUpdatesRef.current.has(updateId)) return;
 			processedUpdatesRef.current.add(updateId);
 

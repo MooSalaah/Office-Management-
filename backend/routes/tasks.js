@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Task = require('../models/Task');
 const jwt = require('jsonwebtoken');
+const logger = require('../logger');
 require('dotenv').config();
 const fetch = require('node-fetch');
 
@@ -56,9 +57,9 @@ router.post('/', async (req, res) => {
           timestamp: Date.now()
         })
       });
-      console.log('Broadcast response:', await broadcastResponse.json());
+      logger.info('Broadcast response', { response: await broadcastResponse.json() }, 'TASKS');
     } catch (broadcastError) {
-      console.error('Broadcast error:', broadcastError);
+      logger.error('Broadcast error', { error: broadcastError.message }, 'TASKS');
     }
     res.status(201).json({ success: true, data: newTask });
   } catch (err) {
@@ -88,9 +89,9 @@ router.put('/:id', async (req, res) => {
           timestamp: Date.now()
         })
       });
-      console.log('Broadcast response:', await broadcastResponse.json());
+      logger.info('Broadcast response', { response: await broadcastResponse.json() }, 'TASKS');
     } catch (broadcastError) {
-      console.error('Broadcast error:', broadcastError);
+      logger.error('Broadcast error', { error: broadcastError.message }, 'TASKS');
     }
     res.json({ success: true, data: updatedTask });
   } catch (err) {

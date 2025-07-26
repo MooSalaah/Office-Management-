@@ -30,6 +30,7 @@ import { PermissionGuard } from "@/components/ui/permission-guard"
 import { DeleteDialog } from "@/components/ui/delete-dialog"
 import { useTaskSearch, useStatusFilter, usePriorityFilter, useCachedCallback } from "@/lib/performance"
 import { useToast } from "@/components/ui/use-toast"
+import { logger } from "@/lib/logger"
 
 type TaskStatus = "todo" | "in-progress" | "completed"
 
@@ -63,29 +64,24 @@ function TasksPageContent() {
       handledTaskUpdateIdsRef.current.add(updateId);
       
       // Debug logs
-      console.log('=== TASK UPDATE RECEIVED ===');
-      console.log('Realtime task update:', lastUpdate);
-      console.log('Current user:', currentUser);
-      console.log('Current tasks count:', state.tasks.length);
-      console.log('Update action:', lastUpdate.action);
-      console.log('Task data:', lastUpdate.task);
+      logger.debug('=== TASK UPDATE RECEIVED ===', { lastUpdate, currentUser, tasksCount: state.tasks.length }, 'TASKS');
       
       if (lastUpdate.action === 'create') {
         const exists = state.tasks.some(t => t.id === lastUpdate.task.id);
-        console.log('Task exists in state:', exists);
+        logger.debug('Task exists in state', { exists, taskId: lastUpdate.task.id }, 'TASKS');
         if (!exists) {
-          console.log('Adding task to state...');
+          logger.debug('Adding task to state', { taskId: lastUpdate.task.id }, 'TASKS');
           dispatch({ type: "ADD_TASK", payload: lastUpdate.task });
-          console.log('Task added to state successfully');
+          logger.debug('Task added to state successfully', { taskId: lastUpdate.task.id }, 'TASKS');
         }
       } else if (lastUpdate.action === 'update') {
-        console.log('Updating task in state...');
+        logger.debug('Updating task in state', { taskId: lastUpdate.task.id }, 'TASKS');
         dispatch({ type: "UPDATE_TASK", payload: lastUpdate.task });
-        console.log('Task updated in state successfully');
+        logger.debug('Task updated in state successfully', { taskId: lastUpdate.task.id }, 'TASKS');
       } else if (lastUpdate.action === 'delete') {
-        console.log('Deleting task from state...');
+        logger.debug('Deleting task from state', { taskId: lastUpdate.task.id }, 'TASKS');
         dispatch({ type: "DELETE_TASK", payload: lastUpdate.task.id });
-        console.log('Task deleted from state successfully');
+        logger.debug('Task deleted from state successfully', { taskId: lastUpdate.task.id }, 'TASKS');
       }
       
       if (lastUpdate.userId && lastUpdate.userId !== currentUser?.id && lastUpdate.userName) {
@@ -236,7 +232,7 @@ function TasksPageContent() {
       }
 
       const result = await response.json();
-      console.log('Task updated in database:', result);
+      logger.info('Task updated in database', { result }, 'TASKS');
 
       // Update local state
       dispatch({ type: "UPDATE_TASK", payload: updatedTask })
@@ -409,7 +405,7 @@ function TasksPageContent() {
       }
 
       const result = await response.json();
-      console.log('Task deleted from database:', result);
+      logger.info('Task deleted from database', { result }, 'TASKS');
 
       // Update local state
       dispatch({ type: "DELETE_TASK", payload: taskToDelete })
@@ -566,7 +562,7 @@ function TasksPageContent() {
         }
 
         const result = await response.json();
-        console.log('User saved to database:', result);
+        logger.info('User saved to database', { result }, 'TASKS');
 
         // Add to users list
         dispatch({ type: "ADD_USER", payload: newAssignee })
@@ -641,7 +637,7 @@ function TasksPageContent() {
         }
 
         const result = await response.json();
-        console.log('Project saved to database:', result);
+        logger.info('Project saved to database', { result }, 'TASKS');
 
         // Add to projects list
         dispatch({ type: "ADD_PROJECT", payload: newProject })

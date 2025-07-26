@@ -21,7 +21,7 @@ export const FinalOptimization = {
   // Optimize all data operations
   optimizeDataOperations: () => {
     // Optimize search operations
-    const optimizedSearch = React.useCallback((items: any[], searchTerm: string, searchFields: string[]) => {
+    const optimizedSearch = React.useCallback((items: Record<string, unknown>[], searchTerm: string, searchFields: string[]) => {
       if (!searchTerm.trim()) return items
       
       const searchLower = searchTerm.toLowerCase()
@@ -37,7 +37,7 @@ export const FinalOptimization = {
     }, [])
     
     // Optimize filter operations
-    const optimizedFilter = React.useCallback((items: any[], filterValue: string, filterField: string) => {
+    const optimizedFilter = React.useCallback((items: Record<string, unknown>[], filterValue: string, filterField: string) => {
       if (filterValue === 'all') return items
       
       return items.filter(item => {
@@ -47,7 +47,7 @@ export const FinalOptimization = {
     }, [])
     
     // Optimize sort operations
-    const optimizedSort = React.useCallback((items: any[], sortBy: string, sortOrder: 'asc' | 'desc') => {
+    const optimizedSort = React.useCallback((items: Record<string, unknown>[], sortBy: string, sortOrder: 'asc' | 'desc') => {
       if (!sortBy) return items
       
       return [...items].sort((a, b) => {
@@ -96,7 +96,7 @@ export const FinalOptimization = {
     
     // Cached API calls
     const cachedAPI = React.useCallback((url: string, options: RequestInit = {}) => {
-      const cache = new Map<string, { data: any; timestamp: number }>()
+      const cache = new Map<string, { data: unknown; timestamp: number }>()
       const cacheKey = `${url}-${JSON.stringify(options)}`
       
       return new Promise(async (resolve, reject) => {
@@ -126,10 +126,10 @@ export const FinalOptimization = {
   // Optimize all form operations
   optimizeFormOperations: () => {
     // Optimized form validation
-    const optimizedValidation = React.useCallback((data: any, rules: any) => {
+    const optimizedValidation = React.useCallback((data: Record<string, unknown>, rules: Record<string, unknown>) => {
       const errors: Record<string, string> = {}
       
-      Object.entries(rules).forEach(([field, rule]: [string, any]) => {
+              Object.entries(rules).forEach(([field, rule]: [string, unknown]) => {
         const value = data[field]
         
         if (rule.required && !value) {
@@ -153,7 +153,7 @@ export const FinalOptimization = {
     }, [])
     
     // Optimized form submission
-    const optimizedSubmission = React.useCallback(async (data: any, onSubmit: (data: any) => Promise<void>) => {
+    const optimizedSubmission = React.useCallback(async (data: Record<string, unknown>, onSubmit: (data: Record<string, unknown>) => Promise<void>) => {
       try {
         await onSubmit(data)
         return { success: true }

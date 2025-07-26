@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Project = require('../models/Project');
 const jwt = require('jsonwebtoken');
+const logger = require('../logger');
 const fetch = require('node-fetch');
 require('dotenv').config();
 
@@ -59,9 +60,9 @@ router.post('/', async (req, res) => {
           timestamp: Date.now()
         })
       });
-      console.log('Broadcast response:', await broadcastResponse.json());
+      logger.info('Broadcast response', { response: await broadcastResponse.json() }, 'PROJECTS');
     } catch (broadcastError) {
-      console.error('Broadcast error:', broadcastError);
+      logger.error('Broadcast error', { error: broadcastError.message }, 'PROJECTS');
     }
     
     res.status(201).json({ success: true, data: newProject });

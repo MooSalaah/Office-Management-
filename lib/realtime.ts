@@ -1,4 +1,10 @@
 // Real-time updates management
+import { logger } from "./logger";
+
+import { Project, Task, Client, Transaction, Notification, User, AttendanceRecord } from './types';
+
+export type RealtimeDataType = Project | Task | Client | Transaction | Notification | User | AttendanceRecord;
+
 export interface RealtimeUpdate {
 	type:
 		| "project"
@@ -9,7 +15,7 @@ export interface RealtimeUpdate {
 		| "user"
 		| "attendance";
 	action: "create" | "update" | "delete";
-	data: any;
+	data: RealtimeDataType;
 	userId: string;
 	timestamp: number;
 }
@@ -66,7 +72,7 @@ class RealtimeManager {
 			};
 
 			this.eventSource.onopen = () => {
-				console.log("✅ Realtime connection established");
+				logger.info("✅ Realtime connection established", undefined, 'REALTIME');
 				this.isConnected = true;
 				this.reconnectAttempts = 0;
 			};
@@ -85,8 +91,10 @@ class RealtimeManager {
 				this.maxReconnectDelay
 			);
 
-			console.log(
-				`🔄 Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts}) in ${delay}ms...`
+			logger.info(
+				`🔄 Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts}) in ${delay}ms...`,
+				{ reconnectAttempts: this.reconnectAttempts, maxReconnectAttempts: this.maxReconnectAttempts, delay },
+				'REALTIME'
 			);
 
 			setTimeout(() => {
@@ -99,7 +107,7 @@ class RealtimeManager {
 	}
 
 	private fallbackToPolling() {
-		console.log("🔄 Falling back to polling mode");
+		logger.info("🔄 Falling back to polling mode", undefined, 'REALTIME');
 		// Polling is already running as backup
 	}
 
@@ -138,7 +146,7 @@ class RealtimeManager {
 				!this.isConnected &&
 				this.reconnectAttempts < this.maxReconnectAttempts
 			) {
-				console.log("🔍 Connection check: attempting to reconnect...");
+				logger.info("🔍 Connection check: attempting to reconnect...", undefined, 'REALTIME');
 				this.initializeEventSource();
 			}
 		}, 30000);

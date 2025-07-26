@@ -1,6 +1,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const logger = require('./logger');
 require('dotenv').config();
 
 const app = express();
@@ -31,7 +32,7 @@ const connectDB = async () => {
   try {
     const mongoURI = process.env.MONGODB_URI;
     if (!mongoURI) {
-      console.log('⚠️ MONGODB_URI not found, using fallback');
+      logger.warn('⚠️ MONGODB_URI not found, using fallback', undefined, 'DATABASE');
       // Don't exit, just log warning
       return;
     }
@@ -47,23 +48,23 @@ const connectDB = async () => {
       }
     });
 
-    console.log('✅ MongoDB connected successfully');
+    logger.info('✅ MongoDB connected successfully', undefined, 'DATABASE');
     
     // Monitor connection events
     mongoose.connection.on('error', (err) => {
-      console.error('❌ MongoDB connection error:', err);
+      logger.error('❌ MongoDB connection error', { error: err.message }, 'DATABASE');
     });
 
     mongoose.connection.on('disconnected', () => {
-      console.log('⚠️ MongoDB disconnected');
+      logger.warn('⚠️ MongoDB disconnected', undefined, 'DATABASE');
     });
 
     mongoose.connection.on('reconnected', () => {
-      console.log('✅ MongoDB reconnected');
+      logger.info('✅ MongoDB reconnected', undefined, 'DATABASE');
     });
 
   } catch (error) {
-    console.error('❌ MongoDB connection failed:', error);
+    logger.error('❌ MongoDB connection failed', { error: error.message }, 'DATABASE');
     // Don't exit, just log error
   }
 };
@@ -99,7 +100,7 @@ app.use('/api/roles', require('./routes/roles'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error('Error:', err);
+  logger.error('Error in middleware', { error: err.message, stack: err.stack }, 'MIDDLEWARE');
   res.status(500).json({
     success: false,
     error: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message
@@ -116,10 +117,10 @@ app.use('*', (req, res) => {
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
-  console.log('SIGTERM received, shutting down gracefully');
+  logger.info('SIGTERM received, shutting down gracefully', undefined, 'SERVER');
   if (mongoose.connection.readyState === 1) {
     mongoose.connection.close(() => {
-      console.log('MongoDB connection closed');
+      logger.info('MongoDB connection closed', undefined, 'SERVER');
       process.exit(0);
     });
   } else {
@@ -128,10 +129,10 @@ process.on('SIGTERM', () => {
 });
 
 process.on('SIGINT', () => {
-  console.log('SIGINT received, shutting down gracefully');
+  logger.info('SIGINT received, shutting down gracefully', undefined, 'SERVER');
   if (mongoose.connection.readyState === 1) {
     mongoose.connection.close(() => {
-      console.log('MongoDB connection closed');
+      logger.info('MongoDB connection closed', undefined, 'SERVER');
       process.exit(0);
     });
   } else {
@@ -140,7 +141,6 @@ process.on('SIGINT', () => {
 });
 
 app.listen(port, () => {
-  console.log(`🚀 Server running on port ${port}`);
-  console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔗 Health check: http://localhost:${port}/health`);
+  logger.info(`🚀 Server running on port ${port}`, { port, environment: process.env.NODE_ENV || 'development' }, 'SERVER');
+  logger.info(`🔗 Health check: http://localhost:${port}/health`, undefined, 'SERVER');
 }); 
