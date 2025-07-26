@@ -279,6 +279,11 @@ function ProjectsPageContent() {
     const assignedEngineerId = formData.team[0] || "";
     const engineer = users.find(u => u.id === assignedEngineerId)
 
+    // Parse numeric values safely
+    const price = formData.price ? parseFloat(formData.price.toString()) : 0;
+    const downPayment = formData.downPayment ? parseFloat(formData.downPayment.toString()) : 0;
+    const remainingBalance = price - downPayment;
+
     const newProject: Project = {
       id: Date.now().toString(),
       name: formData.name,
@@ -288,9 +293,9 @@ function ProjectsPageContent() {
       status: formData.status,
       team: formData.team,
       startDate: formData.startDate,
-      price: Number.parseFloat(formData.price) || 0,
-      downPayment: Number.parseFloat(formData.downPayment) || 0,
-      remainingBalance: (Number.parseFloat(formData.price) || 0) - (Number.parseFloat(formData.downPayment) || 0),
+      price: price,
+      downPayment: downPayment,
+      remainingBalance: remainingBalance,
       assignedEngineerId,
       assignedEngineerName: engineer?.name || "",
       importance: formData.importance,
@@ -360,6 +365,11 @@ function ProjectsPageContent() {
     const assignedEngineerId = formData.team[0] || "";
     const engineer = users.find(u => u.id === assignedEngineerId)
 
+    // Parse numeric values safely
+    const price = formData.price ? parseFloat(formData.price.toString()) : 0;
+    const downPayment = formData.downPayment ? parseFloat(formData.downPayment.toString()) : 0;
+    const remainingBalance = price - downPayment;
+
     const updatedProject: Project = {
       ...editingProject,
       name: formData.name,
@@ -369,9 +379,9 @@ function ProjectsPageContent() {
       status: formData.status,
       team: formData.team,
       startDate: formData.startDate,
-      price: Number.parseFloat(formData.price) || 0,
-      downPayment: Number.parseFloat(formData.downPayment) || 0,
-      remainingBalance: (Number.parseFloat(formData.price) || 0) - (Number.parseFloat(formData.downPayment) || 0),
+      price: price,
+      downPayment: downPayment,
+      remainingBalance: remainingBalance,
       assignedEngineerId,
       assignedEngineerName: engineer?.name || "",
       importance: formData.importance,
@@ -1268,18 +1278,18 @@ function ProjectsPageContent() {
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {taskTypes.map((type) => {
-                          const isSelected = selectedTasks.some((t) => t.typeId === type.id);
-                          const selectedTask = selectedTasks.find((t) => t.typeId === type.id);
+                          const isSelected = selectedTasks.some((t) => t.typeId === type._id);
+                          const selectedTask = selectedTasks.find((t) => t.typeId === type._id);
                           
                           return (
-                            <div key={type.id} className="flex items-center gap-3 p-3 border rounded bg-background hover:bg-muted/50 transition-colors">
+                            <div key={type._id} className="flex items-center gap-3 p-3 border rounded bg-background hover:bg-muted/50 transition-colors">
                               <Checkbox
                                 checked={isSelected}
                                 onCheckedChange={(checked) => {
                                   if (checked) {
-                                    setSelectedTasks((prev) => [...prev, { typeId: type.id, assigneeId: '' }]);
+                                    setSelectedTasks((prev) => [...prev, { typeId: type._id, assigneeId: '' }]);
                                   } else {
-                                    setSelectedTasks((prev) => prev.filter((t) => t.typeId !== type.id));
+                                    setSelectedTasks((prev) => prev.filter((t) => t.typeId !== type._id));
                                   }
                                 }}
                               />
@@ -1290,7 +1300,7 @@ function ProjectsPageContent() {
                                   onValueChange={(value) => {
                                     setSelectedTasks((prev) => 
                                       prev.map((t) => 
-                                        t.typeId === type.id ? { ...t, assigneeId: value } : t
+                                        t.typeId === type._id ? { ...t, assigneeId: value } : t
                                       )
                                     );
                                   }}
