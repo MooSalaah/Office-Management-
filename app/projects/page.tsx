@@ -435,6 +435,19 @@ function ProjectsPageContent() {
           triggeredBy: currentUser?.id || "",
           isRead: false,
         })
+        
+        // إرسال تحديث فوري للمهندس الجديد
+        if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
+          (window as any).realtimeUpdates.broadcastUpdate('notification', {
+            userId: engineer.id,
+            title: "تم تعيين مشروع لك",
+            message: `تم تعيين مشروع "${formData.name}" لك`,
+            type: "project",
+            actionUrl: `/projects/${updatedProject.id}`,
+            triggeredBy: currentUser?.id || "",
+            isRead: false,
+          });
+        }
       }
     } catch (error) {
       console.error('Error updating project:', error);

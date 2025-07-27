@@ -396,6 +396,31 @@ function TasksPageContent() {
       if (data.success && data.data) {
         dispatch({ type: "ADD_TASK", payload: data.data });
         
+        // ربط المهمة بالمشروع تلقائياً إذا كانت مرتبطة بمشروع
+        if (data.data.projectId) {
+          const project = projects.find(p => p.id === data.data.projectId);
+          if (project) {
+            // تحديث المشروع لإضافة المهمة الجديدة
+            const updatedProject = {
+              ...project,
+              tasks: [...(project.tasks || []), data.data.id],
+              updatedAt: new Date().toISOString()
+            };
+            dispatch({ type: "UPDATE_PROJECT", payload: updatedProject });
+            
+            // حفظ تحديث المشروع في قاعدة البيانات
+            try {
+              await fetch(`/api/projects/${project.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updatedProject),
+              });
+            } catch (error) {
+              console.error('Error updating project with new task:', error);
+            }
+          }
+        }
+        
         // إرسال إشعار للمسؤول عن المهمة
         if (data.data.assigneeId && data.data.assigneeId !== currentUser?.id) {
           addNotification({
@@ -407,6 +432,19 @@ function TasksPageContent() {
             triggeredBy: currentUser?.id || "",
             isRead: false,
           });
+          
+          // إرسال تحديث فوري للمسؤول الجديد
+          if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
+            (window as any).realtimeUpdates.broadcastUpdate('notification', {
+              userId: data.data.assigneeId,
+              title: "مهمة جديدة مُعيّنة لك",
+              message: `تم تعيين مهمة "${data.data.title}" لك بواسطة ${currentUser?.name}`,
+              type: "task",
+              actionUrl: `/tasks?highlight=${data.data.id}`,
+              triggeredBy: currentUser?.id || "",
+              isRead: false,
+            });
+          }
         }
         
         // إرسال إشعار للمديرين عند إنشاء مهمة جديدة
