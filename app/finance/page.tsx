@@ -183,21 +183,21 @@ function FinancePageContent() {
   const [transactionToDelete, setTransactionToDelete] = useState<string | null>(null)
   const [deleteError, setDeleteError] = useState("")
 
-  // استبدل جلب المعاملات من state بجلبها من backend
-  useEffect(() => {
-    async function fetchTransactions() {
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/transactions`);
-        const data = await res.json();
-        if (data.success) {
-          dispatch({ type: "LOAD_TRANSACTIONS", payload: data.data });
-        }
-      } catch (err) {
-        // يمكن عرض رسالة خطأ هنا
-      }
-    }
-    fetchTransactions();
-  }, [dispatch]);
+  // البيانات يتم تحميلها من AppContext، لا نحتاج لجلبها مرة أخرى
+  // useEffect(() => {
+  //   async function fetchTransactions() {
+  //     try {
+  //       const res = await fetch(`${API_BASE_URL}/api/transactions`);
+  //       const data = await res.json();
+  //       if (data.success) {
+  //         dispatch({ type: "LOAD_TRANSACTIONS", payload: data.data });
+  //       }
+  //     } catch (err) {
+  //       // يمكن عرض رسالة خطأ هنا
+  //     }
+  //   }
+  //   fetchTransactions();
+  // }, [dispatch]);
 
   // جلب المدفوعات القادمة من backend
   useEffect(() => {

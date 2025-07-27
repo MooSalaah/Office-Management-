@@ -139,3 +139,21 @@ export class RealtimeUpdates {
 if (typeof window !== 'undefined') {
   (window as any).realtimeUpdates = new RealtimeUpdates();
 }
+
+// Export broadcastUpdate function
+export const broadcastUpdate = async (data: any) => {
+  if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
+    const realtimeUpdates = (window as any).realtimeUpdates as RealtimeUpdates;
+    realtimeUpdates.sendUpdate(data.type, data.action, data.data);
+  }
+};
+
+// Export types
+export type RealtimeDataType = any;
+export type RealtimeUpdate = any;
+
+// Export hook
+export const useRealtime = (event: string, callback: Function) => {
+  // Implementation for useRealtime hook
+  return { realtimeManager: (window as any).realtimeUpdates };
+};

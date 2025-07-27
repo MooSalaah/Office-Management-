@@ -21,7 +21,10 @@ export class RealtimeUpdates {
 	// إرسال تحديث لجميع المستخدمين عبر SSE
 	async broadcastUpdate(type: string, data: RealtimeDataType) {
 		try {
-			await broadcastUpdate({
+			// استيراد دالة broadcastUpdate من realtime.ts
+			const { broadcastUpdate: broadcastUpdateFn } = await import('./realtime');
+			
+			await broadcastUpdateFn({
 				type: type as any,
 				action: data.action || "update",
 				data: data,
@@ -31,7 +34,7 @@ export class RealtimeUpdates {
 			// إرسال التحديث للمستمعين المحليين أيضاً
 			this.notifyListeners(type, data);
 		} catch (error) {
-			console.error("Failed to broadcast update:", error);
+			console.error("ERROR [NOTIFICATIONS] Error broadcasting notification update | Data:", { error });
 			// Fallback: إرسال للمستمعين المحليين فقط
 			this.notifyListeners(type, data);
 		}
