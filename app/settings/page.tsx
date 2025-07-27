@@ -100,14 +100,7 @@ function SettingsPageContent() {
   })
 
   // Notification settings
-  const [notificationSettings, setNotificationSettings] = useState({
-    emailNotifications: true,
-    taskNotifications: true,
-    projectNotifications: true,
-    financeNotifications: false,
-    systemNotifications: true,
-    browserNotifications: true,
-  })
+  // تم إزالة إعدادات الإشعارات من صفحة المديرين
 
   // User form data
   const [userFormData, setUserFormData] = useState({
@@ -429,10 +422,12 @@ function SettingsPageContent() {
       
       try {
         // Save to backend database
-        const response = await fetch(`/api/users?id=${currentUser.id}`, {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
+        const response = await fetch(`${apiUrl}/api/users?id=${currentUser.id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
           },
           body: JSON.stringify(updatedUser),
         });
@@ -463,15 +458,18 @@ function SettingsPageContent() {
         
         // إرسال إشعار للمدير عند تغيير البريد الإلكتروني أو كلمة المرور
         if (currentUser.role !== "admin" && (profileData.email !== currentUser.email || profileData.newPassword)) {
-          addNotification({
-            userId: "1", // Admin user ID
-            title: "تحديث بيانات المستخدم",
-            message: `تم تحديث بيانات المستخدم "${currentUser.name}" - ${profileData.email !== currentUser.email ? 'البريد الإلكتروني' : ''}${profileData.email !== currentUser.email && profileData.newPassword ? ' و' : ''}${profileData.newPassword ? 'كلمة المرور' : ''}`,
-            type: "system",
-            actionUrl: `/settings`,
-            triggeredBy: currentUser?.id || "",
-            isRead: false,
-          })
+          const adminUsers = users.filter(user => user.role === 'admin');
+          for (const adminUser of adminUsers) {
+            addNotification({
+              userId: adminUser.id,
+              title: "تحديث بيانات المستخدم",
+              message: `تم تحديث بيانات المستخدم "${currentUser.name}" - ${profileData.email !== currentUser.email ? 'البريد الإلكتروني' : ''}${profileData.email !== currentUser.email && profileData.newPassword ? ' و' : ''}${profileData.newPassword ? 'كلمة المرور' : ''}`,
+              type: "system",
+              actionUrl: `/settings`,
+              triggeredBy: currentUser?.id || "",
+              isRead: false,
+            })
+          }
         }
       } catch (error) {
         console.error('Error updating profile:', error);
@@ -500,26 +498,7 @@ function SettingsPageContent() {
     fetchCompanySettings();
   }, [dispatch]);
 
-  // جلب إعدادات المستخدم من backend مع تحديث فوري
-  useEffect(() => {
-    async function fetchUserSettings() {
-      if (!currentUser?.id) return;
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/userSettings/${currentUser.id}`);
-        const data = await res.json();
-        if (data.success && data.data) {
-          setNotificationSettings(data.data.notificationSettings || notificationSettings);
-          dispatch({ type: "UPDATE_USER_SETTINGS", payload: data.data });
-          
-          // حفظ في localStorage للتحديثات الفورية
-          localStorage.setItem(`userSettings_${currentUser.id}`, JSON.stringify(data.data));
-        }
-      } catch (err) {
-        console.error('Error fetching user settings:', err);
-      }
-    }
-    fetchUserSettings();
-  }, [currentUser, dispatch]);
+  // تم إزالة إعدادات الإشعارات من صفحة المديرين
 
   // جلب الأدوار من backend مع تحديث فوري
   useEffect(() => {
@@ -576,9 +555,13 @@ function SettingsPageContent() {
   // حفظ إعدادات المكتب في backend مع تحديث فوري
   const handleOfficeUpdate = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/companySettings`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
+      const response = await fetch(`${apiUrl}/api/companySettings`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+        },
         body: JSON.stringify(officeData),
       });
       if (!response.ok) throw new Error('Failed to save company settings to database');
@@ -594,55 +577,28 @@ function SettingsPageContent() {
       // إرسال تحديث فوري
       realtimeUpdates.broadcastUpdate('companySettings', officeData);
       
-              setAlert(null);
-        showSuccessToast("تم تحديث بيانات المكتب بنجاح", "تم حفظ البيانات في قاعدة البيانات");
-      addNotification({
-        userId: "1",
-        title: "تحديث بيانات المكتب",
-        message: "تم تحديث معلومات المكتب بنجاح",
-        type: "system",
-        actionUrl: `/settings`,
-        triggeredBy: currentUser?.id || "",
-        isRead: false,
-      });
+      setAlert(null);
+      showSuccessToast("تم تحديث بيانات المكتب بنجاح", "تم حفظ البيانات في قاعدة البيانات");
+      
+      // إرسال إشعار لجميع المديرين
+      const adminUsers = users.filter(user => user.role === 'admin');
+      for (const adminUser of adminUsers) {
+        addNotification({
+          userId: adminUser.id,
+          title: "تحديث بيانات المكتب",
+          message: "تم تحديث معلومات المكتب بنجاح",
+          type: "system",
+          actionUrl: `/settings`,
+          triggeredBy: currentUser?.id || "",
+          isRead: false,
+        });
+      }
     } catch (error) {
       setAlert({ type: "error", message: "حدث خطأ أثناء حفظ إعدادات المكتب في قاعدة البيانات" });
     }
   };
 
-  // حفظ إعدادات الإشعارات للمستخدم في backend مع تحديث فوري
-  const handleNotificationUpdate = async () => {
-    try {
-      if (notificationSettings.browserNotifications && 'Notification' in window) {
-        Notification.requestPermission().then((permission) => {
-          if (permission !== 'granted') setNotificationSettings(prev => ({ ...prev, browserNotifications: false }));
-        });
-      }
-      const response = await fetch(`${API_BASE_URL}/api/userSettings`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: currentUser?.id, notificationSettings }),
-      });
-      if (!response.ok) throw new Error('Failed to save notification settings to database');
-      const result = await response.json();
-      
-      // تحديث state
-      dispatch({ type: "UPDATE_NOTIFICATION_SETTINGS", payload: notificationSettings });
-      
-      // حفظ في localStorage
-      if (currentUser?.id) {
-        localStorage.setItem(`userSettings_${currentUser.id}`, JSON.stringify({
-          userId: currentUser.id,
-          notificationSettings
-        }));
-      }
-      
-      setAlert({ type: "success", message: "تم تحديث إعدادات الإشعارات بنجاح" });
-      showSuccessToast("تم تحديث إعدادات الإشعارات بنجاح", "تم حفظ البيانات في قاعدة البيانات");
-    } catch (error) {
-      setAlert({ type: "error", message: "حدث خطأ أثناء حفظ إعدادات الإشعارات في قاعدة البيانات" });
-    }
-  };
+  // تم إزالة إعدادات الإشعارات من صفحة المديرين
 
   const [userFormErrors, setUserFormErrors] = useState({
     name: "",
@@ -771,7 +727,7 @@ function SettingsPageContent() {
       ...editingUser,
       name: userFormData.name,
       email: userFormData.email,
-      password: userFormData.password || editingUser.password,
+      password: userFormData.password || editingUser.password || "",
       phone: userFormData.phone,
       role: userFormData.role,
       isActive: userFormData.isActive,
@@ -781,9 +737,13 @@ function SettingsPageContent() {
     }
     try {
       // Save to backend database
-      const response = await fetch(`/api/users?id=${editingUser.id}`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
+      const response = await fetch(`${apiUrl}/api/users?id=${editingUser.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+        },
         body: JSON.stringify(updatedUser),
       });
       const result = await response.json();
@@ -880,9 +840,13 @@ function SettingsPageContent() {
       }
 
       // حفظ في قاعدة البيانات
-      const response = await fetch('/api/roles', {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
+      const response = await fetch(`${apiUrl}/api/roles`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+        },
         body: JSON.stringify(newJobRole),
       });
 
@@ -1096,9 +1060,13 @@ function SettingsPageContent() {
     }
 
     try {
-      const response = await fetch('/api/taskTypes', {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
+      const response = await fetch(`${apiUrl}/api/taskTypes`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+        },
         body: JSON.stringify(taskTypeFormData),
       });
 
@@ -1783,100 +1751,7 @@ function SettingsPageContent() {
         )}
 
         {/* Notification Settings - Only for admin */}
-        {isAdmin && (
-      <Card className="bg-card text-card-foreground border border-border">
-        <CardHeader>
-          <CardTitle className="flex items-center text-foreground"> <Bell className="w-5 h-5 mr-2" /> إعدادات الإشعارات </CardTitle>
-          <CardDescription className="text-muted-foreground">تخصيص إعدادات الإشعارات</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2 rounded-md bg-muted/30">
-              <div>
-                <Label htmlFor="email-notifications">إشعارات البريد الإلكتروني</Label>
-                <p className="text-sm text-muted-foreground">استلام الإشعارات عبر البريد الإلكتروني</p>
-              </div>
-              <Switch
-                id="email-notifications"
-                checked={notificationSettings.emailNotifications}
-                onCheckedChange={(checked) =>
-                  setNotificationSettings((prev) => ({ ...prev, emailNotifications: checked }))
-                }
-              />
-            </div>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2 rounded-md bg-muted/30">
-              <div>
-                <Label htmlFor="task-notifications">إشعارات المهام</Label>
-                <p className="text-sm text-muted-foreground">إشعارات المهام الجديدة والتحديثات</p>
-              </div>
-              <Switch
-                id="task-notifications"
-                checked={notificationSettings.taskNotifications}
-                onCheckedChange={(checked) =>
-                  setNotificationSettings((prev) => ({ ...prev, taskNotifications: checked }))
-                }
-              />
-            </div>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2 rounded-md bg-muted/30">
-              <div>
-                <Label htmlFor="project-notifications">إشعارات المشاريع</Label>
-                <p className="text-sm text-muted-foreground">إشعارات المشاريع والتحديثات</p>
-              </div>
-              <Switch
-                id="project-notifications"
-                checked={notificationSettings.projectNotifications}
-                onCheckedChange={(checked) =>
-                  setNotificationSettings((prev) => ({ ...prev, projectNotifications: checked }))
-                }
-              />
-            </div>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2 rounded-md bg-muted/30">
-              <div>
-                <Label htmlFor="finance-notifications">إشعارات مالية</Label>
-                <p className="text-sm text-muted-foreground">إشعارات المعاملات المالية</p>
-              </div>
-              <Switch
-                id="finance-notifications"
-                checked={notificationSettings.financeNotifications}
-                onCheckedChange={(checked) =>
-                  setNotificationSettings((prev) => ({ ...prev, financeNotifications: checked }))
-                }
-              />
-            </div>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2 rounded-md bg-muted/30">
-              <div>
-                <Label htmlFor="system-notifications">إشعارات النظام</Label>
-                <p className="text-sm text-muted-foreground">إشعارات النظام والتحديثات</p>
-              </div>
-              <Switch
-                id="system-notifications"
-                checked={notificationSettings.systemNotifications}
-                onCheckedChange={(checked) =>
-                  setNotificationSettings((prev) => ({ ...prev, systemNotifications: checked }))
-                }
-              />
-            </div>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2 rounded-md bg-muted/30">
-              <div>
-                <Label htmlFor="browser-notifications">إشعارات المتصفح</Label>
-                <p className="text-sm text-muted-foreground">إشعارات المتصفح عند وجود إشعار جديد</p>
-              </div>
-              <Switch
-                id="browser-notifications"
-                checked={notificationSettings.browserNotifications}
-                onCheckedChange={(checked) =>
-                  setNotificationSettings((prev) => ({ ...prev, browserNotifications: checked }))
-                }
-              />
-            </div>
-            <Button onClick={handleNotificationUpdate} className="w-full">
-              <Save className="w-4 h-4 mr-2" />
-              حفظ الإعدادات
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-        )}
+        {/* تم إزالة إعدادات الإشعارات من صفحة المديرين */}
       </div>
 
       {/* Admin-only sections */}
