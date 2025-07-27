@@ -987,6 +987,52 @@ function FinancePageContent() {
     }
   }
 
+  // تحديث البيانات المالية تلقائياً كل 30 ثانية
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
+        const response = await fetch(`${apiUrl}/api/transactions`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+          }
+        });
+        if (response.ok) {
+          const result = await response.json();
+          if (result && result.success && Array.isArray(result.data)) {
+            // تحديث البيانات المالية فقط إذا كان هناك تغيير
+            const currentTransactions = state.transactions;
+            const newTransactions = result.data;
+            
+            // مقارنة عدد المعاملات
+            if (currentTransactions.length !== newTransactions.length) {
+              dispatch({ type: "LOAD_TRANSACTIONS", payload: newTransactions });
+              console.log('Finance: Transactions updated from Backend API', { 
+                oldCount: currentTransactions.length,
+                newCount: newTransactions.length
+              });
+            } else {
+              // مقارنة آخر معاملة
+              const lastCurrentTransaction = currentTransactions[0];
+              const lastNewTransaction = newTransactions[0];
+              
+              if (lastCurrentTransaction?.id !== lastNewTransaction?.id) {
+                dispatch({ type: "LOAD_TRANSACTIONS", payload: newTransactions });
+                console.log('Finance: New transactions detected, updated from Backend API', { 
+                  count: newTransactions.length
+                });
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Finance: Error updating transactions from Backend API', { error });
+      }
+    }, 30000); // 30 ثانية
+
+    return () => clearInterval(interval);
+  }, [state.transactions.length, dispatch]);
+
   return (
     <div className="max-w-screen-xl mx-auto space-y-6">
       {alert && (

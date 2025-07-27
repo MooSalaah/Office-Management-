@@ -566,6 +566,84 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     fetchNotifications();
   }, []);
 
+  // جلب المهام من الباكند عند بدء التطبيق
+  useEffect(() => {
+    const fetchTasks = async () => {
+      try {
+        const response = await api.tasks.getAll();
+        if (response && response.success && Array.isArray(response.data)) {
+          dispatch({ type: "LOAD_TASKS", payload: response.data });
+        }
+      } catch (error) {
+        logger.error("فشل جلب المهام من الباكند", { error }, 'API');
+        // في حال الفشل، تبقى المهام من localStorage أو mockTasks
+      }
+    };
+    fetchTasks();
+  }, []);
+
+  // جلب البيانات المالية من الباكند عند بدء التطبيق
+  useEffect(() => {
+    const fetchTransactions = async () => {
+      try {
+        dispatch({ type: "SET_LOADING_STATE", payload: { key: 'transactions', value: true } });
+        const response = await api.transactions.getAll();
+        if (response && response.success && Array.isArray(response.data)) {
+          dispatch({ type: "LOAD_TRANSACTIONS", payload: response.data });
+          logger.info('Transactions loaded from Backend API', { 
+            count: response.data.length 
+          }, 'TRANSACTIONS');
+        } else {
+          logger.warn('Invalid transactions response format from Backend API', { response }, 'TRANSACTIONS');
+        }
+      } catch (error) {
+        logger.error('Error fetching transactions from Backend API', { error }, 'TRANSACTIONS');
+      } finally {
+        dispatch({ type: "SET_LOADING_STATE", payload: { key: 'transactions', value: false } });
+      }
+    };
+    
+    fetchTransactions();
+  }, []);
+
+  // تحديث البيانات المالية تلقائياً كل 30 ثانية
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const response = await api.transactions.getAll();
+        if (response && response.success && Array.isArray(response.data)) {
+          // تحديث البيانات المالية فقط إذا كان هناك تغيير
+          const currentTransactions = state.transactions;
+          const newTransactions = response.data;
+          
+          // مقارنة عدد المعاملات
+          if (currentTransactions.length !== newTransactions.length) {
+            dispatch({ type: "LOAD_TRANSACTIONS", payload: newTransactions });
+            logger.info('Transactions updated from Backend API', { 
+              oldCount: currentTransactions.length,
+              newCount: newTransactions.length
+            }, 'TRANSACTIONS');
+          } else {
+            // مقارنة آخر معاملة
+            const lastCurrentTransaction = currentTransactions[0];
+            const lastNewTransaction = newTransactions[0];
+            
+            if (lastCurrentTransaction?.id !== lastNewTransaction?.id) {
+              dispatch({ type: "LOAD_TRANSACTIONS", payload: newTransactions });
+              logger.info('New transactions detected, updated from Backend API', { 
+                count: newTransactions.length
+              }, 'TRANSACTIONS');
+            }
+          }
+        }
+      } catch (error) {
+        logger.error('Error updating transactions from Backend API', { error }, 'TRANSACTIONS');
+      }
+    }, 30000); // 30 ثانية
+
+    return () => clearInterval(interval);
+  }, [state.transactions.length]);
+
   // تحديث الإشعارات تلقائياً كل 30 ثانية
   useEffect(() => {
     const interval = setInterval(async () => {
@@ -611,23 +689,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     return () => clearInterval(interval);
   }, [state.notifications.length]);
-
-  // جلب المهام من الباكند عند بدء التطبيق
-  useEffect(() => {
-    const fetchTasks = async () => {
-      try {
-        const response = await api.tasks.getAll();
-        if (response && response.success && Array.isArray(response.data)) {
-          logger.info("تم جلب المهام من الباكند", { count: response.data.length }, 'TASKS');
-          dispatch({ type: "LOAD_TASKS", payload: response.data });
-        }
-      } catch (error) {
-        logger.error("فشل جلب المهام من الباكند", { error }, 'API');
-        // في حال الفشل، تبقى المهام من localStorage أو mockTasks
-      }
-    };
-    fetchTasks();
-  }, []);
 
   // جلب الأدوار من الباكند عند بدء التطبيق
   useEffect(() => {
@@ -1393,6 +1454,44 @@ export function useAppActions() {
 
   const setCurrentUser = (user: User | null) => {
     dispatch({ type: "SET_CURRENT_USER", payload: user })
+    
+    // تحديث فوري للبيانات المالية عند تسجيل دخول المدير
+    if (user?.role === "admin") {
+      const refreshFinancialData = async () => {
+        try {
+          // تحديث البيانات المالية
+          const transactionsResponse = await api.transactions.getAll();
+          if (transactionsResponse && transactionsResponse.success && Array.isArray(transactionsResponse.data)) {
+            dispatch({ type: "LOAD_TRANSACTIONS", payload: transactionsResponse.data });
+            logger.info('Financial data refreshed for admin login', { 
+              transactionsCount: transactionsResponse.data.length 
+            }, 'FINANCE');
+          }
+          
+          // تحديث المشاريع
+          const projectsResponse = await api.projects.getAll();
+          if (projectsResponse && projectsResponse.success && Array.isArray(projectsResponse.data)) {
+            dispatch({ type: "LOAD_PROJECTS", payload: projectsResponse.data });
+            logger.info('Projects data refreshed for admin login', { 
+              projectsCount: projectsResponse.data.length 
+            }, 'PROJECTS');
+          }
+          
+          // تحديث العملاء
+          const clientsResponse = await api.clients.getAll();
+          if (clientsResponse && clientsResponse.success && Array.isArray(clientsResponse.data)) {
+            dispatch({ type: "LOAD_CLIENTS", payload: clientsResponse.data });
+            logger.info('Clients data refreshed for admin login', { 
+              clientsCount: clientsResponse.data.length 
+            }, 'CLIENTS');
+          }
+        } catch (error) {
+          logger.error('Error refreshing financial data for admin login', { error }, 'FINANCE');
+        }
+      };
+      
+      refreshFinancialData();
+    }
   }
 
   const logout = () => {
