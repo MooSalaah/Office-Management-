@@ -176,7 +176,11 @@ export function Navbar() {
                   .filter((n) => n.userId === currentUser?.id)
                   .slice(0, 5)
                   .map((notification) => (
-                    <SwipeToDelete key={notification.id} onDelete={() => deleteNotification(notification.id)}>
+                    <SwipeToDelete key={notification.id} onDelete={() => {
+                      if (notification.id) {
+                        deleteNotification(notification.id)
+                      }
+                    }}>
                       <DropdownMenuItem className="flex flex-col items-start p-3">
                         <div className="flex items-center justify-between w-full">
                           <span className="font-medium text-sm">{notification.title}</span>
@@ -189,7 +193,9 @@ export function Navbar() {
                               disabled={notification.isRead}
                               onClick={(e) => {
                                 e.stopPropagation()
-                                markNotificationAsRead(notification.id)
+                                if (notification.id) {
+                                  markNotificationAsRead(notification.id)
+                                }
                               }}
                             >
                               <CheckCircle className={`w-4 h-4 ${notification.isRead ? 'text-gray-400' : 'text-blue-600'}`} />
@@ -201,7 +207,9 @@ export function Navbar() {
                               title="حذف الإشعار"
                               onClick={(e) => {
                                 e.stopPropagation()
-                                deleteNotification(notification.id)
+                                if (notification.id) {
+                                  deleteNotification(notification.id)
+                                }
                               }}
                             >
                               <Trash2 className="w-4 h-4 text-red-600" />
@@ -228,7 +236,11 @@ export function Navbar() {
                       size="sm"
                       className="w-11/12 flex items-center gap-2 rounded-md"
                       onClick={() => {
-                        notifications.filter((n) => n.userId === currentUser?.id).forEach(n => deleteNotification(n.id))
+                        notifications.filter((n) => n.userId === currentUser?.id).forEach(n => {
+                          if (n.id) {
+                            deleteNotification(n.id)
+                          }
+                        })
                       }}
                     >
                       <Trash2 className="w-4 h-4" />

@@ -5,7 +5,7 @@ const Notification = require('../models/Notification');
 // Get all notifications
 router.get('/', async (req, res) => {
   try {
-    const notifications = await Notification.find();
+    const notifications = await Notification.find().sort({ createdAt: -1 });
     res.json({ success: true, data: notifications });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -23,11 +23,11 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Update notification
+// Update notification - search by id field instead of _id
 router.put('/:id', async (req, res) => {
   try {
-    const updatedNotification = await Notification.findByIdAndUpdate(
-      req.params.id,
+    const updatedNotification = await Notification.findOneAndUpdate(
+      { id: req.params.id }, // البحث بالـ id بدلاً من _id
       req.body,
       { new: true }
     );
@@ -38,10 +38,10 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// Delete notification
+// Delete notification - search by id field instead of _id
 router.delete('/:id', async (req, res) => {
   try {
-    const deletedNotification = await Notification.findByIdAndDelete(req.params.id);
+    const deletedNotification = await Notification.findOneAndDelete({ id: req.params.id }); // البحث بالـ id بدلاً من _id
     if (!deletedNotification) return res.status(404).json({ success: false, error: 'Notification not found' });
     res.json({ success: true, message: 'Notification deleted' });
   } catch (err) {
