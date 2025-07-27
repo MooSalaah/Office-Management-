@@ -280,191 +280,286 @@ function AttendancePageContent() {
     }, 5000)
   }
 
-  // تسجيل الحضور
-  const handleCheckIn = (session: "morning" | "evening") => {
-    if (!currentUser) return
-    const now = new Date()
-    const hour = now.getHours()
-    // السماح بالتسجيل فقط في أوقات الجلسة الصحيحة
-    if (session === "morning" && (hour < 8 || hour >= 12)) {
-      showAlertDialogMessage("error", "يمكن تسجيل الحضور للفترة الصباحية فقط بين 8:00 صباحًا و12:00 ظهرًا")
-      return
-    }
-    if (session === "evening" && (hour < 16 || hour >= 21)) {
-      showAlertDialogMessage("error", "يمكن تسجيل الحضور للفترة المسائية فقط بين 4:00 عصرًا و9:00 مساءً")
-      return
-    }
-    const today = new Date().toISOString().split("T")[0]
-    // منع تكرار الحضور لنفس الفترة
-    if (!canCheckInForSession(session)) {
-      showAlertDialogMessage("error", `تم تسجيل حضورك بالفعل للفترة ${session === "morning" ? "الصباحية" : "المسائية"}`)
-      return
-    }
-    const checkInTime = now.toISOString()
-    // منطق جديد: إذا كان خارج أوقات الدوام الرسمية، سجل كـ overtime
-    let status: AttendanceRecord["status"] = "present"
-    if ((session === "morning" && (hour < 8 || hour >= 12)) || (session === "evening" && (hour < 16 || hour >= 21))) {
-      status = "overtime"
-    } else if (session === "morning" && hour > 8) {
-      status = "late"
-    } else if (session === "evening" && hour > 16) {
-      status = "late"
-    }
-    const newRecord: AttendanceRecord = {
-      id: Date.now().toString(),
-      userId: currentUser.id,
-      userName: currentUser.name,
-      checkIn: checkInTime,
-      date: today,
-      status,
-      session: session,
-      regularHours: 0,
-      lateHours: 0,
-      overtimeHours: status === "overtime" ? 1 : 0, // مبدئياً 1 ساعة إضافية، وسيتم احتسابها بدقة عند الانصراف
-      totalHours: 0,
-    }
-    setAttendanceRecords(prev => [...prev, newRecord])
-    // بث تحديث فوري لجميع المستخدمين
-    realtimeUpdates.sendAttendanceUpdate({ action: 'create', attendance: newRecord, userId: currentUser?.id, userName: currentUser?.name })
-    showAlertDialogMessage("success", `تم تسجيل الحضور (${session === "morning" ? "صباحية" : "مسائية"}) بنجاح${status === "overtime" ? " (خارج أوقات الدوام - ساعات إضافية)" : ""}`)
+  // إضافة دالة لحساب إحصائيات الموظف الشهرية
+  const getEmployeeMonthlyStats = () => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const monthStart = new Date(currentYear, currentMonth, 1);
+    const monthEnd = new Date(currentYear, currentMonth + 1, 0);
+    const totalDays = monthEnd.getDate();
     
-          // Add notification to admin when attendance is recorded
-      if (currentUser.role !== "admin") {
-        addNotification({
-          userId: "1", // Admin user ID
-          title: "تسجيل حضور",
-          message: `تم تسجيل حضور ${currentUser.name} (${session === "morning" ? "صباحية" : "مسائية"}) في ${now.toLocaleTimeString("ar-SA")}`,
-          type: "attendance",
-          actionUrl: `/attendance`,
-          triggeredBy: currentUser.id,
-          isRead: false,
-        })
-        
-        // إضافة المستخدم إلى قائمة الحاضرين في صفحة الحضور للمدير
-        const existingRecord = attendanceRecords.find(r => 
-          r.userId === currentUser.id && 
-          r.date === today && 
-          r.session === session
-        )
-        
-        if (!existingRecord) {
-          const newAttendanceRecord: AttendanceRecord = {
-            id: Date.now().toString(),
-            userId: currentUser.id,
-            userName: currentUser.name,
-            date: today,
-            session: session,
-            checkIn: checkInTime,
-            checkOut: undefined,
-            regularHours: 0,
-            lateHours: 0,
-            overtimeHours: 0,
-            totalHours: 0,
-            status: "present",
-          }
-          
-          // إضافة سجل الحضور إلى localStorage
-          const existingAttendance = JSON.parse(localStorage.getItem("attendanceRecords") || "[]")
-          existingAttendance.push(newAttendanceRecord)
-          localStorage.setItem("attendanceRecords", JSON.stringify(existingAttendance))
-          
-          // تحديث state مباشرة
-          dispatch({ type: "ADD_ATTENDANCE", payload: newAttendanceRecord })
-          
-          // بث تحديث فوري لجميع المستخدمين
-          realtimeUpdates.sendAttendanceUpdate({ action: 'create', attendance: newAttendanceRecord, userId: currentUser.id, userName: currentUser.name })
-          
-          // إرسال إشعار فوري للمدير
-          addNotification({
-            userId: "1",
-            title: "تسجيل حضور جديد",
-            message: `تم تسجيل حضور ${currentUser.name} (${session === "morning" ? "صباحية" : "مسائية"})`,
-            type: "attendance",
-            actionUrl: `/attendance`,
-            triggeredBy: currentUser.id,
-            isRead: false,
-          })
-        }
-      }
-  }
+    // سجلات الحضور للموظف الحالي في الشهر الحالي
+    const employeeMonthlyRecords = attendanceRecords.filter(r => {
+      const recordDate = new Date(r.date);
+      return r.userId === currentUser?.id && 
+             recordDate.getMonth() === currentMonth && 
+             recordDate.getFullYear() === currentYear;
+    });
 
-  // تسجيل الانصراف وحساب الساعات الإضافية
-  const handleCheckOut = (session: "morning" | "evening") => {
-    if (!currentUser) return
+    // أيام الحضور
+    const presentDays = employeeMonthlyRecords.reduce((acc, r) => acc.add(r.date), new Set()).size;
     
-    const today = new Date().toISOString().split("T")[0]
-    const recordIndex = attendanceRecords.findIndex(r => 
-      r.userId === currentUser.id && 
-      r.date === today && 
-      r.session === session && 
-      !r.checkOut
-    )
+    // أيام الغياب
+    const absentDays = totalDays - presentDays;
     
-    if (recordIndex === -1) {
-      showAlertDialogMessage("error", `لم يتم تسجيل حضور للفترة ${session === "morning" ? "الصباحية" : "المسائية"} أو تم تسجيل الانصراف بالفعل`)
-      return
-    }
-
-    const now = new Date()
-    const checkOutTime = now.toISOString()
-    const checkInTime = new Date(attendanceRecords[recordIndex].checkIn || "")
+    // إجمالي الساعات الشهرية
+    const totalMonthlyHours = Math.ceil(employeeMonthlyRecords.reduce((sum, r) => sum + (r.totalHours || 0), 0));
     
-    // تحديد وقت انتهاء الفترة العادي
-    let regularEnd = new Date(checkInTime)
-    if (session === "morning") {
-      regularEnd.setHours(12, 0, 0, 0) // 12:00 ظهراً
-    } else {
-      regularEnd.setHours(21, 0, 0, 0) // 9:00 مساءً
-    }
+    // ساعات إضافية
+    const overtimeHours = Math.round(employeeMonthlyRecords.reduce((sum, r) => sum + Math.max(0, (r.totalHours || 0) - 9), 0));
 
-    // حساب الساعات الإجمالية
-    const totalMs = now.getTime() - checkInTime.getTime()
-    const totalHours = Math.round((totalMs / (1000 * 60 * 60)) * 100) / 100
+    return {
+      presentDays,
+      absentDays,
+      totalMonthlyHours,
+      overtimeHours
+    };
+  };
 
-    // حساب الساعات الإضافية
-    let overtimeHours = 0
-    if (now > regularEnd) {
-      const overtimeMs = now.getTime() - regularEnd.getTime()
-      overtimeHours = Math.round((overtimeMs / (1000 * 60 * 60)) * 100) / 100
-    }
-
-    // حساب الساعات الإضافية فوق 9 ساعات
-    const totalOvertimeHours = Math.max(0, totalHours - 9)
-    const finalOvertimeHours = overtimeHours + totalOvertimeHours
-
-    // حساب الراتب الإضافي
-    const user = users.find(u => u.id === currentUser.id)
-    const monthlySalary = user?.monthlySalary || 5000
-    const hourlyRate = monthlySalary / 26 / 9 // الراتب الشهري / 26 يوم / 9 ساعات
-    const overtimePay = finalOvertimeHours * hourlyRate * 1.5 // 1.5x للساعات الإضافية
-
-    const updatedRecord = {
-      ...attendanceRecords[recordIndex],
-      checkOut: checkOutTime,
-      totalHours,
-      overtimeHours: finalOvertimeHours,
-      overtimePay,
-    }
-
-    setAttendanceRecords(prev => prev.map((r, i) => i === recordIndex ? updatedRecord : r))
-    // بث تحديث فوري لجميع المستخدمين
-    realtimeUpdates.sendAttendanceUpdate({ action: 'update', attendance: updatedRecord, userId: currentUser?.id, userName: currentUser?.name })
+  // إضافة دالة لإرسال إشعار للمدير عند تسجيل حضور/انصراف
+  const notifyManager = async (action: 'checkin' | 'checkout', session: string) => {
+    if (currentUser?.role === 'admin') return; // المدير لا يرسل إشعار لنفسه
     
-    showAlertDialogMessage("success", `تم تسجيل الانصراف (${session === "morning" ? "صباحية" : "مسائية"}) بنجاح`)
-    
-    // Add notification to admin when checkout is recorded
-    if (currentUser.role !== "admin") {
-      addNotification({
-        userId: "1", // Admin user ID
-        title: "تسجيل انصراف",
-        message: `تم تسجيل انصراف ${currentUser.name} (${session === "morning" ? "صباحية" : "مسائية"}) في ${now.toLocaleTimeString("ar-SA")}`,
+    try {
+      const sessionText = session === 'morning' ? 'صباحية' : 'مسائية';
+      const actionText = action === 'checkin' ? 'حضور' : 'انصراف';
+      
+      await addNotification({
+        userId: "admin", // إرسال لجميع المديرين
+        title: `تسجيل ${actionText}`,
+        message: `${currentUser?.name} قام بتسجيل ${actionText} في الفترة ${sessionText}`,
         type: "attendance",
         actionUrl: `/attendance`,
-        triggeredBy: currentUser.id,
+        triggeredBy: currentUser?.id || "",
         isRead: false,
-      })
+      });
+    } catch (error) {
+      console.error('Error sending notification to manager:', error);
     }
-  }
+  };
+
+  // تعديل الكروت الإحصائية بناءً على دور المستخدم
+  const renderStatsCards = () => {
+    // للمدير: عرض إحصائيات جميع الموظفين
+    if (currentUser?.role === 'admin') {
+      return (
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">الحاضرون</p>
+                  <p className="text-2xl font-bold text-green-600"><ArabicNumber value={todayStats.present} /></p>
+                </div>
+                <CheckCircle className="w-8 h-8 text-green-600" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">المتأخرون</p>
+                  <p className="text-2xl font-bold text-yellow-600"><ArabicNumber value={todayStats.late} /></p>
+                </div>
+                <AlertTriangle className="w-8 h-8 text-yellow-600" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">الغائبون</p>
+                  <p className="text-2xl font-bold text-red-600"><ArabicNumber value={todayStats.absent} /></p>
+                </div>
+                <XCircle className="w-8 h-8 text-red-600" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">إجمالي الساعات</p>
+                  <p className="text-2xl font-bold text-blue-600"><ArabicNumber value={todayStats.totalHours} /></p>
+                </div>
+                <Clock className="w-8 h-8 text-blue-600" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">ساعات إضافية</p>
+                  <p className="text-2xl font-bold text-orange-600">
+                    <ArabicNumber value={todayStats.overtimeHours} />
+                  </p>
+                </div>
+                <Timer className="w-8 h-8 text-orange-600" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+    
+    // للموظفين العاديين: عرض إحصائياتهم الشخصية الشهرية
+    const employeeStats = getEmployeeMonthlyStats();
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">أيام الحضور</p>
+                <p className="text-2xl font-bold text-green-600"><ArabicNumber value={employeeStats.presentDays} /></p>
+              </div>
+              <CheckCircle className="w-8 h-8 text-green-600" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">أيام الغياب</p>
+                <p className="text-2xl font-bold text-red-600"><ArabicNumber value={employeeStats.absentDays} /></p>
+              </div>
+              <XCircle className="w-8 h-8 text-red-600" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">إجمالي الساعات</p>
+                <p className="text-2xl font-bold text-blue-600"><ArabicNumber value={employeeStats.totalMonthlyHours} /></p>
+              </div>
+              <Clock className="w-8 h-8 text-blue-600" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">ساعات إضافية</p>
+                <p className="text-2xl font-bold text-orange-600">
+                  <ArabicNumber value={employeeStats.overtimeHours} />
+                </p>
+              </div>
+              <Timer className="w-8 h-8 text-orange-600" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  };
+
+  const handleCheckIn = (session: "morning" | "evening") => {
+    if (!currentUser) return;
+
+    const now = new Date();
+    const currentTime = now.toISOString();
+    const today = now.toISOString().split("T")[0];
+    
+    // التحقق من عدم وجود تسجيل حضور سابق لنفس الفترة
+    const existingRecord = attendanceRecords.find(
+      (r) => r.userId === currentUser.id && r.date === today && r.session === session
+    );
+
+    if (existingRecord) {
+      setAlert({ type: "error", message: "تم تسجيل الحضور مسبقاً لهذه الفترة" });
+      return;
+    }
+
+    // تحديد حالة الحضور بناءً على الوقت
+    let status = "present";
+    const hour = now.getHours();
+    const minute = now.getMinutes();
+    
+    if (session === "morning") {
+      // الفترة الصباحية: 8:00 - 12:00
+      if (hour > 8 || (hour === 8 && minute > 15)) {
+        status = "late";
+      }
+    } else {
+      // الفترة المسائية: 16:00 - 21:00
+      if (hour > 16 || (hour === 16 && minute > 15)) {
+        status = "late";
+      }
+    }
+
+    const newRecord: AttendanceRecord = {
+      id: `attendance_${Date.now()}`,
+      userId: currentUser.id,
+      userName: currentUser.name,
+      date: today,
+      session: session,
+      checkIn: currentTime,
+      checkOut: null,
+      totalHours: 0,
+      overtimeHours: 0,
+      status: status,
+      notes: "",
+      location: "",
+      createdAt: currentTime,
+      updatedAt: currentTime,
+    };
+
+    handleCreateAttendance(newRecord);
+    
+    // إرسال إشعار للمدير
+    notifyManager('checkin', session);
+  };
+
+  const handleCheckOut = (session: "morning" | "evening") => {
+    if (!currentUser) return;
+
+    const now = new Date();
+    const currentTime = now.toISOString();
+    const today = now.toISOString().split("T")[0];
+
+    // البحث عن سجل الحضور الموجود
+    const existingRecord = attendanceRecords.find(
+      (r) => r.userId === currentUser.id && r.date === today && r.session === session
+    );
+
+    if (!existingRecord) {
+      setAlert({ type: "error", message: "لم يتم العثور على سجل حضور لهذه الفترة" });
+      return;
+    }
+
+    if (existingRecord.checkOut) {
+      setAlert({ type: "error", message: "تم تسجيل الانصراف مسبقاً لهذه الفترة" });
+      return;
+    }
+
+    // حساب الساعات
+    const checkInTime = new Date(existingRecord.checkIn);
+    const checkOutTime = now;
+    const totalHours = Math.round((checkOutTime.getTime() - checkInTime.getTime()) / (1000 * 60 * 60) * 100) / 100;
+    
+    // حساب الساعات الإضافية (أكثر من 9 ساعات)
+    const overtimeHours = Math.max(0, totalHours - 9);
+
+    const updatedRecord: AttendanceRecord = {
+      ...existingRecord,
+      checkOut: currentTime,
+      totalHours: totalHours,
+      overtimeHours: overtimeHours,
+      updatedAt: currentTime,
+    };
+
+    handleUpdateAttendance(existingRecord.id, updatedRecord);
+    
+    // إرسال إشعار للمدير
+    notifyManager('checkout', session);
+  };
 
   const handleManualCheckInOut = () => {
     if (!manualFormData.employeeId) {
@@ -639,7 +734,10 @@ function AttendancePageContent() {
   const filteredRecords = attendanceRecords
     .filter((record) => record.date === selectedDate)
     .filter((record) => 
-      record.userName.toLowerCase().includes(searchTerm.toLowerCase())
+      // للمدير: عرض جميع السجلات، للموظفين: عرض سجلاتهم فقط
+      currentUser?.role === 'admin' ? 
+        record.userName.toLowerCase().includes(searchTerm.toLowerCase()) :
+        record.userId === currentUser?.id
     )
 
   const todayStats = {
@@ -1179,75 +1277,19 @@ function AttendancePageContent() {
       )}
 
       {/* Stats Cards - Only for admin and users with view permission */}
-      {(canManageAttendance || canViewAttendance) && (
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">الحاضرون</p>
-                  <p className="text-2xl font-bold text-green-600"><ArabicNumber value={todayStats.present} /></p>
-                </div>
-                <CheckCircle className="w-8 h-8 text-green-600" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">المتأخرون</p>
-                  <p className="text-2xl font-bold text-yellow-600"><ArabicNumber value={todayStats.late} /></p>
-                </div>
-                <AlertTriangle className="w-8 h-8 text-yellow-600" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">الغائبون</p>
-                  <p className="text-2xl font-bold text-red-600"><ArabicNumber value={todayStats.absent} /></p>
-                </div>
-                <XCircle className="w-8 h-8 text-red-600" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">إجمالي الساعات</p>
-                  <p className="text-2xl font-bold text-blue-600"><ArabicNumber value={todayStats.totalHours} /></p>
-                </div>
-                <Clock className="w-8 h-8 text-blue-600" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">ساعات إضافية</p>
-                  <p className="text-2xl font-bold text-orange-600">
-                    <ArabicNumber value={todayStats.overtimeHours} />
-                  </p>
-                </div>
-                <Timer className="w-8 h-8 text-orange-600" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+      {(canManageAttendance || canViewAttendance) && renderStatsCards()}
 
       {/* Attendance Records - Only for admin and users with view permission */}
       {(canManageAttendance || canViewAttendance) && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle>سجل الحضور</CardTitle>
-              <CardDescription>تفاصيل حضور الموظفين</CardDescription>
+              <CardTitle>
+                {currentUser?.role === 'admin' ? 'سجل الحضور' : 'سجل الحضور الشخصي'}
+              </CardTitle>
+              <CardDescription>
+                {currentUser?.role === 'admin' ? 'تفاصيل حضور الموظفين' : 'تفاصيل حضورك الشخصي'}
+              </CardDescription>
             </div>
             <div className="flex items-center space-x-2 space-x-reverse">
               <Calendar className="w-4 h-4 text-muted-foreground" />
