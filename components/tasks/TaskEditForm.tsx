@@ -239,18 +239,18 @@ export default function TaskEditForm({ task, onClose }: { task: Task, onClose: (
                       index === self.findIndex(u => u.id === user.id)
                     )
                     .map((user) => (
-                      <SelectItem key={user.id} value={user.id}>
-                        <div className="flex items-center space-x-2 space-x-reverse">
-                          <span>{user.name}</span>
-                          <Badge variant="outline" className="text-xs">
-                            {user.role === "admin" ? "مدير" : 
-                             user.role === "engineer" ? "مهندس" :
-                             user.role === "accountant" ? "محاسب" :
-                             user.role === "hr" ? "موارد بشرية" : user.role}
-                          </Badge>
-                        </div>
-                      </SelectItem>
-                    ))}
+                    <SelectItem key={user.id} value={user.id}>
+                      <div className="flex items-center space-x-2 space-x-reverse">
+                        <span>{user.name}</span>
+                        <Badge variant="outline" className="text-xs">
+                          {user.role === "admin" ? "مدير" : 
+                           user.role === "engineer" ? "مهندس" :
+                           user.role === "accountant" ? "محاسب" :
+                           user.role === "hr" ? "موارد بشرية" : user.role}
+                        </Badge>
+                      </div>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               {(hasPermission(currentUser?.role || "", "create", "users") || currentUser?.role === "engineer") && (

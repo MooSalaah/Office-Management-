@@ -830,16 +830,16 @@ function AttendancePageContent() {
                 <SelectTrigger className="w-48">
                   <SelectValue placeholder="اختر الموظف للتقرير الشهري" />
                 </SelectTrigger>
-                                      <SelectContent>
+                <SelectContent>
                         {users
                           .filter((user, index, self) => 
                             // إزالة التكرار بناءً على المعرف
                             index === self.findIndex(u => u.id === user.id)
                           )
                           .map((user) => (
-                            <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
-                          ))}
-                      </SelectContent>
+                    <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
               <Button
                 variant="outline"

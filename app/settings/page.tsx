@@ -424,7 +424,7 @@ function SettingsPageContent() {
         email: profileData.email,
         phone: profileData.phone,
         avatar: profileData.avatar,
-        password: profileData.newPassword ? profileData.newPassword : currentUser.password,
+        password: profileData.newPassword || currentUser.password || "",
       }
       
       try {
@@ -456,10 +456,10 @@ function SettingsPageContent() {
         dispatch({ type: "SET_CURRENT_USER", payload: updatedUser })
         
         // إرسال تحديث فوري لجميع المستخدمين
-        realtimeUpdates.broadcastUpdate('user', { action: 'update', user: updatedUser })
+        realtimeUpdates.broadcastUpdate('user', updatedUser)
         
         setAlert(null)
-        setSuccessDialog("تم تحديث الملف الشخصي بنجاح وتم حفظ البيانات في قاعدة البيانات")
+        showSuccessToast("تم تحديث الملف الشخصي بنجاح", "تم حفظ البيانات في قاعدة البيانات")
         
         // إرسال إشعار للمدير عند تغيير البريد الإلكتروني أو كلمة المرور
         if (currentUser.role !== "admin" && (profileData.email !== currentUser.email || profileData.newPassword)) {
@@ -592,13 +592,10 @@ function SettingsPageContent() {
       localStorage.setItem("companySettings", JSON.stringify(officeData));
       
       // إرسال تحديث فوري
-      realtimeUpdates.broadcastUpdate('companySettings', { 
-        action: 'update', 
-        settings: officeData 
-      });
+      realtimeUpdates.broadcastUpdate('companySettings', officeData);
       
-      setAlert(null);
-      setSuccessDialog("تم تحديث بيانات المكتب بنجاح وتم حفظ البيانات في قاعدة البيانات");
+              setAlert(null);
+        showSuccessToast("تم تحديث بيانات المكتب بنجاح", "تم حفظ البيانات في قاعدة البيانات");
       addNotification({
         userId: "1",
         title: "تحديث بيانات المكتب",
@@ -641,7 +638,7 @@ function SettingsPageContent() {
       }
       
       setAlert({ type: "success", message: "تم تحديث إعدادات الإشعارات بنجاح" });
-      setSuccessDialog("تم تحديث إعدادات الإشعارات بنجاح وتم حفظ البيانات في قاعدة البيانات");
+      showSuccessToast("تم تحديث إعدادات الإشعارات بنجاح", "تم حفظ البيانات في قاعدة البيانات");
     } catch (error) {
       setAlert({ type: "error", message: "حدث خطأ أثناء حفظ إعدادات الإشعارات في قاعدة البيانات" });
     }
@@ -738,7 +735,7 @@ function SettingsPageContent() {
         localStorage.setItem("users", JSON.stringify(existingUsers))
         
         // إرسال تحديث فوري
-        realtimeUpdates.broadcastUpdate('user', { action: 'create', user: result.data })
+        realtimeUpdates.broadcastUpdate('user', result.data)
         
         showSuccessToast("تم إنشاء المستخدم بنجاح", `تم إنشاء المستخدم "${result.data.name}" بنجاح`)
         setIsUserDialogOpen(false)
@@ -800,7 +797,7 @@ function SettingsPageContent() {
         localStorage.setItem("users", JSON.stringify(updatedUsers))
         
         // إرسال تحديث فوري
-        realtimeUpdates.broadcastUpdate('user', { action: 'update', user: result.data })
+        realtimeUpdates.broadcastUpdate('user', result.data)
         
         showSuccessToast("تم تحديث المستخدم بنجاح", `تم تحديث المستخدم "${result.data.name}" بنجاح`)
         setIsUserDialogOpen(false)
@@ -927,7 +924,7 @@ function SettingsPageContent() {
       realtimeUpdates.broadcastUpdate('role', { action: 'create', role: savedRole })
       
       // Show success dialog with confirmation
-      setSuccessDialog("تم إنشاء الدور الوظيفي بنجاح وتم حفظ البيانات في قاعدة البيانات")
+              showSuccessToast("تم إنشاء الدور الوظيفي بنجاح", "تم حفظ البيانات في قاعدة البيانات")
       
       setAlert({ type: "success", message: "تم إنشاء الدور الوظيفي بنجاح" })
       setIsJobRoleDialogOpen(false)

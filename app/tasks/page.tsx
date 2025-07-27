@@ -300,14 +300,14 @@ function TasksPageContent() {
         // إرسال إشعار لجميع المديرين
         const adminUsers = users.filter(user => user.role === "admin");
         adminUsers.forEach(admin => {
-          addNotification({
+        addNotification({
             userId: admin.id,
-            title: "مهمة مكتملة",
-            message: `تم إنجاز مهمة "${task.title}" بواسطة ${currentUser?.name}`,
-            type: "task",
+          title: "مهمة مكتملة",
+          message: `تم إنجاز مهمة "${task.title}" بواسطة ${currentUser?.name}`,
+          type: "task",
             actionUrl: `/tasks?highlight=${task.id}`,
-            triggeredBy: currentUser?.id || "",
-            isRead: false,
+          triggeredBy: currentUser?.id || "",
+          isRead: false,
           });
         });
         
@@ -434,17 +434,15 @@ function TasksPageContent() {
           });
           
           // إرسال تحديث فوري للمسؤول الجديد
-          if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
-            (window as any).realtimeUpdates.broadcastUpdate('notification', {
-              userId: data.data.assigneeId,
-              title: "مهمة جديدة مُعيّنة لك",
-              message: `تم تعيين مهمة "${data.data.title}" لك بواسطة ${currentUser?.name}`,
-              type: "task",
-              actionUrl: `/tasks?highlight=${data.data.id}`,
-              triggeredBy: currentUser?.id || "",
-              isRead: false,
-            });
-          }
+          realtimeUpdates.broadcastUpdate('notification', {
+            userId: data.data.assigneeId,
+            title: "مهمة جديدة مُعيّنة لك",
+            message: `تم تعيين مهمة "${data.data.title}" لك بواسطة ${currentUser?.name}`,
+            type: "task",
+            actionUrl: `/tasks?highlight=${data.data.id}`,
+            triggeredBy: currentUser?.id || "",
+            isRead: false,
+          });
         }
         
         // إرسال إشعار للمديرين عند إنشاء مهمة جديدة
@@ -948,18 +946,18 @@ function TasksPageContent() {
                                 index === self.findIndex(u => u.id === user.id)
                               )
                               .map((user) => (
-                                <SelectItem key={user.id} value={user.id}>
-                                  <div className="flex items-center space-x-2 space-x-reverse">
-                                    <span>{user.name}</span>
-                                    <Badge variant="outline" className="text-xs">
-                                      {user.role === "admin" ? "مدير" : 
-                                       user.role === "engineer" ? "مهندس" :
-                                       user.role === "accountant" ? "محاسب" :
-                                       user.role === "hr" ? "موارد بشرية" : user.role}
-                                    </Badge>
-                                  </div>
-                                </SelectItem>
-                              ))}
+                              <SelectItem key={user.id} value={user.id}>
+                                <div className="flex items-center space-x-2 space-x-reverse">
+                                  <span>{user.name}</span>
+                                  <Badge variant="outline" className="text-xs">
+                                    {user.role === "admin" ? "مدير" : 
+                                     user.role === "engineer" ? "مهندس" :
+                                     user.role === "accountant" ? "محاسب" :
+                                     user.role === "hr" ? "موارد بشرية" : user.role}
+                                  </Badge>
+                                </div>
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                         {(hasPermission(currentUser?.role || "", "create", "users") || currentUser?.role === "engineer") && (
