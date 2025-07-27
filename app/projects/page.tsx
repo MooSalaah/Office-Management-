@@ -136,11 +136,12 @@ function ProjectsPageContent() {
   const filterParam = searchParams.get("filter")
   const clientParam = searchParams.get("client")
   const clientNameParam = searchParams.get("clientName")
+  const actionParam = searchParams.get("action")
 
   const [filteredProjects, setFilteredProjects] = useState<Project[]>(projects)
   const [searchTerm, setSearchTerm] = useState("")
   const [filterStatus, setFilterStatus] = useState(filterParam || "in-progress")
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isDialogOpen, setIsDialogOpen] = useState(actionParam === "create")
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false)
   const [editingProject, setEditingProject] = useState<Project | null>(null)
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)

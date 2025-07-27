@@ -46,6 +46,7 @@ import { PermissionGuard } from "@/components/ui/permission-guard"
 import { useTransactionSearch, useTypeFilter, useDateFilter, useSortedData } from "@/lib/performance"
 import { InvoiceGenerator } from "@/lib/invoice-generator"
 import { DeleteDialog } from "@/components/ui/delete-dialog"
+import { useSearchParams } from "next/navigation"
 
 // أضف متغير API_BASE_URL
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
@@ -67,9 +68,11 @@ function FinancePageContent() {
   const { addNotification, broadcastTransactionUpdate, broadcastNotificationUpdate, showSuccessToast } = useAppActions()
   const { currentUser, transactions, projects, clients } = state
 
+  const actionParam = useSearchParams().get("action")
+
   const [searchTerm, setSearchTerm] = useState("")
   const [filterType, setFilterType] = useState("all")
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isDialogOpen, setIsDialogOpen] = useState(actionParam === "create")
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false)
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
