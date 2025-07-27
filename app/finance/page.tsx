@@ -1955,7 +1955,9 @@ function FinancePageContent() {
               <Card className="bg-card text-card-foreground">
                 <CardHeader>
                   <CardTitle className="text-lg">الشهر الحالي</CardTitle>
-                  <CardDescription className="text-muted-foreground">يناير 2024</CardDescription>
+                  <CardDescription className="text-muted-foreground">
+                    {new Date().toLocaleDateString('ar-SA', { month: 'long', year: 'numeric' })}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex justify-between items-center">
