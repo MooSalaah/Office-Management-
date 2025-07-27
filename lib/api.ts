@@ -151,6 +151,31 @@ class ApiClient {
 		});
 	}
 
+	// Transactions API
+	async getTransactions() {
+		return this.request("/api/transactions");
+	}
+
+	async createTransaction(transactionData: any) {
+		return this.request("/api/transactions", {
+			method: "POST",
+			body: JSON.stringify(transactionData),
+		});
+	}
+
+	async updateTransaction(id: string, transactionData: any) {
+		return this.request(`/api/transactions/${id}`, {
+			method: "PUT",
+			body: JSON.stringify(transactionData),
+		});
+	}
+
+	async deleteTransaction(id: string) {
+		return this.request(`/api/transactions/${id}`, {
+			method: "DELETE",
+		});
+	}
+
 	// Users API
 	async getUsers() {
 		return this.request("/api/users");
@@ -284,6 +309,12 @@ export const api = {
 		create: (data: any) => apiClient.createUser(data),
 		update: (id: string, data: any) => apiClient.updateUser(id, data),
 		delete: (id: string) => apiClient.deleteUser(id),
+	},
+	transactions: {
+		getAll: () => apiClient.getTransactions(),
+		create: (data: any) => apiClient.createTransaction(data),
+		update: (id: string, data: any) => apiClient.updateTransaction(id, data),
+		delete: (id: string) => apiClient.deleteTransaction(id),
 	},
 	roles: {
 		getAll: () => apiClient.getRoles(),

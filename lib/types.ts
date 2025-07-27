@@ -109,11 +109,12 @@ export interface Notification {
 	userId: string;
 	title: string;
 	message: string;
-	type: "task" | "project" | "finance" | "system" | "attendance";
+	type: "task" | "project" | "finance" | "system" | "attendance" | "client";
 	isRead: boolean;
 	actionUrl?: string;
 	triggeredBy: string;
 	createdAt: string;
+	updatedAt?: string;
 }
 
 export interface AttendanceRecord {

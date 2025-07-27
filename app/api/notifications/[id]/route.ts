@@ -8,6 +8,14 @@ export async function PUT(
     const body = await request.json();
     const notificationId = params.id;
 
+    // Validate notification ID
+    if (!notificationId) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Notification ID is required' 
+      }, { status: 400 });
+    }
+
     // Connect to MongoDB and update notification
     const { MongoClient, ObjectId } = require('mongodb');
     const uri = process.env.MONGODB_URI;
@@ -24,9 +32,14 @@ export async function PUT(
     const notifications = database.collection('notifications');
     
     // Update notification in database
+    const updateData = {
+      ...body,
+      updatedAt: new Date().toISOString()
+    };
+    
     const result = await notifications.updateOne(
       { _id: new ObjectId(notificationId) },
-      { $set: body }
+      { $set: updateData }
     );
     
     await client.close();
@@ -34,19 +47,27 @@ export async function PUT(
     if (result.matchedCount === 0) {
       return NextResponse.json({ 
         success: false, 
-        error: 'Notification not found' 
+        error: 'Notification not found',
+        notificationId: notificationId
       }, { status: 404 });
     }
     
+    console.log('Notification updated successfully:', { 
+      notificationId, 
+      modifiedCount: result.modifiedCount 
+    });
+    
     return NextResponse.json({ 
       success: true, 
-      message: 'Notification updated successfully' 
+      message: 'Notification updated successfully',
+      modifiedCount: result.modifiedCount
     });
   } catch (error) {
     console.error('Error updating notification:', error);
     return NextResponse.json({ 
       success: false, 
-      error: 'Failed to update notification' 
+      error: 'Failed to update notification',
+      details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
 }
@@ -57,6 +78,14 @@ export async function DELETE(
 ) {
   try {
     const notificationId = params.id;
+
+    // Validate notification ID
+    if (!notificationId) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Notification ID is required' 
+      }, { status: 400 });
+    }
 
     // Connect to MongoDB and delete notification
     const { MongoClient, ObjectId } = require('mongodb');
@@ -81,19 +110,27 @@ export async function DELETE(
     if (result.deletedCount === 0) {
       return NextResponse.json({ 
         success: false, 
-        error: 'Notification not found' 
+        error: 'Notification not found',
+        notificationId: notificationId
       }, { status: 404 });
     }
     
+    console.log('Notification deleted successfully:', { 
+      notificationId, 
+      deletedCount: result.deletedCount 
+    });
+    
     return NextResponse.json({ 
       success: true, 
-      message: 'Notification deleted successfully' 
+      message: 'Notification deleted successfully',
+      deletedCount: result.deletedCount
     });
   } catch (error) {
     console.error('Error deleting notification:', error);
     return NextResponse.json({ 
       success: false, 
-      error: 'Failed to delete notification' 
+      error: 'Failed to delete notification',
+      details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
 } 

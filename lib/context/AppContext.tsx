@@ -304,7 +304,14 @@ function appReducer(state: AppState, action: AppAction): AppState {
         ...state, 
         userSettings: state.userSettings ? { 
           ...state.userSettings, 
-          notificationSettings: action.payload 
+          notificationSettings: {
+            emailNotifications: (action.payload as any).emailNotifications ?? state.userSettings.notificationSettings?.emailNotifications ?? state.userSettings.emailNotifications,
+            taskNotifications: (action.payload as any).taskNotifications ?? state.userSettings.notificationSettings?.taskNotifications ?? state.userSettings.taskNotifications,
+            projectNotifications: (action.payload as any).projectNotifications ?? state.userSettings.notificationSettings?.projectNotifications ?? state.userSettings.projectNotifications,
+            financeNotifications: (action.payload as any).financeNotifications ?? state.userSettings.notificationSettings?.financeNotifications ?? state.userSettings.financeNotifications,
+            systemNotifications: (action.payload as any).systemNotifications ?? state.userSettings.notificationSettings?.systemNotifications ?? state.userSettings.systemNotifications,
+            browserNotifications: (action.payload as any).browserNotifications ?? true,
+          }
         } : null
       }
 
@@ -436,6 +443,61 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     logger.info('Realtime updates disabled for SSR compatibility', undefined, 'REALTIME');
   }, [state.currentUser?.id, state.notifications])
 
+  // جلب المستخدمين من الباكند عند بدء التطبيق
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        dispatch({ type: "SET_LOADING_STATE", payload: { key: 'users', value: true } });
+        const response = await api.users.getAll();
+        if (response && response.success && Array.isArray(response.data)) {
+          logger.info("تم جلب المستخدمين من الباكند", { count: response.data.length }, 'USERS');
+          // استبدال جميع المستخدمين ببيانات قاعدة البيانات
+          dispatch({ type: "LOAD_USERS", payload: response.data });
+          
+          // تحديث المستخدم الحالي إذا كان موجوداً في قاعدة البيانات
+          const currentUserData = localStorage.getItem("currentUser");
+          if (currentUserData) {
+            const currentUser = JSON.parse(currentUserData);
+            const currentUserFromDB = response.data.find((u: User) => 
+              u.email === currentUser.email || 
+              u.name === currentUser.name ||
+              u.id === currentUser.id
+            );
+            if (currentUserFromDB) {
+              const updatedCurrentUser = updateUserPermissionsByRole(currentUserFromDB);
+              dispatch({ type: "SET_CURRENT_USER", payload: updatedCurrentUser });
+              localStorage.setItem("currentUser", JSON.stringify(updatedCurrentUser));
+              logger.info("تم تحديث المستخدم الحالي ببيانات قاعدة البيانات", { user: updatedCurrentUser }, 'USERS');
+            }
+          }
+          
+          // حفظ في localStorage للاستخدام offline
+          localStorage.setItem("users", JSON.stringify(response.data));
+        } else {
+          logger.warn("فشل جلب المستخدمين من الباكند، استخدام localStorage", { response }, 'USERS');
+          // استخدام localStorage كبديل
+          const usersData = localStorage.getItem("users");
+          if (usersData) {
+            const users = JSON.parse(usersData);
+            dispatch({ type: "LOAD_USERS", payload: users });
+          }
+        }
+      } catch (error) {
+        logger.error("خطأ في جلب المستخدمين من الباكند", { error }, 'USERS');
+        // استخدام localStorage كبديل
+        const usersData = localStorage.getItem("users");
+        if (usersData) {
+          const users = JSON.parse(usersData);
+          dispatch({ type: "LOAD_USERS", payload: users });
+        }
+      } finally {
+        dispatch({ type: "SET_LOADING_STATE", payload: { key: 'users', value: false } });
+      }
+    };
+    
+    fetchUsers();
+  }, []);
+
   // جلب المشاريع من الباكند عند بدء التطبيق
   useEffect(() => {
     const fetchProjects = async () => {
@@ -472,19 +534,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const fetchNotifications = async () => {
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com'}/api/notifications`);
+        dispatch({ type: "SET_LOADING_STATE", payload: { key: 'notifications', value: true } });
+        const response = await fetch('/api/notifications');
         if (response.ok) {
           const result = await response.json();
           if (result && result.success && Array.isArray(result.data)) {
-            logger.info("تم جلب الإشعارات من الباكند", { count: result.data.length }, 'NOTIFICATIONS');
             dispatch({ type: "LOAD_NOTIFICATIONS", payload: result.data });
+            logger.info('Notifications loaded from database', { 
+              count: result.data.length 
+            }, 'NOTIFICATIONS');
+          } else {
+            logger.warn('Invalid notifications response format', { result }, 'NOTIFICATIONS');
           }
+        } else {
+          logger.error('Failed to fetch notifications from API', { 
+            status: response.status 
+          }, 'NOTIFICATIONS');
         }
       } catch (error) {
-        logger.error("فشل جلب الإشعارات من الباكند", { error }, 'API');
-        // في حال الفشل، تبقى الإشعارات من localStorage أو mockNotifications
+        logger.error('Error fetching notifications', { error }, 'NOTIFICATIONS');
+      } finally {
+        dispatch({ type: "SET_LOADING_STATE", payload: { key: 'notifications', value: false } });
       }
     };
+    
     fetchNotifications();
   }, []);
 
@@ -842,8 +915,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // عند أي تغيير في البيانات، إذا online أرسل broadcast، إذا offline أضف لقائمة الانتظار:
   const broadcastOrQueue = (type: string, data: unknown, isOnline: boolean, setPendingUpdates: React.Dispatch<React.SetStateAction<unknown[]>>) => {
     if (isOnline) {
-      if (window.realtimeUpdates) {
-        window.realtimeUpdates.broadcastUpdate(type, data)
+      if (typeof window !== 'undefined' && window.realtimeUpdates && typeof window.realtimeUpdates === 'object' && typeof (window.realtimeUpdates as any).broadcastUpdate === 'function') {
+        (window.realtimeUpdates as any).broadcastUpdate(type, data)
       }
     } else {
               setPendingUpdates((prev: unknown[]) => [...prev, { type, data }])
@@ -854,8 +927,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isOnline && pendingUpdates.length > 0) {
       pendingUpdates.forEach(update => {
-        if (window.realtimeUpdates) {
-          window.realtimeUpdates.broadcastUpdate(update.type, update.data)
+        if (typeof window !== 'undefined' && window.realtimeUpdates && typeof window.realtimeUpdates === 'object' && typeof (window.realtimeUpdates as any).broadcastUpdate === 'function') {
+          (window.realtimeUpdates as any).broadcastUpdate(update.type, update.data)
         }
       })
       setPendingUpdates([])
@@ -864,10 +937,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // استقبل التحديثات من الخادم وحدث الحالة فورياً:
   useEffect(() => {
-    if (window.realtimeUpdates) {
-      window.realtimeUpdates.subscribe('*', (data: unknown) => {
+    if (typeof window !== 'undefined' && window.realtimeUpdates && typeof window.realtimeUpdates === 'object' && typeof (window.realtimeUpdates as any).subscribe === 'function') {
+      (window.realtimeUpdates as any).subscribe('*', (data: any) => {
         // مثال: إذا كان التحديث لمستخدم
-        if (data && data.id) {
+        if (data && typeof data === 'object' && 'id' in data) {
           dispatch({ type: 'UPDATE_USER', payload: data })
         }
         // أضف منطق التحديث لباقي الأنواع حسب الحاجة
@@ -976,6 +1049,12 @@ export function useAppActions() {
   }
 
   const addNotification = async (notification: Omit<Notification, "id" | "createdAt">) => {
+    // التحقق من صحة البيانات
+    if (!notification.userId || !notification.title || !notification.message || !notification.type) {
+      logger.error('Invalid notification data', { notification }, 'NOTIFICATIONS');
+      return;
+    }
+
     const newNotification: Notification = {
       ...notification,
       id: Date.now().toString(),
@@ -984,10 +1063,10 @@ export function useAppActions() {
     
     // تحقق من إعدادات الإشعارات للمستخدم
     const userSettings = state.userSettings;
-    if (userSettings) {
+    if (userSettings?.notificationSettings) {
       const notificationType = notification.type;
       const notificationKey = `${notificationType}Notifications` as keyof typeof userSettings.notificationSettings;
-      const isEnabled = userSettings.notificationSettings?.[notificationKey] !== false;
+      const isEnabled = userSettings.notificationSettings[notificationKey] !== false;
       
       if (!isEnabled) {
         logger.info(`Notification disabled for user ${notification.userId}`, { 
@@ -998,7 +1077,7 @@ export function useAppActions() {
       }
     }
     
-    // إضافة الإشعار إلى state
+    // إضافة الإشعار إلى state أولاً
     dispatch({ type: "ADD_NOTIFICATION", payload: newNotification });
     
     // حفظ الإشعار في قاعدة البيانات
@@ -1010,24 +1089,31 @@ export function useAppActions() {
       });
       
       if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
         logger.error('Failed to save notification to database', { 
           status: response.status, 
+          error: errorData.error,
           notification: newNotification 
         }, 'NOTIFICATIONS');
       } else {
+        const result = await response.json();
         logger.info('Notification saved to database', { 
           id: newNotification.id, 
-          type: newNotification.type 
+          type: newNotification.type,
+          databaseId: result.data?._id
         }, 'NOTIFICATIONS');
       }
     } catch (error) {
       logger.error('Error saving notification to database', { error }, 'NOTIFICATIONS');
     }
     
-    // إرسال تحديث فوري
+    // إرسال تحديث فوري (إذا كان متاحاً)
     try {
       if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
         (window as any).realtimeUpdates.broadcastUpdate('notification', newNotification);
+        logger.info('Notification broadcasted via realtime updates', { 
+          id: newNotification.id 
+        }, 'NOTIFICATIONS');
       }
     } catch (error) {
       logger.error('Error broadcasting notification update', { error }, 'NOTIFICATIONS');
@@ -1035,8 +1121,35 @@ export function useAppActions() {
     
     // عرض إشعار المتصفح إذا كان مسموحاً
     try {
-      if (userSettings?.notificationSettings?.browserNotifications) {
-        showBrowserNotification(newNotification);
+      if (userSettings?.notificationSettings?.browserNotifications && 
+          'Notification' in window && 
+          Notification.permission === 'granted') {
+        // إنشاء إشعار المتصفح
+        const browserNotification = new Notification(newNotification.title, {
+          body: newNotification.message,
+          icon: '/logo.png',
+          badge: '/logo.png',
+          tag: newNotification.id,
+          requireInteraction: false,
+          silent: false,
+        });
+
+        browserNotification.onclick = () => {
+          window.focus();
+          if (newNotification.actionUrl) {
+            window.location.href = newNotification.actionUrl;
+          }
+          browserNotification.close();
+        };
+
+        // إغلاق تلقائي بعد 5 ثوانٍ
+        setTimeout(() => {
+          browserNotification.close();
+        }, 5000);
+        
+        logger.info('Browser notification shown', { 
+          id: newNotification.id 
+        }, 'NOTIFICATIONS');
       }
     } catch (error) {
       logger.error('Error showing browser notification', { error }, 'NOTIFICATIONS');
@@ -1096,42 +1209,35 @@ export function useAppActions() {
   };
 
   const notifyProjectEngineers = async (project: Project, action: 'update' | 'delete', actorName: string) => {
-    // اجمع كل المهندسين المسؤولين (بدون تكرار)
-    const engineerIds = new Set<string>();
-    if (project.assignedEngineerId) engineerIds.add(project.assignedEngineerId);
-    if (Array.isArray(project.team)) project.team.forEach(id => engineerIds.add(id));
-    engineerIds.forEach((engineerId) => {
-      if (!engineerId) return;
-      addNotification({
-        userId: engineerId,
-        title: action === 'update' ? `تم تحديث مشروع` : `تم حذف مشروع`,
-        message: `قام ${actorName} ${(action === 'update') ? 'بتحديث' : 'بحذف'} المشروع "${project.name}"`,
-        type: "project",
-        actionUrl: `/projects/${project.id}`,
-        triggeredBy: state.currentUser?.id || "",
-        isRead: false,
-      });
-    });
+    try {
+      const engineers = state.users.filter(user => user.role === 'engineer' && user.isActive);
+      for (const engineer of engineers) {
+        await addNotification({
+          userId: engineer.id,
+          title: `تحديث مشروع: ${project.name}`,
+          message: `تم ${action === 'update' ? 'تحديث' : 'حذف'} مشروع "${project.name}" بواسطة ${actorName}`,
+          type: 'project',
+          triggeredBy: state.currentUser?.id || 'system',
+          actionUrl: '/projects',
+          isRead: false
+        });
+      }
+    } catch (error) {
+      logger.error('فشل في إرسال إشعارات للمهندسين', { error }, 'NOTIFICATIONS');
+    }
   };
 
   const updateProjectWithFinancialTransaction = async (project: Project) => {
     try {
       setLoadingState('projects', true);
       const response = await api.projects.update(project.id, project);
-      if (response && response.success && typeof response.data === 'object' && response.data !== null && 'id' in response.data) {
-        dispatch({ type: "UPDATE_PROJECT", payload: response.data as Project });
-        if (window.realtimeUpdates) {
-          window.realtimeUpdates.sendProjectUpdate({ action: 'update', project: response.data });
-        }
-        await notifyProjectEngineers(response.data as Project, 'update', state.currentUser?.name || 'مستخدم');
-        showSuccessToast("تم تحديث المشروع بنجاح", `تم تحديث مشروع \"${project.name}\"`);
-      } else if (response && response.success) {
+      if (response && response.success) {
         dispatch({ type: "UPDATE_PROJECT", payload: project });
-        if (window.realtimeUpdates) {
-          window.realtimeUpdates.sendProjectUpdate({ action: 'update', project });
+        if (typeof window !== 'undefined' && window.realtimeUpdates && typeof window.realtimeUpdates === 'object' && typeof (window.realtimeUpdates as any).sendProjectUpdate === 'function') {
+          (window.realtimeUpdates as any).sendProjectUpdate({ action: 'update', project });
         }
         await notifyProjectEngineers(project, 'update', state.currentUser?.name || 'مستخدم');
-        showSuccessToast("تم تحديث المشروع بنجاح", `تم تحديث مشروع \"${project.name}\"`);
+        showSuccessToast("تم تحديث المشروع بنجاح", `تم تحديث مشروع "${project.name}"`);
       } else {
         showErrorToast("خطأ في تحديث المشروع", response?.error || "فشل التحديث في الباكند");
       }
@@ -1144,44 +1250,49 @@ export function useAppActions() {
   };
 
   const createProjectWithDownPayment = async (project: Project) => {
-    await createProjectWithFinancialTransaction(project)
-    
-    // إرسال تحديث فوري
-    realtimeUpdates.sendProjectUpdate({ action: 'create', project })
-    
-    // إضافة إشعار للمهندس المسؤول
-    if (project.assignedEngineerId && project.assignedEngineerId !== currentUser?.id) {
-      addNotification({
-        userId: project.assignedEngineerId,
-        title: "مشروع جديد مُعيّن لك",
-        message: `تم تعيين مشروع "${project.name}" لك`,
-        type: "project",
-        actionUrl: `/projects/${project.id}`,
-        triggeredBy: currentUser?.id || "",
-        isRead: false,
-      })
+    try {
+      setLoadingState('projects', true);
+      const response = await api.projects.create(project);
+      if (response && response.success) {
+        const newProject = response.data as Project;
+        dispatch({ type: "ADD_PROJECT", payload: newProject });
+        if (typeof window !== 'undefined' && window.realtimeUpdates && typeof window.realtimeUpdates === 'object' && typeof (window.realtimeUpdates as any).sendProjectUpdate === 'function') {
+          (window.realtimeUpdates as any).sendProjectUpdate({ action: 'create', project: newProject });
+        }
+        await notifyProjectEngineers(newProject, 'update', state.currentUser?.name || 'مستخدم');
+        showSuccessToast("تم إنشاء المشروع بنجاح", `تم إنشاء مشروع "${newProject.name}"`);
+      } else {
+        showErrorToast("خطأ في إنشاء المشروع", response?.error || "فشل الإنشاء في الباكند");
+      }
+    } catch (error) {
+      showErrorToast("خطأ في إنشاء المشروع", "حدث خطأ أثناء إنشاء المشروع");
+      console.error("Error creating project:", error);
+    } finally {
+      setLoadingState('projects', false);
     }
-  }
+  };
 
   const updateProjectWithDownPayment = async (project: Project) => {
-    await updateProjectWithFinancialTransaction(project)
-    
-    // إرسال تحديث فوري
-    realtimeUpdates.sendProjectUpdate({ action: 'update', project })
-    
-    // إضافة إشعار للمهندس المسؤول إذا تم تغيير المهندس
-    if (project.assignedEngineerId && project.assignedEngineerId !== currentUser?.id) {
-      addNotification({
-        userId: project.assignedEngineerId,
-        title: "تم تحديث مشروع مُعيّن لك",
-        message: `تم تحديث مشروع "${project.name}"`,
-        type: "project",
-        actionUrl: `/projects/${project.id}`,
-        triggeredBy: currentUser?.id || "",
-        isRead: false,
-      })
+    try {
+      setLoadingState('projects', true);
+      const response = await api.projects.update(project.id, project);
+      if (response && response.success) {
+        dispatch({ type: "UPDATE_PROJECT", payload: project });
+        if (typeof window !== 'undefined' && window.realtimeUpdates && typeof window.realtimeUpdates === 'object' && typeof (window.realtimeUpdates as any).sendProjectUpdate === 'function') {
+          (window.realtimeUpdates as any).sendProjectUpdate({ action: 'update', project });
+        }
+        await notifyProjectEngineers(project, 'update', state.currentUser?.name || 'مستخدم');
+        showSuccessToast("تم تحديث المشروع بنجاح", `تم تحديث مشروع "${project.name}"`);
+      } else {
+        showErrorToast("خطأ في تحديث المشروع", response?.error || "فشل التحديث في الباكند");
+      }
+    } catch (error) {
+      showErrorToast("خطأ في تحديث المشروع", "حدث خطأ أثناء تحديث المشروع");
+      console.error("Error updating project:", error);
+    } finally {
+      setLoadingState('projects', false);
     }
-  }
+  };
 
   const deleteProject = async (projectId: string) => {
     try {
@@ -1194,11 +1305,11 @@ export function useAppActions() {
       const response = await api.projects.delete(projectId);
       if (response && response.success) {
         dispatch({ type: "DELETE_PROJECT", payload: projectId });
-        if (window.realtimeUpdates) {
-          window.realtimeUpdates.sendProjectUpdate({ action: 'delete', project });
+        if (typeof window !== 'undefined' && window.realtimeUpdates && typeof window.realtimeUpdates === 'object' && typeof (window.realtimeUpdates as any).sendProjectUpdate === 'function') {
+          (window.realtimeUpdates as any).sendProjectUpdate({ action: 'delete', project });
         }
         await notifyProjectEngineers(project, 'delete', state.currentUser?.name || 'مستخدم');
-        showSuccessToast("تم حذف المشروع بنجاح", `تم حذف مشروع \"${project.name}\"`);
+        showSuccessToast("تم حذف المشروع بنجاح", `تم حذف مشروع "${project.name}"`);
       } else {
         showErrorToast("خطأ في حذف المشروع", response?.error || "فشل الحذف في الباكند");
       }
@@ -1273,60 +1384,72 @@ export function useAppActions() {
   // Enhanced CRUD operations with loading states and toast notifications
   const createTask = async (task: Task) => {
     try {
-      setLoadingState('tasks', true)
-      dispatch({ type: "ADD_TASK", payload: task })
-      saveDataToStorage()
-      
-      // إرسال تحديث فوري
-      realtimeUpdates.sendTaskUpdate({ action: 'create', task })
-      
-      showSuccessToast("تم إنشاء المهمة بنجاح", `تم إنشاء مهمة "${task.title}"`)
+      setLoadingState('tasks', true);
+      const response = await api.tasks.create(task);
+      if (response && response.success) {
+        const newTask = response.data as Task;
+        dispatch({ type: "ADD_TASK", payload: newTask });
+        if (typeof window !== 'undefined' && window.realtimeUpdates && typeof window.realtimeUpdates === 'object' && typeof (window.realtimeUpdates as any).sendTaskUpdate === 'function') {
+          (window.realtimeUpdates as any).sendTaskUpdate({ action: 'create', task: newTask });
+        }
+        showSuccessToast("تم إنشاء المهمة بنجاح", `تم إنشاء مهمة "${newTask.title}"`);
+      } else {
+        showErrorToast("خطأ في إنشاء المهمة", response?.error || "فشل الإنشاء في الباكند");
+      }
     } catch (error) {
-      showErrorToast("خطأ في إنشاء المهمة", "حدث خطأ أثناء إنشاء المهمة")
+      showErrorToast("خطأ في إنشاء المهمة", "حدث خطأ أثناء إنشاء المهمة");
+      console.error("Error creating task:", error);
     } finally {
-      setLoadingState('tasks', false)
+      setLoadingState('tasks', false);
     }
-  }
+  };
 
   const updateTask = async (task: Task) => {
     try {
-      setLoadingState('tasks', true)
-      dispatch({ type: "UPDATE_TASK", payload: task })
-      saveDataToStorage()
-      
-      // إرسال تحديث فوري
-      realtimeUpdates.sendTaskUpdate({ action: 'update', task })
-      
-      showSuccessToast("تم تحديث المهمة بنجاح", `تم تحديث مهمة "${task.title}"`)
+      setLoadingState('tasks', true);
+      const response = await api.tasks.update(task.id, task);
+      if (response && response.success) {
+        dispatch({ type: "UPDATE_TASK", payload: task });
+        if (typeof window !== 'undefined' && window.realtimeUpdates && typeof window.realtimeUpdates === 'object' && typeof (window.realtimeUpdates as any).sendTaskUpdate === 'function') {
+          (window.realtimeUpdates as any).sendTaskUpdate({ action: 'update', task });
+        }
+        showSuccessToast("تم تحديث المهمة بنجاح", `تم تحديث مهمة "${task.title}"`);
+      } else {
+        showErrorToast("خطأ في تحديث المهمة", response?.error || "فشل التحديث في الباكند");
+      }
     } catch (error) {
-      showErrorToast("خطأ في تحديث المهمة", "حدث خطأ أثناء تحديث المهمة")
+      showErrorToast("خطأ في تحديث المهمة", "حدث خطأ أثناء تحديث المهمة");
+      console.error("Error updating task:", error);
     } finally {
-      setLoadingState('tasks', false)
+      setLoadingState('tasks', false);
     }
-  }
+  };
 
   const deleteTask = async (taskId: string) => {
     try {
-      setLoadingState('tasks', true)
-      const task = state.tasks.find(t => t.id === taskId)
+      setLoadingState('tasks', true);
+      const task = state.tasks.find(t => t.id === taskId);
       if (!task) {
-        showErrorToast("خطأ في حذف المهمة", "المهمة غير موجودة")
-        return
+        showErrorToast("خطأ في حذف المهمة", "المهمة غير موجودة");
+        return;
       }
-
-      dispatch({ type: "DELETE_TASK", payload: taskId })
-      saveDataToStorage()
-      
-      // إرسال تحديث فوري
-      realtimeUpdates.sendTaskUpdate({ action: 'delete', task })
-      
-      showSuccessToast("تم حذف المهمة بنجاح", `تم حذف مهمة "${task.title}"`)
+      const response = await api.tasks.delete(taskId);
+      if (response && response.success) {
+        dispatch({ type: "DELETE_TASK", payload: taskId });
+        if (typeof window !== 'undefined' && window.realtimeUpdates && typeof window.realtimeUpdates === 'object' && typeof (window.realtimeUpdates as any).sendTaskUpdate === 'function') {
+          (window.realtimeUpdates as any).sendTaskUpdate({ action: 'delete', task });
+        }
+        showSuccessToast("تم حذف المهمة بنجاح", `تم حذف مهمة "${task.title}"`);
+      } else {
+        showErrorToast("خطأ في حذف المهمة", response?.error || "فشل الحذف في الباكند");
+      }
     } catch (error) {
-      showErrorToast("خطأ في حذف المهمة", "حدث خطأ أثناء حذف المهمة")
+      showErrorToast("خطأ في حذف المهمة", "حدث خطأ أثناء حذف المهمة");
+      console.error("Error deleting task:", error);
     } finally {
-      setLoadingState('tasks', false)
+      setLoadingState('tasks', false);
     }
-  }
+  };
 
   const createClient = async (client: Client) => {
     try {
@@ -1444,119 +1567,113 @@ export function useAppActions() {
 
   const createTransaction = async (transaction: Transaction) => {
     try {
-      setLoadingState('transactions', true)
-      dispatch({ type: "ADD_TRANSACTION", payload: transaction })
-      saveDataToStorage()
-      
-      // إرسال تحديث فوري
-      realtimeUpdates.sendTransactionUpdate({ action: 'create', transaction })
-      
-      showSuccessToast("تم إنشاء المعاملة بنجاح", `تم إنشاء معاملة بقيمة ${transaction.amount} ريال`)
+      setLoadingState('transactions', true);
+      const response = await api.transactions.create(transaction);
+      if (response && response.success) {
+        const newTransaction = response.data as Transaction;
+        dispatch({ type: "ADD_TRANSACTION", payload: newTransaction });
+        if (typeof window !== 'undefined' && window.realtimeUpdates && typeof window.realtimeUpdates === 'object' && typeof (window.realtimeUpdates as any).sendTransactionUpdate === 'function') {
+          (window.realtimeUpdates as any).sendTransactionUpdate({ action: 'create', transaction: newTransaction });
+        }
+        showSuccessToast("تم إنشاء العملية المالية بنجاح", `تم إنشاء عملية "${newTransaction.description}"`);
+      } else {
+        showErrorToast("خطأ في إنشاء العملية المالية", response?.error || "فشل الإنشاء في الباكند");
+      }
     } catch (error) {
-      showErrorToast("خطأ في إنشاء المعاملة", "حدث خطأ أثناء إنشاء المعاملة")
+      showErrorToast("خطأ في إنشاء العملية المالية", "حدث خطأ أثناء إنشاء العملية المالية");
+      console.error("Error creating transaction:", error);
     } finally {
-      setLoadingState('transactions', false)
+      setLoadingState('transactions', false);
     }
-  }
+  };
 
   const updateTransaction = async (transaction: Transaction) => {
     try {
-      setLoadingState('transactions', true)
-      dispatch({ type: "UPDATE_TRANSACTION", payload: transaction })
-      saveDataToStorage()
-      
-      // إرسال تحديث فوري
-      realtimeUpdates.sendTransactionUpdate({ action: 'update', transaction })
-      
-      showSuccessToast("تم تحديث المعاملة بنجاح", `تم تحديث معاملة بقيمة ${transaction.amount} ريال`)
+      setLoadingState('transactions', true);
+      const response = await api.transactions.update(transaction.id, transaction);
+      if (response && response.success) {
+        dispatch({ type: "UPDATE_TRANSACTION", payload: transaction });
+        if (typeof window !== 'undefined' && window.realtimeUpdates && typeof window.realtimeUpdates === 'object' && typeof (window.realtimeUpdates as any).sendTransactionUpdate === 'function') {
+          (window.realtimeUpdates as any).sendTransactionUpdate({ action: 'update', transaction });
+        }
+        showSuccessToast("تم تحديث العملية المالية بنجاح", `تم تحديث عملية "${transaction.description}"`);
+      } else {
+        showErrorToast("خطأ في تحديث العملية المالية", response?.error || "فشل التحديث في الباكند");
+      }
     } catch (error) {
-      showErrorToast("خطأ في تحديث المعاملة", "حدث خطأ أثناء تحديث المعاملة")
+      showErrorToast("خطأ في تحديث العملية المالية", "حدث خطأ أثناء تحديث العملية المالية");
+      console.error("Error updating transaction:", error);
     } finally {
-      setLoadingState('transactions', false)
+      setLoadingState('transactions', false);
     }
-  }
+  };
 
   const deleteTransaction = async (transactionId: string) => {
     try {
-      setLoadingState('transactions', true)
-      const transaction = state.transactions.find(t => t.id === transactionId)
+      setLoadingState('transactions', true);
+      const transaction = state.transactions.find(t => t.id === transactionId);
       if (!transaction) {
-        showErrorToast("خطأ في حذف المعاملة", "المعاملة غير موجودة")
-        return
+        showErrorToast("خطأ في حذف العملية المالية", "العملية غير موجودة");
+        return;
       }
-
-      dispatch({ type: "DELETE_TRANSACTION", payload: transactionId })
-      saveDataToStorage()
-      
-      // إرسال تحديث فوري
-      realtimeUpdates.sendTransactionUpdate({ action: 'delete', transaction })
-      
-      showSuccessToast("تم حذف المعاملة بنجاح", `تم حذف معاملة بقيمة ${transaction.amount} ريال`)
+      const response = await api.transactions.delete(transactionId);
+      if (response && response.success) {
+        dispatch({ type: "DELETE_TRANSACTION", payload: transactionId });
+        if (typeof window !== 'undefined' && window.realtimeUpdates && typeof window.realtimeUpdates === 'object' && typeof (window.realtimeUpdates as any).sendTransactionUpdate === 'function') {
+          (window.realtimeUpdates as any).sendTransactionUpdate({ action: 'delete', transaction });
+        }
+        showSuccessToast("تم حذف العملية المالية بنجاح", `تم حذف عملية "${transaction.description}"`);
+      } else {
+        showErrorToast("خطأ في حذف العملية المالية", response?.error || "فشل الحذف في الباكند");
+      }
     } catch (error) {
-      showErrorToast("خطأ في حذف المعاملة", "حدث خطأ أثناء حذف المعاملة")
+      showErrorToast("خطأ في حذف العملية المالية", "حدث خطأ أثناء حذف العملية المالية");
+      console.error("Error deleting transaction:", error);
     } finally {
-      setLoadingState('transactions', false)
+      setLoadingState('transactions', false);
     }
-  }
+  };
 
   // Realtime broadcast functions
   const broadcastProjectUpdate = async (action: 'create' | 'update' | 'delete', data: Project) => {
-    try {
-      realtimeUpdates.sendProjectUpdate({ action, ...data })
-    } catch (error) {
-      console.error('Failed to broadcast project update:', error)
+    if (typeof window !== 'undefined' && window.realtimeUpdates && typeof window.realtimeUpdates === 'object' && typeof (window.realtimeUpdates as any).broadcastUpdate === 'function') {
+      (window.realtimeUpdates as any).broadcastUpdate('project', { action, data });
     }
   }
 
-  const broadcastTaskUpdate = async (action: 'create' | 'update' | 'delete', data: any) => {
-    try {
-      realtimeUpdates.sendTaskUpdate({ action, ...data })
-    } catch (error) {
-      console.error('Failed to broadcast task update:', error)
+  const broadcastTaskUpdate = async (action: 'create' | 'update' | 'delete', data: Task) => {
+    if (typeof window !== 'undefined' && window.realtimeUpdates && typeof window.realtimeUpdates === 'object' && typeof (window.realtimeUpdates as any).broadcastUpdate === 'function') {
+      (window.realtimeUpdates as any).broadcastUpdate('task', { action, data });
     }
   }
 
-  const broadcastClientUpdate = async (action: 'create' | 'update' | 'delete', data: any) => {
-    try {
-      realtimeUpdates.sendClientUpdate({ action, ...data })
-    } catch (error) {
-      console.error('Failed to broadcast client update:', error)
+  const broadcastClientUpdate = async (action: 'create' | 'update' | 'delete', data: Client) => {
+    if (typeof window !== 'undefined' && window.realtimeUpdates && typeof window.realtimeUpdates === 'object' && typeof (window.realtimeUpdates as any).broadcastUpdate === 'function') {
+      (window.realtimeUpdates as any).broadcastUpdate('client', { action, data });
     }
   }
 
-  const broadcastTransactionUpdate = async (action: 'create' | 'update' | 'delete', data: any) => {
-    try {
-      console.log('Transaction update:', action, data);
-      // Realtime functionality temporarily disabled for SSR compatibility
-    } catch (error) {
-      console.error('Failed to broadcast transaction update:', error)
+  const broadcastTransactionUpdate = async (action: 'create' | 'update' | 'delete', data: Transaction) => {
+    if (typeof window !== 'undefined' && window.realtimeUpdates && typeof window.realtimeUpdates === 'object' && typeof (window.realtimeUpdates as any).broadcastUpdate === 'function') {
+      (window.realtimeUpdates as any).broadcastUpdate('transaction', { action, data });
     }
   }
 
-  const broadcastNotificationUpdate = async (action: 'create' | 'update' | 'delete', data: any) => {
-    try {
-      console.log('Notification update:', action, data);
-      // Realtime functionality temporarily disabled for SSR compatibility
-    } catch (error) {
-      console.error('Failed to broadcast notification update:', error)
+  const broadcastNotificationUpdate = async (action: 'create' | 'update' | 'delete', data: Notification) => {
+    if (typeof window !== 'undefined' && window.realtimeUpdates && typeof window.realtimeUpdates === 'object' && typeof (window.realtimeUpdates as any).broadcastUpdate === 'function') {
+      (window.realtimeUpdates as any).broadcastUpdate('notification', { action, data });
     }
   }
 
-  const broadcastUserUpdate = async (action: 'create' | 'update' | 'delete', data: any) => {
-    try {
-      console.log('User update:', action, data);
-      // Realtime functionality temporarily disabled for SSR compatibility
-    } catch (error) {
-      console.error('Failed to broadcast user update:', error)
+  const broadcastUserUpdate = async (action: 'create' | 'update' | 'delete', data: User) => {
+    if (typeof window !== 'undefined' && window.realtimeUpdates && typeof window.realtimeUpdates === 'object' && typeof (window.realtimeUpdates as any).broadcastUpdate === 'function') {
+      (window.realtimeUpdates as any).broadcastUpdate('user', { action, data });
     }
   }
 
-  const broadcastAttendanceUpdate = async (action: 'create' | 'update', data: any) => {
-    try {
-      console.log('Attendance update:', action, data);
-      // Realtime functionality temporarily disabled for SSR compatibility
-    } catch (error) {
-      console.error('Failed to broadcast attendance update:', error)
+  const broadcastAttendanceUpdate = async (action: 'create' | 'update', data: AttendanceRecord) => {
+    if (typeof window !== 'undefined' && window.realtimeUpdates && typeof window.realtimeUpdates === 'object' && typeof (window.realtimeUpdates as any).broadcastUpdate === 'function') {
+      (window.realtimeUpdates as any).broadcastUpdate('attendance', { action, data });
     }
   }
 

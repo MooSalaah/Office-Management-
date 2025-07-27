@@ -1,20 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Mock database for notifications
-let notificationsDB: any[] = [
-  {
-    id: "1",
-    userId: "1",
-    title: "مرحباً بك في النظام",
-    message: "تم تسجيل دخولك بنجاح إلى نظام إدارة المكتب",
-    type: "system",
-    isRead: false,
-    actionUrl: "/dashboard",
-    triggeredBy: "system",
-    createdAt: new Date().toISOString()
-  }
-];
-
 export async function GET() {
   try {
     // Connect to MongoDB and fetch notifications
@@ -32,20 +17,24 @@ export async function GET() {
     const database = client.db('test');
     const notifications = database.collection('notifications');
     
-    // Fetch all notifications from database
-    const notificationsList = await notifications.find({}).toArray();
+    // Fetch all notifications from database with sorting by createdAt
+    const notificationsList = await notifications.find({})
+      .sort({ createdAt: -1 }) // ترتيب تنازلي حسب تاريخ الإنشاء
+      .toArray();
     
     await client.close();
     
     return NextResponse.json({ 
       success: true, 
-      data: notificationsList 
+      data: notificationsList,
+      count: notificationsList.length
     });
   } catch (error) {
     console.error('Error fetching notifications:', error);
     return NextResponse.json({ 
       success: false, 
-      error: 'Failed to fetch notifications' 
+      error: 'Failed to fetch notifications',
+      details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
 }
@@ -58,7 +47,18 @@ export async function POST(request: NextRequest) {
     if (!body.userId || !body.title || !body.message || !body.type) {
       return NextResponse.json({ 
         success: false, 
-        error: 'Missing required fields: userId, title, message, type' 
+        error: 'Missing required fields: userId, title, message, type',
+        received: { userId: !!body.userId, title: !!body.title, message: !!body.message, type: !!body.type }
+      }, { status: 400 });
+    }
+
+    // Validate notification type
+    const validTypes = ['task', 'project', 'finance', 'system', 'attendance', 'client'];
+    if (!validTypes.includes(body.type)) {
+      return NextResponse.json({ 
+        success: false, 
+        error: `Invalid notification type. Must be one of: ${validTypes.join(', ')}`,
+        received: body.type
       }, { status: 400 });
     }
 
@@ -71,7 +71,8 @@ export async function POST(request: NextRequest) {
       isRead: body.isRead || false,
       actionUrl: body.actionUrl || null,
       triggeredBy: body.triggeredBy || null,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
 
     // Connect to MongoDB and save notification
@@ -94,15 +95,23 @@ export async function POST(request: NextRequest) {
     
     await client.close();
     
+    console.log('Notification created successfully:', { 
+      id: newNotification.id, 
+      userId: newNotification.userId, 
+      type: newNotification.type 
+    });
+    
     return NextResponse.json({ 
       success: true, 
-      data: { ...newNotification, _id: result.insertedId } 
+      data: { ...newNotification, _id: result.insertedId },
+      message: 'Notification created successfully'
     }, { status: 201 });
   } catch (error) {
     console.error('Error creating notification:', error);
     return NextResponse.json({ 
       success: false, 
-      error: 'Failed to create notification' 
+      error: 'Failed to create notification',
+      details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
 } 
