@@ -1279,7 +1279,7 @@ function ProjectsPageContent() {
                     {taskTypes.length === 0 ? (
                       <div className="text-xs text-muted-foreground">لا توجد أنواع مهام متاحة</div>
                     ) : (
-                      <div className="grid grid-cols-1 gap-3 w-full">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full">
                         {taskTypes.map((type) => {
                           const isSelected = selectedTasks.some((t) => t.typeId === type._id);
                           const selectedTask = selectedTasks.find((t) => t.typeId === type._id);
