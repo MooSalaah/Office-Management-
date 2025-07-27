@@ -321,9 +321,13 @@ function ProjectsPageContent() {
 
     try {
       console.log('بيانات المشروع المرسلة للسيرفر:', { project: newProject, tasks, createdByName: currentUser?.name || '' });
-      const response = await fetch('/api/projects', {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
+      const response = await fetch(`${apiUrl}/api/projects`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+        },
         body: JSON.stringify({ 
           project: newProject, 
           tasks, 
@@ -393,11 +397,13 @@ function ProjectsPageContent() {
     }
 
     try {
-      // Save to backend database
-      const response = await fetch(`/api/projects?id=${editingProject.id}`, {
+      // Save to backend database via Backend API
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
+      const response = await fetch(`${apiUrl}/api/projects/${editingProject.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
         },
         body: JSON.stringify(updatedProject),
       });
@@ -407,7 +413,7 @@ function ProjectsPageContent() {
       }
 
       const result = await response.json();
-      logger.info('Project updated in database', { result }, 'PROJECTS');
+      logger.info('Project updated in database via Backend API', { result }, 'PROJECTS');
 
       // Update local state
       dispatch({ type: "UPDATE_PROJECT", payload: updatedProject })
@@ -501,15 +507,21 @@ function ProjectsPageContent() {
     if (!projectToDelete) return
 
     try {
+      setDeleteError("")
       const project = projects.find(p => p.id === projectToDelete)
+      
       if (!project) {
         setDeleteError("المشروع غير موجود")
         return
       }
 
-      // Delete from backend database
-      const response = await fetch(`/api/projects/${projectToDelete}`, {
+      // Delete from backend database via Backend API
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
+      const response = await fetch(`${apiUrl}/api/projects/${projectToDelete}`, {
         method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+        }
       });
 
       if (!response.ok) {
@@ -517,7 +529,7 @@ function ProjectsPageContent() {
       }
 
       const result = await response.json();
-      logger.info('Project deleted from database', { result }, 'PROJECTS');
+      logger.info('Project deleted from database via Backend API', { result }, 'PROJECTS');
 
       // Update local state
       dispatch({ type: "DELETE_PROJECT", payload: projectToDelete })

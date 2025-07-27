@@ -190,6 +190,7 @@ async function fixNotificationSystem() {
       await notifications.createIndex({ isRead: 1 });
       await notifications.createIndex({ type: 1 });
       await notifications.createIndex({ createdAt: -1 });
+      await notifications.createIndex({ id: 1 }); // Add this line for the new index
       console.log('✅ Database indexes created successfully');
     } catch (error) {
       console.log('⚠️ Some indexes may already exist:', error.message);
