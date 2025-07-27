@@ -535,24 +535,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const fetchNotifications = async () => {
       try {
         dispatch({ type: "SET_LOADING_STATE", payload: { key: 'notifications', value: true } });
-        const response = await fetch('/api/notifications');
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
+        const response = await fetch(`${apiUrl}/api/notifications`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+          }
+        });
         if (response.ok) {
           const result = await response.json();
           if (result && result.success && Array.isArray(result.data)) {
             dispatch({ type: "LOAD_NOTIFICATIONS", payload: result.data });
-            logger.info('Notifications loaded from database', { 
+            logger.info('Notifications loaded from Backend API', { 
               count: result.data.length 
             }, 'NOTIFICATIONS');
           } else {
-            logger.warn('Invalid notifications response format', { result }, 'NOTIFICATIONS');
+            logger.warn('Invalid notifications response format from Backend API', { result }, 'NOTIFICATIONS');
           }
         } else {
-          logger.error('Failed to fetch notifications from API', { 
+          logger.error('Failed to fetch notifications from Backend API', { 
             status: response.status 
           }, 'NOTIFICATIONS');
         }
       } catch (error) {
-        logger.error('Error fetching notifications', { error }, 'NOTIFICATIONS');
+        logger.error('Error fetching notifications from Backend API', { error }, 'NOTIFICATIONS');
       } finally {
         dispatch({ type: "SET_LOADING_STATE", payload: { key: 'notifications', value: false } });
       }
@@ -565,7 +570,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
-        const response = await fetch('/api/notifications');
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
+        const response = await fetch(`${apiUrl}/api/notifications`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+          }
+        });
         if (response.ok) {
           const result = await response.json();
           if (result && result.success && Array.isArray(result.data)) {
@@ -576,7 +586,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             // مقارنة عدد الإشعارات
             if (currentNotifications.length !== newNotifications.length) {
               dispatch({ type: "LOAD_NOTIFICATIONS", payload: newNotifications });
-              logger.info('Notifications updated from database', { 
+              logger.info('Notifications updated from Backend API', { 
                 oldCount: currentNotifications.length,
                 newCount: newNotifications.length
               }, 'NOTIFICATIONS');
@@ -587,7 +597,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               
               if (lastCurrentNotification?.id !== lastNewNotification?.id) {
                 dispatch({ type: "LOAD_NOTIFICATIONS", payload: newNotifications });
-                logger.info('New notifications detected, updated from database', { 
+                logger.info('New notifications detected, updated from Backend API', { 
                   count: newNotifications.length
                 }, 'NOTIFICATIONS');
               }
@@ -595,7 +605,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           }
         }
       } catch (error) {
-        logger.error('Error updating notifications', { error }, 'NOTIFICATIONS');
+        logger.error('Error updating notifications from Backend API', { error }, 'NOTIFICATIONS');
       }
     }, 30000); // 30 ثانية
 
@@ -1121,31 +1131,35 @@ export function useAppActions() {
     // إضافة الإشعار إلى state أولاً
     dispatch({ type: "ADD_NOTIFICATION", payload: newNotification });
     
-    // حفظ الإشعار في قاعدة البيانات
+    // حفظ الإشعار في قاعدة البيانات عبر Backend API
     try {
-      const response = await fetch('/api/notifications', {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
+      const response = await fetch(`${apiUrl}/api/notifications`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+        },
         body: JSON.stringify(newNotification),
       });
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        logger.error('Failed to save notification to database', { 
+        logger.error('Failed to save notification to database via Backend API', { 
           status: response.status, 
           error: errorData.error,
           notification: newNotification 
         }, 'NOTIFICATIONS');
       } else {
         const result = await response.json();
-        logger.info('Notification saved to database', { 
+        logger.info('Notification saved to database via Backend API', { 
           id: newNotification.id, 
           type: newNotification.type,
           databaseId: result.data?._id
         }, 'NOTIFICATIONS');
       }
     } catch (error) {
-      logger.error('Error saving notification to database', { error }, 'NOTIFICATIONS');
+      logger.error('Error saving notification to database via Backend API', { error }, 'NOTIFICATIONS');
     }
     
     // إرسال تحديث فوري (إذا كان متاحاً)
@@ -1189,7 +1203,8 @@ export function useAppActions() {
         }, 5000);
         
         logger.info('Browser notification shown', { 
-          id: newNotification.id 
+          id: newNotification.id,
+          title: newNotification.title 
         }, 'NOTIFICATIONS');
       }
     } catch (error) {
