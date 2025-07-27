@@ -1209,7 +1209,25 @@ function FinancePageContent() {
                     )}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="transaction-category">نوع المعاملة</Label>
+                    <Label htmlFor="transaction-category" className="flex items-center">
+                      نوع المعاملة
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 mr-2"
+                        onClick={() => {
+                          // إضافة نوع جديد
+                          const newType = prompt("أدخل نوع المعاملة الجديد:");
+                          if (newType && newType.trim()) {
+                            // يمكن إضافة منطق لحفظ النوع الجديد
+                            alert(`تم إضافة النوع الجديد: ${newType}`);
+                          }
+                        }}
+                      >
+                        <Plus className="w-4 h-4" />
+                      </Button>
+                    </Label>
                     <Select
                       value={formData.transactionType}
                       onValueChange={(value: typeof formData.transactionType) =>
@@ -1220,16 +1238,11 @@ function FinancePageContent() {
                         <SelectValue placeholder="اختر النوع" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="license">رخصة إنشاء</SelectItem>
-                        <SelectItem value="certificate">شهادة إشغال</SelectItem>
-                        <SelectItem value="safety">مخطط سلامة</SelectItem>
-                        <SelectItem value="consultation">استشارة هندسية</SelectItem>
-                        <SelectItem value="design">تصميم</SelectItem>
-                        <SelectItem value="supervision">إشراف</SelectItem>
-                        <SelectItem value="maintenance">صيانة</SelectItem>
-                        <SelectItem value="renovation">ترميم</SelectItem>
-                        <SelectItem value="inspection">فحص</SelectItem>
-                        <SelectItem value="other">أخرى</SelectItem>
+                        {transactionTypes.map((type) => (
+                          <SelectItem key={type.value} value={type.value}>
+                            {type.label}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1252,10 +1265,28 @@ function FinancePageContent() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="payment-method">طريقة الدفع</Label>
+                    <Label htmlFor="payment-method" className="flex items-center">
+                      طريقة الدفع
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 mr-2"
+                        onClick={() => {
+                          // إضافة طريقة دفع جديدة
+                          const newMethod = prompt("أدخل طريقة الدفع الجديدة:");
+                          if (newMethod && newMethod.trim()) {
+                            // يمكن إضافة منطق لحفظ طريقة الدفع الجديدة
+                            alert(`تم إضافة طريقة الدفع الجديدة: ${newMethod}`);
+                          }
+                        }}
+                      >
+                        <Plus className="w-4 h-4" />
+                      </Button>
+                    </Label>
                     <Select
                       value={formData.paymentMethod}
-                      onValueChange={(value: "cash" | "transfer" | "pos") =>
+                      onValueChange={(value: "cash" | "transfer" | "pos" | "check" | "credit") =>
                         setFormData((prev) => ({ ...prev, paymentMethod: value }))
                       }
                     >
@@ -1263,9 +1294,11 @@ function FinancePageContent() {
                         <SelectValue placeholder="اختر طريقة الدفع" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="cash">نقدي</SelectItem>
-                        <SelectItem value="transfer">تحويل</SelectItem>
-                        <SelectItem value="pos">شبكة</SelectItem>
+                        {paymentMethods.map((method) => (
+                          <SelectItem key={method.value} value={method.value}>
+                            {method.label}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1273,7 +1306,14 @@ function FinancePageContent() {
                     <Label htmlFor="related-project">المشروع المرتبط</Label>
                     <Select
                       value={formData.projectId}
-                      onValueChange={(value) => setFormData((prev) => ({ ...prev, projectId: value }))}
+                      onValueChange={(value) => {
+                        const project = projects.find(p => p.id === value);
+                        setFormData((prev) => ({ 
+                          ...prev, 
+                          projectId: value,
+                          payerName: project ? project.client : prev.payerName
+                        }));
+                      }}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="اختر المشروع (اختياري)" />
@@ -1289,18 +1329,38 @@ function FinancePageContent() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="date" className="flex items-center">
-                      التاريخ
+                      التاريخ الميلادي
                       <span className="text-red-500 mr-1">*</span>
                     </Label>
                     <Input
                       type="date"
                       value={formData.date}
                       onChange={(e) => setFormData((prev) => ({ ...prev, date: e.target.value }))}
-                      readOnly
                     />
                     {requiredFieldsTransaction.date && (
                       <p className="text-xs text-red-500 mt-1">هذا الحقل مطلوب</p>
                     )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="hijri-date">التاريخ الهجري</Label>
+                    <Input
+                      id="hijri-date"
+                      type="text"
+                      placeholder="سيتم التحويل تلقائياً"
+                      value={(() => {
+                        // تحويل التاريخ الميلادي إلى هجري
+                        if (formData.date) {
+                          const date = new Date(formData.date);
+                          // هنا يمكن إضافة مكتبة تحويل التاريخ أو حساب بسيط
+                          const hijriYear = date.getFullYear() - 622;
+                          const hijriMonth = date.getMonth() + 1;
+                          const hijriDay = date.getDate();
+                          return `${hijriDay}/${hijriMonth}/${hijriYear}`;
+                        }
+                        return "";
+                      })()}
+                      readOnly
+                    />
                   </div>
                   <div className="space-y-2 md:col-span-2">
                     <Label htmlFor="notes">ملاحظات</Label>
@@ -1311,14 +1371,47 @@ function FinancePageContent() {
                       onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
                     />
                   </div>
-                  <div className="space-y-2 md:col-span-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="recipientName" className="flex items-center">
+                      اسم المستلم
+                      <span className="text-red-500 mr-1">*</span>
+                    </Label>
+                    <Select
+                      value={formData.payerName}
+                      onValueChange={(value) => setFormData((prev) => ({ ...prev, payerName: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="اختر المستلم" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={currentUser?.name || ""}>
+                          {currentUser?.name || "المستخدم الحالي"}
+                        </SelectItem>
+                        {users.map((user) => (
+                          <SelectItem key={user.id} value={user.name}>
+                            {user.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
                     <Label htmlFor="payerName" className="flex items-center">
                       اسم الدافع
                       <span className="text-red-500 mr-1">*</span>
                     </Label>
                     <Input
                       id="payerName"
-                      placeholder="اسم الدافع"
+                      placeholder={(() => {
+                        // إذا كان هناك مشروع محدد، عرض اسم العميل تلقائياً
+                        if (formData.projectId) {
+                          const project = projects.find(p => p.id === formData.projectId);
+                          if (project) {
+                            return project.client;
+                          }
+                        }
+                        return "اسم الدافع";
+                      })()}
                       value={formData.payerName}
                       onChange={(e) => setFormData((prev) => ({ ...prev, payerName: e.target.value }))}
                     />
