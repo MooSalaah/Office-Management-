@@ -274,98 +274,66 @@ function SettingsPageContent() {
       } else if (data.action === 'update') {
         // تحديث المستخدم في state
         dispatch({ type: "UPDATE_USER", payload: data.user })
+        
+        // إذا كان المستخدم المحدث هو المستخدم الحالي، تحديث currentUser أيضاً
+        if (currentUser && data.user.id === currentUser.id) {
+          dispatch({ type: "SET_CURRENT_USER", payload: data.user })
+          localStorage.setItem("currentUser", JSON.stringify(data.user))
+        }
       } else if (data.action === 'delete') {
         // حذف المستخدم من state
         dispatch({ type: "DELETE_USER", payload: data.userId })
       }
     }
 
-    // تسجيل المستمع للتحديثات
-    const unsubscribe = realtimeUpdates.subscribe("user", handleUserUpdate)
+    // استماع لتحديثات الأدوار
+    const handleRoleUpdate = (data: any) => {
+      if (data.action === 'create') {
+        setJobRoles((prev: any) => [...prev, data.role])
+      } else if (data.action === 'update') {
+        setJobRoles((prev: any) => prev.map((role: any) => 
+          role._id === data.role._id ? data.role : role
+        ))
+      } else if (data.action === 'delete') {
+        setJobRoles((prev: any) => prev.filter((role: any) => role._id !== data.roleId))
+      }
+    }
 
-    // تنظيف المستمع عند إلغاء التحميل
-    return unsubscribe
+    // استماع لتحديثات أنواع المهام
+    const handleTaskTypeUpdate = (data: any) => {
+      if (data.action === 'create') {
+        setTaskTypes((prev: any) => [...prev, data.taskType])
+      } else if (data.action === 'update') {
+        setTaskTypes((prev: any) => prev.map((tt: any) => 
+          tt._id === data.taskType._id ? data.taskType : tt
+        ))
+      } else if (data.action === 'delete') {
+        setTaskTypes((prev: any) => prev.filter((tt: any) => tt._id !== data.taskTypeId))
+      }
+    }
+
+    // استماع لتحديثات إعدادات المكتب
+    const handleCompanySettingsUpdate = (data: any) => {
+      if (data.action === 'update') {
+        setOfficeData(prev => ({ ...prev, ...data.settings }))
+        dispatch({ type: "UPDATE_COMPANY_SETTINGS", payload: data.settings })
+      }
+    }
+
+    // تسجيل المستمعين للتحديثات
+    const unsubscribeUser = realtimeUpdates.subscribe("user", handleUserUpdate)
+    const unsubscribeRole = realtimeUpdates.subscribe("role", handleRoleUpdate)
+    const unsubscribeTaskType = realtimeUpdates.subscribe("taskType", handleTaskTypeUpdate)
+    const unsubscribeCompanySettings = realtimeUpdates.subscribe("companySettings", handleCompanySettingsUpdate)
+
+    // تنظيف المستمعين عند إلغاء التحميل
+    return () => {
+      unsubscribeUser()
+      unsubscribeRole()
+      unsubscribeTaskType()
+      unsubscribeCompanySettings()
+    }
   }, [currentUser, dispatch, addNotification])
-
-  // Remove the toggleDarkMode function and its usages
-
-  const handleProfileUpdate = async () => {
-    if (profileData.newPassword && profileData.newPassword !== profileData.confirmPassword) {
-      setAlert({ type: "error", message: "كلمات المرور الجديدة غير متطابقة" })
-      return
-    }
-
-    // تحقق من كلمة المرور الحالية إذا كان المستخدم يريد تغيير كلمة المرور
-    if (profileData.newPassword) {
-      if (currentUser?.password && profileData.currentPassword !== currentUser.password) {
-        setAlert({ type: "error", message: "كلمة المرور الحالية غير صحيحة" })
-        return
-      }
-    }
-
-    // Update global user info
-    if (currentUser) {
-      const updatedUser = {
-        ...currentUser,
-        name: profileData.name,
-        email: profileData.email,
-        phone: profileData.phone,
-        avatar: profileData.avatar,
-        password: profileData.newPassword ? profileData.newPassword : currentUser.password,
-      }
-      
-      try {
-        // Save to backend database
-        const response = await fetch(`/api/users?id=${currentUser.id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(updatedUser),
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to update profile in database');
-        }
-
-        const result = await response.json();
-        logger.info('Profile updated in database', { result }, 'SETTINGS');
-
-        // Save to localStorage
-        const existingUsers = JSON.parse(localStorage.getItem("users") || "[]")
-        const updatedUsers = existingUsers.map((u: any) => u.id === currentUser.id ? updatedUser : u)
-        localStorage.setItem("users", JSON.stringify(updatedUsers))
-        localStorage.setItem("currentUser", JSON.stringify(updatedUser))
-        logger.debug("Profile updated and saved to localStorage", { updatedUser }, 'SETTINGS')
-        
-        // Update state
-        dispatch({ type: "UPDATE_USER", payload: updatedUser })
-        dispatch({ type: "SET_CURRENT_USER", payload: updatedUser })
-        
-        // إرسال تحديث فوري لجميع المستخدمين
-        realtimeUpdates.sendUserUpdate({ action: 'update', user: updatedUser })
-        
-        setAlert(null)
-        setSuccessDialog("تم تحديث الملف الشخصي بنجاح وتم حفظ البيانات في قاعدة البيانات")
-        
-        // إرسال إشعار للمدير عند تغيير البريد الإلكتروني أو كلمة المرور
-        if (currentUser.role !== "admin" && (profileData.email !== currentUser.email || profileData.newPassword)) {
-          addNotification({
-            userId: "1", // Admin user ID
-            title: "تحديث بيانات المستخدم",
-            message: `تم تحديث بيانات المستخدم "${currentUser.name}" - ${profileData.email !== currentUser.email ? 'البريد الإلكتروني' : ''}${profileData.email !== currentUser.email && profileData.newPassword ? ' و' : ''}${profileData.newPassword ? 'كلمة المرور' : ''}`,
-            type: "system",
-            actionUrl: `/settings`,
-            triggeredBy: currentUser?.id || "",
-            isRead: false,
-          })
-        }
-      } catch (error) {
-        console.error('Error updating profile:', error);
-        setAlert({ type: "error", message: "حدث خطأ أثناء تحديث الملف الشخصي في قاعدة البيانات" });
-      }
-    }
-  }
 
   const handleProfileImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -434,10 +402,85 @@ function SettingsPageContent() {
     }
   }
 
-  // أضف متغير API_BASE_URL إذا لم يكن موجودًا
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+  const handleProfileUpdate = async () => {
+    if (profileData.newPassword && profileData.newPassword !== profileData.confirmPassword) {
+      setAlert({ type: "error", message: "كلمات المرور الجديدة غير متطابقة" })
+      return
+    }
 
-  // جلب إعدادات المكتب من backend
+    // تحقق من كلمة المرور الحالية إذا كان المستخدم يريد تغيير كلمة المرور
+    if (profileData.newPassword) {
+      if (currentUser?.password && profileData.currentPassword !== currentUser.password) {
+        setAlert({ type: "error", message: "كلمة المرور الحالية غير صحيحة" })
+        return
+      }
+    }
+
+    // Update global user info
+    if (currentUser) {
+      const updatedUser = {
+        ...currentUser,
+        name: profileData.name,
+        email: profileData.email,
+        phone: profileData.phone,
+        avatar: profileData.avatar,
+        password: profileData.newPassword ? profileData.newPassword : currentUser.password,
+      }
+      
+      try {
+        // Save to backend database
+        const response = await fetch(`/api/users?id=${currentUser.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(updatedUser),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to update profile in database');
+        }
+
+        const result = await response.json();
+        logger.info('Profile updated in database', { result }, 'SETTINGS');
+
+        // Save to localStorage
+        const existingUsers = JSON.parse(localStorage.getItem("users") || "[]")
+        const updatedUsers = existingUsers.map((u: any) => u.id === currentUser.id ? updatedUser : u)
+        localStorage.setItem("users", JSON.stringify(updatedUsers))
+        localStorage.setItem("currentUser", JSON.stringify(updatedUser))
+        logger.debug("Profile updated and saved to localStorage", { updatedUser }, 'SETTINGS')
+        
+        // Update state
+        dispatch({ type: "UPDATE_USER", payload: updatedUser })
+        dispatch({ type: "SET_CURRENT_USER", payload: updatedUser })
+        
+        // إرسال تحديث فوري لجميع المستخدمين
+        realtimeUpdates.broadcastUpdate('user', { action: 'update', user: updatedUser })
+        
+        setAlert(null)
+        setSuccessDialog("تم تحديث الملف الشخصي بنجاح وتم حفظ البيانات في قاعدة البيانات")
+        
+        // إرسال إشعار للمدير عند تغيير البريد الإلكتروني أو كلمة المرور
+        if (currentUser.role !== "admin" && (profileData.email !== currentUser.email || profileData.newPassword)) {
+          addNotification({
+            userId: "1", // Admin user ID
+            title: "تحديث بيانات المستخدم",
+            message: `تم تحديث بيانات المستخدم "${currentUser.name}" - ${profileData.email !== currentUser.email ? 'البريد الإلكتروني' : ''}${profileData.email !== currentUser.email && profileData.newPassword ? ' و' : ''}${profileData.newPassword ? 'كلمة المرور' : ''}`,
+            type: "system",
+            actionUrl: `/settings`,
+            triggeredBy: currentUser?.id || "",
+            isRead: false,
+          })
+        }
+      } catch (error) {
+        console.error('Error updating profile:', error);
+        setAlert({ type: "error", message: "حدث خطأ أثناء تحديث الملف الشخصي في قاعدة البيانات" });
+      }
+    }
+  }
+
+  // جلب إعدادات المكتب من backend مع تحديث فوري
   useEffect(() => {
     async function fetchCompanySettings() {
       try {
@@ -446,13 +489,18 @@ function SettingsPageContent() {
         if (data.success && data.data) {
           setOfficeData(prev => ({ ...prev, ...data.data }));
           dispatch({ type: "UPDATE_COMPANY_SETTINGS", payload: data.data });
+          
+          // حفظ في localStorage للتحديثات الفورية
+          localStorage.setItem("companySettings", JSON.stringify(data.data));
         }
-      } catch (err) {}
+      } catch (err) {
+        console.error('Error fetching company settings:', err);
+      }
     }
     fetchCompanySettings();
   }, [dispatch]);
 
-  // جلب إعدادات المستخدم من backend
+  // جلب إعدادات المستخدم من backend مع تحديث فوري
   useEffect(() => {
     async function fetchUserSettings() {
       if (!currentUser?.id) return;
@@ -462,13 +510,18 @@ function SettingsPageContent() {
         if (data.success && data.data) {
           setNotificationSettings(data.data.notificationSettings || notificationSettings);
           dispatch({ type: "UPDATE_USER_SETTINGS", payload: data.data });
+          
+          // حفظ في localStorage للتحديثات الفورية
+          localStorage.setItem(`userSettings_${currentUser.id}`, JSON.stringify(data.data));
         }
-      } catch (err) {}
+      } catch (err) {
+        console.error('Error fetching user settings:', err);
+      }
     }
     fetchUserSettings();
   }, [currentUser, dispatch]);
 
-  // جلب الأدوار من backend
+  // جلب الأدوار من backend مع تحديث فوري
   useEffect(() => {
     async function fetchRoles() {
       try {
@@ -476,13 +529,29 @@ function SettingsPageContent() {
         const data = await res.json();
         if (data.success && Array.isArray(data.data)) {
           setJobRoles(data.data);
+          
+          // حفظ في localStorage للتحديثات الفورية
+          localStorage.setItem("jobRoles", JSON.stringify(data.data));
+          
+          // تحديث rolePermissions
+          data.data.forEach((role: any) => {
+            rolePermissions[role.id as keyof typeof rolePermissions] = {
+              name: role.name,
+              description: role.description,
+              permissions: role.permissions,
+              modules: role.modules
+            }
+          });
+          localStorage.setItem("rolePermissions", JSON.stringify(rolePermissions));
         }
-      } catch (err) {}
+      } catch (err) {
+        console.error('Error fetching roles:', err);
+      }
     }
     fetchRoles();
   }, []);
 
-  // جلب أنواع المهام من backend
+  // جلب أنواع المهام من backend مع تحديث فوري
   useEffect(() => {
     async function fetchTaskTypes() {
       try {
@@ -490,13 +559,21 @@ function SettingsPageContent() {
         const data = await res.json();
         if (data.success && Array.isArray(data.data)) {
           setTaskTypes(data.data);
+          
+          // حفظ في localStorage للتحديثات الفورية
+          localStorage.setItem("taskTypes", JSON.stringify(data.data));
         }
-      } catch (err) {}
+      } catch (err) {
+        console.error('Error fetching task types:', err);
+      }
     }
     fetchTaskTypes();
   }, []);
 
-  // حفظ إعدادات المكتب في backend
+  // أضف متغير API_BASE_URL إذا لم يكن موجودًا
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+
+  // حفظ إعدادات المكتب في backend مع تحديث فوري
   const handleOfficeUpdate = async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/companySettings`, {
@@ -506,7 +583,20 @@ function SettingsPageContent() {
       });
       if (!response.ok) throw new Error('Failed to save company settings to database');
       const result = await response.json();
+      
+      // تحديث state
       dispatch({ type: "UPDATE_COMPANY_INFO", payload: officeData });
+      dispatch({ type: "UPDATE_COMPANY_SETTINGS", payload: officeData });
+      
+      // حفظ في localStorage
+      localStorage.setItem("companySettings", JSON.stringify(officeData));
+      
+      // إرسال تحديث فوري
+      realtimeUpdates.broadcastUpdate('companySettings', { 
+        action: 'update', 
+        settings: officeData 
+      });
+      
       setAlert(null);
       setSuccessDialog("تم تحديث بيانات المكتب بنجاح وتم حفظ البيانات في قاعدة البيانات");
       addNotification({
@@ -523,7 +613,7 @@ function SettingsPageContent() {
     }
   };
 
-  // حفظ إعدادات الإشعارات للمستخدم في backend
+  // حفظ إعدادات الإشعارات للمستخدم في backend مع تحديث فوري
   const handleNotificationUpdate = async () => {
     try {
       if (notificationSettings.browserNotifications && 'Notification' in window) {
@@ -538,7 +628,18 @@ function SettingsPageContent() {
       });
       if (!response.ok) throw new Error('Failed to save notification settings to database');
       const result = await response.json();
+      
+      // تحديث state
       dispatch({ type: "UPDATE_NOTIFICATION_SETTINGS", payload: notificationSettings });
+      
+      // حفظ في localStorage
+      if (currentUser?.id) {
+        localStorage.setItem(`userSettings_${currentUser.id}`, JSON.stringify({
+          userId: currentUser.id,
+          notificationSettings
+        }));
+      }
+      
       setAlert({ type: "success", message: "تم تحديث إعدادات الإشعارات بنجاح" });
       setSuccessDialog("تم تحديث إعدادات الإشعارات بنجاح وتم حفظ البيانات في قاعدة البيانات");
     } catch (error) {
@@ -628,7 +729,17 @@ function SettingsPageContent() {
       });
       const result = await response.json();
       if (result.success && result.data) {
+        // تحديث state
         dispatch({ type: "ADD_USER", payload: result.data });
+        
+        // حفظ في localStorage
+        const existingUsers = JSON.parse(localStorage.getItem("users") || "[]")
+        existingUsers.push(result.data)
+        localStorage.setItem("users", JSON.stringify(existingUsers))
+        
+        // إرسال تحديث فوري
+        realtimeUpdates.broadcastUpdate('user', { action: 'create', user: result.data })
+        
         showSuccessToast("تم إنشاء المستخدم بنجاح", `تم إنشاء المستخدم "${result.data.name}" بنجاح`)
         setIsUserDialogOpen(false)
         resetUserForm()
@@ -680,7 +791,17 @@ function SettingsPageContent() {
       });
       const result = await response.json();
       if (result.success && result.data) {
+        // تحديث state
         dispatch({ type: "UPDATE_USER", payload: result.data });
+        
+        // حفظ في localStorage
+        const existingUsers = JSON.parse(localStorage.getItem("users") || "[]")
+        const updatedUsers = existingUsers.map((u: any) => u.id === editingUser.id ? result.data : u)
+        localStorage.setItem("users", JSON.stringify(updatedUsers))
+        
+        // إرسال تحديث فوري
+        realtimeUpdates.broadcastUpdate('user', { action: 'update', user: result.data })
+        
         showSuccessToast("تم تحديث المستخدم بنجاح", `تم تحديث المستخدم "${result.data.name}" بنجاح`)
         setIsUserDialogOpen(false)
         setEditingUser(null)
@@ -712,16 +833,31 @@ function SettingsPageContent() {
         setDeleteError("المستخدم غير موجود")
         return
       }
-      dispatch({ type: "DELETE_USER", payload: userToDelete })
-      // Remove from localStorage
-      const existingUsers = JSON.parse(localStorage.getItem("users") || "[]")
-      const filteredUsers = existingUsers.filter((u: any) => u.id !== userToDelete)
-      localStorage.setItem("users", JSON.stringify(filteredUsers))
-      realtimeUpdates.sendUserUpdate({ action: 'delete', userId: userToDelete })
-      showSuccessToast("تم حذف المستخدم بنجاح", `تم حذف المستخدم "${user.name}" بنجاح`)
-      setDeleteDialogOpen(false)
-      setUserToDelete(null)
-      setDeleteError("")
+      
+      // حذف من قاعدة البيانات
+      const response = await fetch(`/api/users?id=${userToDelete}`, {
+        method: 'DELETE',
+      });
+      
+      if (response.ok) {
+        // تحديث state
+        dispatch({ type: "DELETE_USER", payload: userToDelete })
+        
+        // Remove from localStorage
+        const existingUsers = JSON.parse(localStorage.getItem("users") || "[]")
+        const filteredUsers = existingUsers.filter((u: any) => u.id !== userToDelete)
+        localStorage.setItem("users", JSON.stringify(filteredUsers))
+        
+        // إرسال تحديث فوري
+        realtimeUpdates.broadcastUpdate('user', { action: 'delete', userId: userToDelete })
+        
+        showSuccessToast("تم حذف المستخدم بنجاح", `تم حذف المستخدم "${user.name}" بنجاح`)
+        setDeleteDialogOpen(false)
+        setUserToDelete(null)
+        setDeleteError("")
+      } else {
+        setDeleteError("فشل حذف المستخدم من قاعدة البيانات")
+      }
     } catch (error) {
       setDeleteError("حدث خطأ أثناء حذف المستخدم")
     }
@@ -787,6 +923,9 @@ function SettingsPageContent() {
         localStorage.setItem("currentUser", JSON.stringify(updatedUser))
       }
       
+      // إرسال تحديث فوري
+      realtimeUpdates.broadcastUpdate('role', { action: 'create', role: savedRole })
+      
       // Show success dialog with confirmation
       setSuccessDialog("تم إنشاء الدور الوظيفي بنجاح وتم حفظ البيانات في قاعدة البيانات")
       
@@ -827,20 +966,23 @@ function SettingsPageContent() {
         throw new Error(errorData.error || 'فشل تحديث الدور في قاعدة البيانات');
       }
 
+      const result = await response.json();
+      const savedRole = result.data;
+
       // تحديث state المحلي
-      setJobRoles((prev: any) => prev.map((role: any) => (role.id === editingJobRole.id ? updatedRole : role)))
+      setJobRoles((prev: any) => prev.map((role: any) => (role.id === editingJobRole.id ? savedRole : role)))
       
       // Update rolePermissions dynamically
-      rolePermissions[updatedRole.id as keyof typeof rolePermissions] = {
-        name: updatedRole.name,
-        description: updatedRole.description,
-        permissions: updatedRole.permissions,
-        modules: updatedRole.modules
+      rolePermissions[savedRole.id as keyof typeof rolePermissions] = {
+        name: savedRole.name,
+        description: savedRole.description,
+        permissions: savedRole.permissions,
+        modules: savedRole.modules
       }
       
       // Update in localStorage
       const existingRoles = JSON.parse(localStorage.getItem("jobRoles") || "[]")
-      const updatedRoles = existingRoles.map((role: any) => role.id === editingJobRole.id ? updatedRole : role)
+      const updatedRoles = existingRoles.map((role: any) => role.id === editingJobRole.id ? savedRole : role)
       localStorage.setItem("jobRoles", JSON.stringify(updatedRoles))
       
       // Save updated rolePermissions
@@ -849,14 +991,14 @@ function SettingsPageContent() {
       // Update users with this role including current user
       const existingUsers = JSON.parse(localStorage.getItem("users") || "[]")
       const updatedUsers = existingUsers.map((user: any) => {
-        if (user.role === updatedRole.id) {
-          return { ...user, permissions: updatedRole.permissions }
+        if (user.role === savedRole.id) {
+          return { ...user, permissions: savedRole.permissions }
         }
         return user
       })
       localStorage.setItem("users", JSON.stringify(updatedUsers))
-      users.filter(user => user.role === updatedRole.id).forEach(user => {
-        const updatedUser = { ...user, permissions: updatedRole.permissions }
+      users.filter(user => user.role === savedRole.id).forEach(user => {
+        const updatedUser = { ...user, permissions: savedRole.permissions }
         dispatch({ type: "UPDATE_USER", payload: updatedUser })
         // If this is the current user, update currentUser as well
         if (currentUser && user.id === currentUser.id) {
@@ -864,6 +1006,9 @@ function SettingsPageContent() {
           localStorage.setItem("currentUser", JSON.stringify(updatedUser))
         }
       })
+      
+      // إرسال تحديث فوري
+      realtimeUpdates.broadcastUpdate('role', { action: 'update', role: savedRole })
       
       // Show success dialog with confirmation
       setSuccessDialog("تم تحديث الدور الوظيفي بنجاح وتم حفظ البيانات في قاعدة البيانات")
@@ -925,6 +1070,9 @@ function SettingsPageContent() {
         }
       })
       
+      // إرسال تحديث فوري
+      realtimeUpdates.broadcastUpdate('role', { action: 'delete', roleId: roleToDelete._id })
+      
       // Show success dialog with confirmation
       setSuccessDialog("تم حذف الدور الوظيفي بنجاح وتم حفظ البيانات في قاعدة البيانات")
       
@@ -965,7 +1113,17 @@ function SettingsPageContent() {
       const result = await response.json();
       const savedTaskType = result.data;
 
+      // تحديث state
       setTaskTypes((prev: any) => [...prev, savedTaskType])
+      
+      // حفظ في localStorage
+      const existingTaskTypes = JSON.parse(localStorage.getItem("taskTypes") || "[]")
+      existingTaskTypes.push(savedTaskType)
+      localStorage.setItem("taskTypes", JSON.stringify(existingTaskTypes))
+      
+      // إرسال تحديث فوري
+      realtimeUpdates.broadcastUpdate('taskType', { action: 'create', taskType: savedTaskType })
+      
       setAlert({ type: "success", message: "تم إنشاء نوع المهمة بنجاح" })
       setIsTaskTypeDialogOpen(false)
       resetTaskTypeForm()
@@ -996,9 +1154,20 @@ function SettingsPageContent() {
       const result = await response.json();
       const updatedTaskType = result.data;
 
+      // تحديث state
       setTaskTypes((prev: any) => prev.map((tt: any) => 
         tt._id === editingTaskType._id ? updatedTaskType : tt
       ))
+
+      // حفظ في localStorage
+      const existingTaskTypes = JSON.parse(localStorage.getItem("taskTypes") || "[]")
+      const updatedTaskTypes = existingTaskTypes.map((tt: any) => 
+        tt._id === editingTaskType._id ? updatedTaskType : tt
+      )
+      localStorage.setItem("taskTypes", JSON.stringify(updatedTaskTypes))
+      
+      // إرسال تحديث فوري
+      realtimeUpdates.broadcastUpdate('taskType', { action: 'update', taskType: updatedTaskType })
 
       setAlert({ type: "success", message: "تم تحديث نوع المهمة بنجاح" })
       setIsTaskTypeDialogOpen(false)
@@ -1025,7 +1194,17 @@ function SettingsPageContent() {
         throw new Error(errorData.error || 'فشل حذف نوع المهمة من قاعدة البيانات');
       }
 
+      // تحديث state
       setTaskTypes((prev: any) => prev.filter((tt: any) => tt._id !== taskTypeId))
+      
+      // حفظ في localStorage
+      const existingTaskTypes = JSON.parse(localStorage.getItem("taskTypes") || "[]")
+      const filteredTaskTypes = existingTaskTypes.filter((tt: any) => tt._id !== taskTypeId)
+      localStorage.setItem("taskTypes", JSON.stringify(filteredTaskTypes))
+      
+      // إرسال تحديث فوري
+      realtimeUpdates.broadcastUpdate('taskType', { action: 'delete', taskTypeId })
+      
       setAlert({ type: "success", message: "تم حذف نوع المهمة بنجاح" })
       setTaskTypeToDelete(null)
     } catch (error) {
@@ -1051,7 +1230,13 @@ function SettingsPageContent() {
       }
 
       const result = await response.json();
+      
+      // تحديث state
       setTaskTypes(result.data)
+      
+      // حفظ في localStorage
+      localStorage.setItem("taskTypes", JSON.stringify(result.data))
+      
       setAlert({ type: "success", message: "تم إضافة أنواع المهام الافتراضية بنجاح" })
     } catch (error) {
       console.error('Error seeding task types:', error);
