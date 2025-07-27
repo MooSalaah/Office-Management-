@@ -270,15 +270,41 @@ function TasksPageContent() {
 
       // Add notification to admin when task is completed
       if (destinationStatus === "completed" && currentUser?.role !== "admin") {
-        addNotification({
-          userId: "1", // Admin user ID
-          title: "مهمة مكتملة",
-          message: `تم إنجاز مهمة "${task.title}" بواسطة ${currentUser?.name}`,
-          type: "task",
-          actionUrl: `/tasks/${task.id}`,
-          triggeredBy: currentUser?.id || "",
-          isRead: false,
-        })
+        // إرسال إشعار لجميع المديرين
+        const adminUsers = users.filter(user => user.role === "admin");
+        adminUsers.forEach(admin => {
+          addNotification({
+            userId: admin.id,
+            title: "مهمة مكتملة",
+            message: `تم إنجاز مهمة "${task.title}" بواسطة ${currentUser?.name}`,
+            type: "task",
+            actionUrl: `/tasks?highlight=${task.id}`,
+            triggeredBy: currentUser?.id || "",
+            isRead: false,
+          });
+        });
+        
+        // إشعار إضافي إذا كان المشروع مكتمل
+        if (task.projectId) {
+          const projectTasks = tasks.filter(t => t.projectId === task.projectId);
+          const completedTasks = projectTasks.filter(t => t.status === "completed").length;
+          const projectProgress = projectTasks.length > 0 ? Math.round((completedTasks / projectTasks.length) * 100) : 0;
+          
+          if (projectProgress === 100) {
+            const project = projects.find(p => p.id === task.projectId);
+            adminUsers.forEach(admin => {
+              addNotification({
+                userId: admin.id,
+                title: "مشروع مكتمل",
+                message: `تم إكمال جميع مهام مشروع "${project?.name || 'غير محدد'}" بنسبة 100%`,
+                type: "project",
+                actionUrl: `/projects?highlight=${task.projectId}`,
+                triggeredBy: currentUser?.id || "",
+                isRead: false,
+              });
+            });
+          }
+        }
       }
 
       // Add notification to assignee when task is assigned
@@ -342,6 +368,36 @@ function TasksPageContent() {
       const data = await response.json();
       if (data.success && data.data) {
         dispatch({ type: "ADD_TASK", payload: data.data });
+        
+        // إرسال إشعار للمسؤول عن المهمة
+        if (data.data.assigneeId && data.data.assigneeId !== currentUser?.id) {
+          addNotification({
+            userId: data.data.assigneeId,
+            title: "مهمة جديدة مُعيّنة لك",
+            message: `تم تعيين مهمة "${data.data.title}" لك بواسطة ${currentUser?.name}`,
+            type: "task",
+            actionUrl: `/tasks?highlight=${data.data.id}`,
+            triggeredBy: currentUser?.id || "",
+            isRead: false,
+          });
+        }
+        
+        // إرسال إشعار للمديرين عند إنشاء مهمة جديدة
+        if (currentUser?.role !== "admin") {
+          const adminUsers = users.filter(user => user.role === "admin");
+          adminUsers.forEach(admin => {
+            addNotification({
+              userId: admin.id,
+              title: "مهمة جديدة تم إنشاؤها",
+              message: `تم إنشاء مهمة "${data.data.title}" بواسطة ${currentUser?.name}`,
+              type: "task",
+              actionUrl: `/tasks?highlight=${data.data.id}`,
+              triggeredBy: currentUser?.id || "",
+              isRead: false,
+            });
+          });
+        }
+        
         showSuccessToast("تم إنشاء المهمة بنجاح", `تم إنشاء المهمة "${data.data.title}" بنجاح`);
         setIsDialogOpen(false);
         resetForm();

@@ -1667,6 +1667,7 @@ function ProjectsPageContent() {
                                     });
                                     if (response.ok) {
                                       dispatch({ type: "UPDATE_TASK", payload: updatedTask });
+                                      
                                       // Update project progress
                                       const projectTasks = tasks.filter(t => t.projectId === selectedProject.id);
                                       const completedTasks = projectTasks.filter(t => t.status === "completed").length;
@@ -1674,9 +1675,48 @@ function ProjectsPageContent() {
                                       const updatedProject = { ...selectedProject, progress: newProgress };
                                       setSelectedProject(updatedProject);
                                       dispatch({ type: "UPDATE_PROJECT", payload: updatedProject });
+                                      
+                                      // إرسال إشعار للمديرين عند إكمال المهمة من قبل المهندس
+                                      if (currentUser?.role !== "admin") {
+                                        // إرسال إشعار لجميع المديرين
+                                        const adminUsers = users.filter(user => user.role === "admin");
+                                        adminUsers.forEach(admin => {
+                                          addNotification({
+                                            userId: admin.id,
+                                            title: "مهمة مكتملة",
+                                            message: `تم إنجاز مهمة "${task.title}" في مشروع "${selectedProject.name}" بواسطة ${currentUser?.name}`,
+                                            type: "task",
+                                            actionUrl: `/projects?highlight=${selectedProject.id}`,
+                                            triggeredBy: currentUser?.id || "",
+                                            isRead: false,
+                                          });
+                                        });
+                                        
+                                        // إشعار إضافي إذا اكتمل المشروع بالكامل
+                                        if (newProgress === 100) {
+                                          adminUsers.forEach(admin => {
+                                            addNotification({
+                                              userId: admin.id,
+                                              title: "مشروع مكتمل",
+                                              message: `تم إكمال جميع مهام مشروع "${selectedProject.name}" بنسبة 100%`,
+                                              type: "project",
+                                              actionUrl: `/projects?highlight=${selectedProject.id}`,
+                                              triggeredBy: currentUser?.id || "",
+                                              isRead: false,
+                                            });
+                                          });
+                                        }
+                                      }
+                                      
+                                      // إظهار رسالة نجاح
+                                      showSuccessToast(
+                                        "تم إكمال المهمة بنجاح", 
+                                        `تم إكمال مهمة "${task.title}" وتحديث تقدم المشروع إلى ${newProgress}%`
+                                      );
                                     }
                                   } catch (error) {
                                     console.error('Error updating task:', error);
+                                    setAlert({ type: "error", message: "حدث خطأ أثناء إكمال المهمة" });
                                   }
                                 }}
                               >
