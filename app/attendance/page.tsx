@@ -325,15 +325,22 @@ function AttendancePageContent() {
       const sessionText = session === 'morning' ? 'صباحية' : 'مسائية';
       const actionText = action === 'checkin' ? 'حضور' : 'انصراف';
       
-      await addNotification({
-        userId: "admin", // إرسال لجميع المديرين
-        title: `تسجيل ${actionText}`,
-        message: `${currentUser?.name} قام بتسجيل ${actionText} في الفترة ${sessionText}`,
-            type: "attendance",
-            actionUrl: `/attendance`,
-        triggeredBy: currentUser?.id || "",
-            isRead: false,
-      });
+      // إرسال إشعار لجميع المديرين
+      const adminUsers = users.filter(user => user.role === 'admin');
+      
+      for (const adminUser of adminUsers) {
+        await addNotification({
+          userId: adminUser.id,
+          title: `تسجيل ${actionText}`,
+          message: `${currentUser?.name} قام بتسجيل ${actionText} في الفترة ${sessionText}`,
+          type: "attendance",
+          actionUrl: `/attendance`,
+          triggeredBy: currentUser?.id || "",
+          isRead: false,
+        });
+      }
+      
+      console.log(`تم إرسال إشعار ${actionText} للمديرين:`, adminUsers.map(u => u.name));
     } catch (error) {
       console.error('Error sending notification to manager:', error);
     }
@@ -515,6 +522,9 @@ function AttendancePageContent() {
     
     // إرسال إشعار للمدير
     notifyManager('checkin', session);
+    
+    // رسالة نجاح
+    setAlert({ type: "success", message: `تم تسجيل الحضور بنجاح للفترة ${session === 'morning' ? 'الصباحية' : 'المسائية'}` });
   };
 
   const handleCheckOut = (session: "morning" | "evening") => {
@@ -539,6 +549,24 @@ function AttendancePageContent() {
       return;
     }
 
+    // التحقق من أن الوقت مناسب لتسجيل الانصراف
+    const hour = now.getHours();
+    const minute = now.getMinutes();
+    
+    if (session === "morning") {
+      // الفترة الصباحية: يمكن تسجيل الانصراف من 12:00 فصاعداً
+      if (hour < 12) {
+        setAlert({ type: "error", message: "لا يمكن تسجيل الانصراف قبل الساعة 12:00 للفترة الصباحية" });
+        return;
+      }
+    } else {
+      // الفترة المسائية: يمكن تسجيل الانصراف من 21:00 فصاعداً
+      if (hour < 21) {
+        setAlert({ type: "error", message: "لا يمكن تسجيل الانصراف قبل الساعة 21:00 للفترة المسائية" });
+        return;
+      }
+    }
+
     // حساب الساعات
     const checkInTime = new Date(existingRecord.checkIn);
     const checkOutTime = now;
@@ -552,13 +580,15 @@ function AttendancePageContent() {
       checkOut: currentTime,
       totalHours: totalHours,
       overtimeHours: overtimeHours,
-      updatedAt: currentTime,
     };
 
     handleUpdateAttendance(existingRecord.id, updatedRecord);
     
     // إرسال إشعار للمدير
     notifyManager('checkout', session);
+    
+    // رسالة نجاح
+    setAlert({ type: "success", message: `تم تسجيل الانصراف بنجاح للفترة ${session === 'morning' ? 'الصباحية' : 'المسائية'}` });
   };
 
   const handleManualCheckInOut = () => {
