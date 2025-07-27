@@ -24,10 +24,17 @@ export async function GET() {
     
     await client.close();
     
+    // تحويل _id إلى id للتوافق مع الواجهة
+    const formattedNotifications = notificationsList.map((notification: any) => ({
+      ...notification,
+      id: notification._id?.toString() || notification.id || Date.now().toString(),
+      _id: notification._id?.toString() // إبقاء _id كـ string أيضاً
+    }));
+    
     return NextResponse.json({ 
       success: true, 
-      data: notificationsList,
-      count: notificationsList.length
+      data: formattedNotifications,
+      count: formattedNotifications.length
     });
   } catch (error) {
     console.error('Error fetching notifications:', error);

@@ -561,6 +561,47 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     fetchNotifications();
   }, []);
 
+  // تحديث الإشعارات تلقائياً كل 30 ثانية
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const response = await fetch('/api/notifications');
+        if (response.ok) {
+          const result = await response.json();
+          if (result && result.success && Array.isArray(result.data)) {
+            // تحديث الإشعارات فقط إذا كان هناك تغيير
+            const currentNotifications = state.notifications;
+            const newNotifications = result.data;
+            
+            // مقارنة عدد الإشعارات
+            if (currentNotifications.length !== newNotifications.length) {
+              dispatch({ type: "LOAD_NOTIFICATIONS", payload: newNotifications });
+              logger.info('Notifications updated from database', { 
+                oldCount: currentNotifications.length,
+                newCount: newNotifications.length
+              }, 'NOTIFICATIONS');
+            } else {
+              // مقارنة آخر إشعار
+              const lastCurrentNotification = currentNotifications[0];
+              const lastNewNotification = newNotifications[0];
+              
+              if (lastCurrentNotification?.id !== lastNewNotification?.id) {
+                dispatch({ type: "LOAD_NOTIFICATIONS", payload: newNotifications });
+                logger.info('New notifications detected, updated from database', { 
+                  count: newNotifications.length
+                }, 'NOTIFICATIONS');
+              }
+            }
+          }
+        }
+      } catch (error) {
+        logger.error('Error updating notifications', { error }, 'NOTIFICATIONS');
+      }
+    }, 30000); // 30 ثانية
+
+    return () => clearInterval(interval);
+  }, [state.notifications.length]);
+
   // جلب المهام من الباكند عند بدء التطبيق
   useEffect(() => {
     const fetchTasks = async () => {
@@ -1389,6 +1430,31 @@ export function useAppActions() {
       if (response && response.success) {
         const newTask = response.data as Task;
         dispatch({ type: "ADD_TASK", payload: newTask });
+        
+        // إرسال إشعار للمستخدم المسند إليه المهمة
+        if (task.assigneeId && task.assigneeId !== state.currentUser?.id) {
+          await addNotification({
+            userId: task.assigneeId,
+            title: "مهمة جديدة مسندة إليك",
+            message: `تم إسناد مهمة جديدة إليك: "${task.title}"`,
+            type: "task",
+            actionUrl: `/tasks?highlight=${newTask.id}`,
+            triggeredBy: state.currentUser?.id || "system",
+            isRead: false
+          });
+        }
+        
+        // إرسال إشعار عام عن إنشاء المهمة
+        await addNotification({
+          userId: state.currentUser?.id || "system",
+          title: "مهمة جديدة تم إنشاؤها",
+          message: `تم إنشاء مهمة "${task.title}" بواسطة ${state.currentUser?.name || "مستخدم"}`,
+          type: "task",
+          actionUrl: `/tasks?highlight=${newTask.id}`,
+          triggeredBy: state.currentUser?.id || "system",
+          isRead: false
+        });
+        
         if (typeof window !== 'undefined' && window.realtimeUpdates && typeof window.realtimeUpdates === 'object' && typeof (window.realtimeUpdates as any).sendTaskUpdate === 'function') {
           (window.realtimeUpdates as any).sendTaskUpdate({ action: 'create', task: newTask });
         }
