@@ -134,6 +134,9 @@ function TasksPageContent() {
         if (data.success && Array.isArray(data.data)) {
           console.log('✅ Tasks loaded from database:', data.data.length);
           dispatch({ type: "LOAD_TASKS", payload: data.data });
+          
+          // حفظ المهام في localStorage للتحديثات الفورية
+          localStorage.setItem("tasks", JSON.stringify(data.data));
         } else {
           console.log('❌ Failed to load tasks from database:', data);
         }
@@ -142,13 +145,9 @@ function TasksPageContent() {
       }
     };
 
-    // تحميل المهام فقط إذا لم تكن موجودة بالفعل
-    if (tasks.length === 0) {
-      loadTasksFromDatabase();
-    } else {
-      console.log('📋 Tasks already loaded:', tasks.length);
-    }
-  }, [dispatch, tasks.length]);
+    // تحميل المهام من قاعدة البيانات دائماً لضمان الحصول على أحدث البيانات
+    loadTasksFromDatabase();
+  }, [dispatch]);
 
   const [searchTerm, setSearchTerm] = useState("")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -630,7 +629,19 @@ function TasksPageContent() {
     // Filter by user role
     let userFilter = true
     if (currentUser?.role !== "admin") {
-      userFilter = task.assigneeId === currentUser?.id // المستخدم يرى مهامه المخصصة له فقط
+      // البحث عن المستخدم الحالي في قائمة المستخدمين المحدثة من قاعدة البيانات
+      const currentUserFromDB = users.find(u => 
+        u.email === currentUser?.email || 
+        u.name === currentUser?.name ||
+        u.id === currentUser?.id
+      );
+      
+      if (currentUserFromDB) {
+        userFilter = task.assigneeId === currentUserFromDB._id || task.assigneeId === currentUserFromDB.id;
+      } else {
+        // Fallback: مقارنة مباشرة مع معرف المستخدم الحالي
+        userFilter = task.assigneeId === currentUser?.id;
+      }
     }
     
     // Filter by project
@@ -648,6 +659,7 @@ function TasksPageContent() {
         taskTitle: task.title,
         assigneeId: task.assigneeId,
         currentUserId: currentUser?.id,
+        currentUserEmail: currentUser?.email,
         userFilter,
         projectFilterResult
       });

@@ -542,7 +542,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         // Initialize default roles first
         initializeDefaultRoles()
         
-        // Load current user
+        // Load current user from localStorage first
         const userData = localStorage.getItem("currentUser")
         if (userData) {
           const user = JSON.parse(userData)
@@ -564,6 +564,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               })
               // Save to localStorage for offline access
               localStorage.setItem("users", JSON.stringify(data.data))
+              
+              // Update current user with database data if exists
+              const currentUserData = localStorage.getItem("currentUser");
+              if (currentUserData) {
+                const currentUser = JSON.parse(currentUserData);
+                const currentUserFromDB = data.data.find((u: User) => 
+                  u.email === currentUser.email || 
+                  u.name === currentUser.name ||
+                  u.id === currentUser.id
+                );
+                if (currentUserFromDB) {
+                  const updatedCurrentUser = updateUserPermissionsByRole(currentUserFromDB);
+                  dispatch({ type: "SET_CURRENT_USER", payload: updatedCurrentUser });
+                  localStorage.setItem("currentUser", JSON.stringify(updatedCurrentUser));
+                  logger.debug("Updated current user with database data", { user: updatedCurrentUser }, 'DATABASE');
+                }
+              }
             }
           }
         } catch (error) {
