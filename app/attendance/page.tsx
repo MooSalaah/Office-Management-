@@ -502,16 +502,16 @@ function AttendancePageContent() {
     }
 
     const newRecord: AttendanceRecord = {
-      id: `attendance_${Date.now()}`,
+      id: Date.now().toString(),
       userId: currentUser.id,
-      userName: currentUser.name,
+      userName: currentUser.name || "",
       date: today,
       session: session,
       checkIn: currentTime,
-      checkOut: null,
+      checkOut: "",
       totalHours: 0,
       overtimeHours: 0,
-      status: status,
+      status: status as "present" | "absent" | "late" | "overtime",
       notes: "",
       location: "",
       createdAt: currentTime,
@@ -568,7 +568,7 @@ function AttendancePageContent() {
     }
 
     // حساب الساعات
-    const checkInTime = new Date(existingRecord.checkIn);
+    const checkInTime = new Date(existingRecord.checkIn || "");
     const checkOutTime = now;
     const totalHours = Math.round((checkOutTime.getTime() - checkInTime.getTime()) / (1000 * 60 * 60) * 100) / 100;
     
@@ -610,7 +610,7 @@ function AttendancePageContent() {
       const newRecord: AttendanceRecord = {
         id: Date.now().toString(),
         userId: employee.id,
-        userName: employee.name,
+        userName: employee.name || "",
         checkIn: actionTime.toISOString(),
         date: today,
         status: actionTime.getHours() > 8 ? "late" : "present",
@@ -619,12 +619,17 @@ function AttendancePageContent() {
         lateHours: 0,
         overtimeHours: 0,
         totalHours: 0,
+        checkOut: "",
+        notes: "",
+        location: "",
+        createdAt: actionTime.toISOString(),
+        updatedAt: actionTime.toISOString(),
       }
 
       setAttendanceRecords((prev) => [...prev, newRecord])
       
       // بث تحديث فوري لجميع المستخدمين
-      realtimeUpdates.sendAttendanceUpdate({ action: 'create', attendance: newRecord, userId: employee.id, userName: employee.name })
+      realtimeUpdates.sendAttendanceUpdate({ action: 'create', attendance: newRecord, userId: employee.id, userName: employee.name || "" })
     } else {
       // Find existing record for checkout
       const existingRecord = attendanceRecords.find(r => r.userId === employee.id && r.date === today)
@@ -644,8 +649,8 @@ function AttendancePageContent() {
 
       setAttendanceRecords((prev) => prev.map((record) => (record.id === existingRecord.id ? updatedRecord : record)))
       
-      // بث تحديث فوري لجميع المستخدمين
-      realtimeUpdates.sendAttendanceUpdate({ action: 'update', attendance: updatedRecord, userId: employee.id, userName: employee.name })
+              // بث تحديث فوري لجميع المستخدمين
+        realtimeUpdates.sendAttendanceUpdate({ action: 'update', attendance: updatedRecord, userId: employee.id, userName: employee.name || "" })
     }
 
     setAlert({ type: "success", message: `تم تسجيل ${manualFormData.action === "checkin" ? "الحضور" : "الانصراف"} بنجاح` })
