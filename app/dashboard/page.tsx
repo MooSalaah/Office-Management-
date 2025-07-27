@@ -985,13 +985,12 @@ function DashboardPageContent() {
       ];
     }
 
-    // المحاسبين - 5 إجراءات محددة
+    // المحاسبين - 4 إجراءات محددة
     if (currentUser?.role === "accountant") {
       return [
         baseActions.addTransaction,
         baseActions.addUpcomingPayment,
         baseActions.addClient,
-        baseActions.addTask,
         baseActions.settings,
       ];
     }
