@@ -903,57 +903,117 @@ function DashboardPageContent() {
     }
   }, [delayedTasksCount, currentUser])
 
-  const quickActions = [
-    {
-      title: "إضافة مشروع جديد",
-      description: "إنشاء مشروع جديد وربطه بعميل",
-      icon: Building,
-      color: "bg-blue-600 hover:bg-blue-700",
-      onClick: () => router.push("/projects?action=create"),
-    },
-    {
-      title: "إضافة عميل جديد",
-      description: "تسجيل عميل جديد في النظام",
-      icon: UserPlus,
-      color: "bg-green-600 hover:bg-green-700",
-      onClick: () => setIsClientDialogOpen(true),
-    },
-    {
-      title: "تسجيل معاملة مالية",
-      description: "إضافة دخل أو مصروف جديد",
-      icon: Receipt,
-      color: "bg-yellow-600 hover:bg-yellow-700",
-      onClick: () => router.push("/finance?action=create"),
-    },
-    {
-      title: "إضافة دفعة قادمة",
-      description: "تسجيل دفعة قادمة أو مصروف متوقع",
-      icon: Calendar,
-      color: "bg-orange-600 hover:bg-orange-700",
-      onClick: () => setIsUpcomingPaymentDialogOpen(true),
-    },
-    {
-      title: "إضافة مهمة جديدة",
-      description: "تعيين مهمة لأحد أعضاء الفريق",
-      icon: CheckCircle,
-      color: "bg-purple-600 hover:bg-purple-700",
-      onClick: () => {
-        setDefaultTaskForm({
-          assigneeId: currentUser?.id || "",
-          dueDate: new Date().toISOString().split("T")[0],
-        });
-        setIsTaskDialogOpen(true);
+  // تحديد الإجراءات السريعة حسب دور المستخدم
+  const getQuickActions = () => {
+    const baseActions = {
+      addProject: {
+        title: "إضافة مشروع جديد",
+        description: "إنشاء مشروع جديد وربطه بعميل",
+        icon: Building,
+        color: "bg-blue-600 hover:bg-blue-700",
+        onClick: () => router.push("/projects?action=create"),
       },
-    },
+      addClient: {
+        title: "إضافة عميل جديد",
+        description: "تسجيل عميل جديد في النظام",
+        icon: UserPlus,
+        color: "bg-green-600 hover:bg-green-700",
+        onClick: () => setIsClientDialogOpen(true),
+      },
+      addTask: {
+        title: "إضافة مهمة جديدة",
+        description: "تعيين مهمة لأحد أعضاء الفريق",
+        icon: CheckCircle,
+        color: "bg-purple-600 hover:bg-purple-700",
+        onClick: () => {
+          setDefaultTaskForm({
+            assigneeId: currentUser?.id || "",
+            dueDate: new Date().toISOString().split("T")[0] || "",
+          });
+          setIsTaskDialogOpen(true);
+        },
+      },
+      addTransaction: {
+        title: "تسجيل معاملة مالية",
+        description: "إضافة دخل أو مصروف جديد",
+        icon: Receipt,
+        color: "bg-yellow-600 hover:bg-yellow-700",
+        onClick: () => router.push("/finance?action=create"),
+      },
+      addUpcomingPayment: {
+        title: "إضافة دفعة قادمة",
+        description: "تسجيل دفعة قادمة أو مصروف متوقع",
+        icon: Calendar,
+        color: "bg-orange-600 hover:bg-orange-700",
+        onClick: () => setIsUpcomingPaymentDialogOpen(true),
+      },
+      addUser: {
+        title: "إضافة مستخدم جديد",
+        description: "إضافة مستخدم جديد للنظام",
+        icon: UserPlus,
+        color: "bg-indigo-600 hover:bg-indigo-700",
+        onClick: () => router.push("/settings?action=add-user"),
+      },
+      settings: {
+        title: "إعدادات النظام",
+        description: "إدارة المستخدمين وإعدادات المكتب",
+        icon: Settings,
+        color: "bg-gray-600 hover:bg-gray-700",
+        onClick: () => router.push("/settings"),
+      },
+    };
 
-    {
-      title: "إعدادات النظام",
-      description: "إدارة المستخدمين وإعدادات المكتب",
-      icon: Settings,
-      color: "bg-gray-600 hover:bg-gray-700",
-      onClick: () => router.push("/settings"),
-    },
-  ]
+    // المدير - جميع الإجراءات
+    if (currentUser?.role === "admin") {
+      return [
+        baseActions.addProject,
+        baseActions.addClient,
+        baseActions.addTransaction,
+        baseActions.addUpcomingPayment,
+        baseActions.addTask,
+        baseActions.settings,
+      ];
+    }
+
+    // المهندسين - 4 إجراءات محددة
+    if (currentUser?.role === "engineer") {
+      return [
+        baseActions.addProject,
+        baseActions.addClient,
+        baseActions.addTask,
+        baseActions.settings,
+      ];
+    }
+
+    // المحاسبين - 5 إجراءات محددة
+    if (currentUser?.role === "accountant") {
+      return [
+        baseActions.addTransaction,
+        baseActions.addUpcomingPayment,
+        baseActions.addClient,
+        baseActions.addTask,
+        baseActions.settings,
+      ];
+    }
+
+    // الموارد البشرية - 4 إجراءات محددة
+    if (currentUser?.role === "hr") {
+      return [
+        baseActions.addUser,
+        baseActions.addClient,
+        baseActions.addTask,
+        baseActions.settings,
+      ];
+    }
+
+    // المستخدمين العاديين - إجراءات محدودة
+    return [
+      baseActions.addTask,
+      baseActions.settings,
+    ];
+  };
+
+  const quickActions = getQuickActions();
 
   const handleMarkAsRead = (notificationId: string) => {
     markNotificationAsRead(notificationId);
@@ -1181,7 +1241,7 @@ function DashboardPageContent() {
           <CardDescription>الإجراءات الأكثر استخداماً في النظام</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {quickActions.map((action, index) => {
               const Icon = action.icon
               return (
@@ -1399,7 +1459,11 @@ function DashboardPageContent() {
             <DialogTitle>إضافة مهمة جديدة</DialogTitle>
             <DialogDescription>قم بإدخال تفاصيل المهمة الجديدة</DialogDescription>
           </DialogHeader>
-          <TaskForm onClose={() => setIsTaskDialogOpen(false)} defaultAssigneeId={defaultTaskForm.assigneeId} defaultDueDate={defaultTaskForm.dueDate} />
+          <TaskForm 
+            onClose={() => setIsTaskDialogOpen(false)} 
+            defaultAssigneeId={defaultTaskForm.assigneeId} 
+            defaultDueDate={defaultTaskForm.dueDate} 
+          />
         </DialogContent>
       </Dialog>
     </div>
