@@ -1025,13 +1025,21 @@ export function useAppActions() {
     }
     
     // إرسال تحديث فوري
-    if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
-      (window as any).realtimeUpdates.broadcastUpdate('notification', newNotification);
+    try {
+      if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
+        (window as any).realtimeUpdates.broadcastUpdate('notification', newNotification);
+      }
+    } catch (error) {
+      logger.error('Error broadcasting notification update', { error }, 'NOTIFICATIONS');
     }
     
     // عرض إشعار المتصفح إذا كان مسموحاً
-    if (userSettings?.notificationSettings?.browserNotifications) {
-      showBrowserNotification(newNotification);
+    try {
+      if (userSettings?.notificationSettings?.browserNotifications) {
+        showBrowserNotification(newNotification);
+      }
+    } catch (error) {
+      logger.error('Error showing browser notification', { error }, 'NOTIFICATIONS');
     }
   };
 

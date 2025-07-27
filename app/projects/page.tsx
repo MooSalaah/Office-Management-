@@ -426,27 +426,40 @@ function ProjectsPageContent() {
 
       // Add notification to assigned engineer if changed
       if (engineer && engineer.id !== currentUser?.id && engineer.id !== editingProject.assignedEngineerId) {
-        addNotification({
-          userId: engineer.id,
-          title: "تم تعيين مشروع لك",
-          message: `تم تعيين مشروع "${formData.name}" لك`,
-          type: "project",
-          actionUrl: `/projects/${updatedProject.id}`,
-          triggeredBy: currentUser?.id || "",
-          isRead: false,
-        })
+        // البحث عن المستخدم المسؤول في قائمة المستخدمين
+        const assignee = users.find(u => 
+          u._id === engineer.id || 
+          u.id === engineer.id ||
+          u.email === engineer.email
+        );
         
-        // إرسال تحديث فوري للمهندس الجديد
-        if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
-          (window as any).realtimeUpdates.broadcastUpdate('notification', {
-            userId: engineer.id,
+        if (assignee) {
+          addNotification({
+            userId: assignee._id || assignee.id,
             title: "تم تعيين مشروع لك",
             message: `تم تعيين مشروع "${formData.name}" لك`,
             type: "project",
             actionUrl: `/projects/${updatedProject.id}`,
             triggeredBy: currentUser?.id || "",
             isRead: false,
-          });
+          })
+          
+          // إرسال تحديث فوري للمهندس الجديد
+          try {
+            if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
+              (window as any).realtimeUpdates.broadcastUpdate('notification', {
+                userId: assignee._id || assignee.id,
+                title: "تم تعيين مشروع لك",
+                message: `تم تعيين مشروع "${formData.name}" لك`,
+                type: "project",
+                actionUrl: `/projects/${updatedProject.id}`,
+                triggeredBy: currentUser?.id || "",
+                isRead: false,
+              });
+            }
+          } catch (error) {
+            console.error('Error broadcasting project notification:', error);
+          }
         }
       }
     } catch (error) {

@@ -422,26 +422,41 @@ function TasksPageContent() {
         
         // إرسال إشعار للمسؤول عن المهمة
         if (data.data.assigneeId && data.data.assigneeId !== currentUser?.id) {
-          addNotification({
-            userId: data.data.assigneeId,
-            title: "مهمة جديدة مُعيّنة لك",
-            message: `تم تعيين مهمة "${data.data.title}" لك بواسطة ${currentUser?.name}`,
-            type: "task",
-            actionUrl: `/tasks?highlight=${data.data.id}`,
-            triggeredBy: currentUser?.id || "",
-            isRead: false,
-          });
+          // البحث عن المستخدم المسؤول في قائمة المستخدمين
+          const assignee = users.find(u => 
+            u._id === data.data.assigneeId || 
+            u.id === data.data.assigneeId ||
+            u.email === data.data.assigneeName
+          );
           
-          // إرسال تحديث فوري للمسؤول الجديد
-          realtimeUpdates.broadcastUpdate('notification', {
-            userId: data.data.assigneeId,
-            title: "مهمة جديدة مُعيّنة لك",
-            message: `تم تعيين مهمة "${data.data.title}" لك بواسطة ${currentUser?.name}`,
-            type: "task",
-            actionUrl: `/tasks?highlight=${data.data.id}`,
-            triggeredBy: currentUser?.id || "",
-            isRead: false,
-          });
+          if (assignee) {
+            addNotification({
+              userId: assignee._id || assignee.id,
+              title: "مهمة جديدة مُعيّنة لك",
+              message: `تم تعيين مهمة "${data.data.title}" لك بواسطة ${currentUser?.name}`,
+              type: "task",
+              actionUrl: `/tasks?highlight=${data.data.id}`,
+              triggeredBy: currentUser?.id || "",
+              isRead: false,
+            });
+            
+            // إرسال تحديث فوري للمسؤول الجديد
+            try {
+              if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
+                (window as any).realtimeUpdates.broadcastUpdate('notification', {
+                  userId: assignee._id || assignee.id,
+                  title: "مهمة جديدة مُعيّنة لك",
+                  message: `تم تعيين مهمة "${data.data.title}" لك بواسطة ${currentUser?.name}`,
+                  type: "task",
+                  actionUrl: `/tasks?highlight=${data.data.id}`,
+                  triggeredBy: currentUser?.id || "",
+                  isRead: false,
+                });
+              }
+            } catch (error) {
+              console.error('Error broadcasting notification:', error);
+            }
+          }
         }
         
         // إرسال إشعار للمديرين عند إنشاء مهمة جديدة

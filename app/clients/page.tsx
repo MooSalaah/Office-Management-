@@ -235,15 +235,19 @@ function ClientsPageContent() {
 
       // Add notification to admin when client is created
       if (currentUser?.role !== "admin") {
-        addNotification({
-          userId: "1", // Admin user ID
-          title: "عميل جديد تم إضافته",
-          message: `تم إضافة عميل جديد "${formData.name}" بواسطة ${currentUser?.name}`,
-          type: "project",
-          actionUrl: `/clients/${newClient.id}`,
-          triggeredBy: currentUser?.id || "",
-          isRead: false,
-        })
+        // إرسال إشعار لجميع المديرين
+        const adminUsers = users.filter(user => user.role === "admin");
+        adminUsers.forEach(admin => {
+          addNotification({
+            userId: admin._id || admin.id,
+            title: "عميل جديد تم إضافته",
+            message: `تم إضافة عميل جديد "${formData.name}" بواسطة ${currentUser?.name}`,
+            type: "client",
+            actionUrl: `/clients/${newClient.id}`,
+            triggeredBy: currentUser?.id || "",
+            isRead: false,
+          });
+        });
       }
     } catch (error) {
       logger.error('Error creating client:', { error }, 'CLIENTS');
@@ -286,15 +290,19 @@ function ClientsPageContent() {
 
     // Add notification to admin when client is updated
     if (currentUser?.role !== "admin") {
-      addNotification({
-        userId: "1", // Admin user ID
-        title: "عميل تم تحديثه",
-        message: `تم تحديث عميل "${formData.name}" بواسطة ${currentUser?.name}`,
-        type: "project",
-        actionUrl: `/clients/${editingClient?.id}`,
-        triggeredBy: currentUser?.id || "",
-        isRead: false,
-      })
+      // إرسال إشعار لجميع المديرين
+      const adminUsers = users.filter(user => user.role === "admin");
+      adminUsers.forEach(admin => {
+        addNotification({
+          userId: admin._id || admin.id,
+          title: "عميل تم تحديثه",
+          message: `تم تحديث عميل "${formData.name}" بواسطة ${currentUser?.name}`,
+          type: "client",
+          actionUrl: `/clients/${editingClient?.id}`,
+          triggeredBy: currentUser?.id || "",
+          isRead: false,
+        });
+      });
     }
   }
 
