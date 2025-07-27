@@ -186,12 +186,22 @@ async function fixNotificationSystem() {
     console.log('\n🔧 Step 7: Creating database indexes...');
     
     try {
+      // Indexes for notifications
       await notifications.createIndex({ userId: 1 });
       await notifications.createIndex({ isRead: 1 });
       await notifications.createIndex({ type: 1 });
       await notifications.createIndex({ createdAt: -1 });
-      await notifications.createIndex({ id: 1 }); // Add this line for the new index
-      console.log('✅ Database indexes created successfully');
+      await notifications.createIndex({ id: 1 });
+      console.log('✅ Notification indexes created successfully');
+      
+      // Indexes for projects
+      const projects = database.collection('projects');
+      await projects.createIndex({ id: 1 });
+      await projects.createIndex({ status: 1 });
+      await projects.createIndex({ assignedEngineerId: 1 });
+      console.log('✅ Project indexes created successfully');
+      
+      console.log('✅ All database indexes created successfully');
     } catch (error) {
       console.log('⚠️ Some indexes may already exist:', error.message);
     }

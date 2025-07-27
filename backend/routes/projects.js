@@ -33,7 +33,7 @@ router.get('/', async (req, res) => {
 // Get project by ID (public for testing)
 router.get('/:id', async (req, res) => {
   try {
-    const project = await Project.findById(req.params.id);
+    const project = await Project.findOne({ id: req.params.id });
     if (!project) return res.status(404).json({ success: false, error: 'Project not found' });
     res.json({ success: true, data: project });
   } catch (err) {
@@ -135,11 +135,11 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     // Get the original project to compare assigned engineer
-    const originalProject = await Project.findById(req.params.id);
+    const originalProject = await Project.findOne({ id: req.params.id });
     if (!originalProject) return res.status(404).json({ success: false, error: 'Project not found' });
     
-    const updatedProject = await Project.findByIdAndUpdate(
-      req.params.id,
+    const updatedProject = await Project.findOneAndUpdate(
+      { id: req.params.id },
       req.body,
       { new: true }
     );
@@ -181,7 +181,7 @@ router.put('/:id', async (req, res) => {
 // Delete project (public for testing)
 router.delete('/:id', async (req, res) => {
   try {
-    const deletedProject = await Project.findByIdAndDelete(req.params.id);
+    const deletedProject = await Project.findOneAndDelete({ id: req.params.id });
     if (!deletedProject) return res.status(404).json({ success: false, error: 'Project not found' });
     res.json({ success: true, message: 'Project deleted' });
   } catch (err) {
