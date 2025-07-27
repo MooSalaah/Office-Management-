@@ -816,6 +816,29 @@ function FinancePageContent() {
     }
   }
 
+  // إضافة أنواع المعاملات الجديدة
+  const transactionTypes = [
+    { value: "license", label: "رخصة إنشاء" },
+    { value: "certificate", label: "شهادة إشغال" },
+    { value: "safety", label: "مخطط سلامة" },
+    { value: "consultation", label: "استشارة هندسية" },
+    { value: "design", label: "تصميم" },
+    { value: "supervision", label: "إشراف" },
+    { value: "maintenance", label: "صيانة" },
+    { value: "renovation", label: "ترميم" },
+    { value: "inspection", label: "فحص" },
+    { value: "other", label: "أخرى" },
+  ]
+
+  // إضافة طرق الدفع الجديدة
+  const paymentMethods = [
+    { value: "cash", label: "نقداً" },
+    { value: "transfer", label: "تحويل بنكي" },
+    { value: "pos", label: "POS" },
+    { value: "check", label: "شيك" },
+    { value: "credit", label: "بطاقة ائتمان" },
+  ]
+
   // دالة لحساب حالة الدفعة وألوانها
   const getPaymentStatus = (dueDate: string) => {
     const today = new Date()
@@ -1395,12 +1418,17 @@ function FinancePageContent() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">النمو الشهري</p>
+                <p className="text-sm font-medium text-muted-foreground">
+                  النمو الشهري - {new Date().toLocaleDateString('ar-SA', { month: 'long', year: 'numeric' })}
+                </p>
                 <div className="flex items-center gap-1 mt-1">
                   <span className="text-2xl font-bold text-blue-400">
                     {financialSummary.monthlyGrowth}
                   </span>
                 </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  مقارنة بـ {new Date(lastMonthYear, lastMonth).toLocaleDateString('ar-SA', { month: 'long', year: 'numeric' })}
+                </p>
               </div>
               <div className="p-3 rounded-full bg-blue-900">
                 <TrendingUp className="w-6 h-6 text-blue-400" />
@@ -1442,6 +1470,16 @@ function FinancePageContent() {
                     <SelectItem value="all">جميع المعاملات</SelectItem>
                     <SelectItem value="income">الدخل فقط</SelectItem>
                     <SelectItem value="expense">المصروفات فقط</SelectItem>
+                    <SelectItem value="license">رخصة إنشاء</SelectItem>
+                    <SelectItem value="certificate">شهادة إشغال</SelectItem>
+                    <SelectItem value="safety">مخطط سلامة</SelectItem>
+                    <SelectItem value="consultation">استشارة هندسية</SelectItem>
+                    <SelectItem value="design">تصميم</SelectItem>
+                    <SelectItem value="supervision">إشراف</SelectItem>
+                    <SelectItem value="maintenance">صيانة</SelectItem>
+                    <SelectItem value="renovation">ترميم</SelectItem>
+                    <SelectItem value="inspection">فحص</SelectItem>
+                    <SelectItem value="other">أخرى</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

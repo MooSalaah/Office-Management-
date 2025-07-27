@@ -148,13 +148,20 @@ export const useStatusFilter = <T extends { status: string }>(
 };
 
 // تحسين أداء الفلترة حسب النوع
-export const useTypeFilter = <T extends { type: string }>(
+export const useTypeFilter = <T extends { type: string; transactionType?: string }>(
 	data: T[],
 	typeFilter: string
 ) => {
 	return useMemo(() => {
 		if (typeFilter === "all") return data;
-		return data.filter((item) => item.type === typeFilter);
+		
+		// فلترة حسب نوع المعاملة (income/expense)
+		if (typeFilter === "income" || typeFilter === "expense") {
+			return data.filter((item) => item.type === typeFilter);
+		}
+		
+		// فلترة حسب نوع المعاملة (transactionType)
+		return data.filter((item) => item.transactionType === typeFilter);
 	}, [data, typeFilter]);
 };
 

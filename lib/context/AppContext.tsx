@@ -603,7 +603,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     };
     
+    const fetchUpcomingPayments = async () => {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
+        const response = await fetch(`${apiUrl}/api/upcomingPayments`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+          }
+        });
+        if (response.ok) {
+          const result = await response.json();
+          if (result && result.success && Array.isArray(result.data)) {
+            dispatch({ type: "LOAD_UPCOMING_PAYMENTS", payload: result.data });
+            logger.info('Upcoming payments loaded from Backend API', { 
+              count: result.data.length 
+            }, 'UPCOMING_PAYMENTS');
+          } else {
+            logger.warn('Invalid upcoming payments response format from Backend API', { result }, 'UPCOMING_PAYMENTS');
+          }
+        }
+      } catch (error) {
+        logger.error('Error fetching upcoming payments from Backend API', { error }, 'UPCOMING_PAYMENTS');
+      }
+    };
+    
     fetchTransactions();
+    fetchUpcomingPayments();
   }, []);
 
   // تحديث البيانات المالية تلقائياً كل 30 ثانية
