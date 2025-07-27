@@ -508,7 +508,7 @@ function ProjectsPageContent() {
       }
 
       // Delete from backend database
-      const response = await fetch(`/api/projects?id=${projectToDelete}`, {
+      const response = await fetch(`/api/projects/${projectToDelete}`, {
         method: 'DELETE',
       });
 
@@ -534,16 +534,18 @@ function ProjectsPageContent() {
       if (project && Array.isArray(project.team)) {
         project.team.forEach((engineerId: string) => {
           if (engineerId !== currentUser?.id) {
-            const eng = users.find(u => u.id === engineerId);
-            addNotification({
-              userId: engineerId,
-              title: "تم حذف مشروع كنت مسؤول عنه",
-              message: `تم حذف مشروع \"${project.name}\" بواسطة ${currentUser?.name}`,
-              type: "project",
-              triggeredBy: currentUser?.id || "",
-              isRead: false,
-            });
-            logger.info(`تم إشعار ${eng?.name || engineerId} بحذف المشروع`, { engineerId, engineerName: eng?.name }, 'PROJECTS');
+            const eng = users.find(u => u.id === engineerId || u._id === engineerId);
+            if (eng) {
+              addNotification({
+                userId: eng._id || eng.id,
+                title: "تم حذف مشروع كنت مسؤول عنه",
+                message: `تم حذف مشروع \"${project.name}\" بواسطة ${currentUser?.name}`,
+                type: "project",
+                triggeredBy: currentUser?.id || "",
+                isRead: false,
+              });
+              logger.info(`تم إشعار ${eng.name} بحذف المشروع`, { engineerId, engineerName: eng.name }, 'PROJECTS');
+            }
           }
         });
       }

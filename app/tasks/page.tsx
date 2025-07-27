@@ -464,7 +464,7 @@ function TasksPageContent() {
           const adminUsers = users.filter(user => user.role === "admin");
           adminUsers.forEach(admin => {
             addNotification({
-              userId: admin.id,
+              userId: admin._id || admin.id,
               title: "مهمة جديدة تم إنشاؤها",
               message: `تم إنشاء مهمة "${data.data.title}" بواسطة ${currentUser?.name}`,
               type: "task",
