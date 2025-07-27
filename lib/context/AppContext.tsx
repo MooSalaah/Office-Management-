@@ -1632,10 +1632,23 @@ export function useAppActions() {
         return
       }
 
-      // حذف من قاعدة البيانات
-      const response = await api.clients.delete(clientId);
-      if (!response.success) {
-        throw new Error(response.error || 'فشل حذف العميل من قاعدة البيانات');
+      // حذف من قاعدة البيانات مع إرسال معلومات المستخدم
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
+      const response = await fetch(`${apiUrl}/api/clients/${clientId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+        },
+        body: JSON.stringify({
+          deletedBy: state.currentUser?.id,
+          deletedByName: state.currentUser?.name
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'فشل حذف العميل من قاعدة البيانات');
       }
 
       dispatch({ type: "DELETE_CLIENT", payload: clientId })

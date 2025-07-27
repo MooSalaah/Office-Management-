@@ -57,8 +57,8 @@ export default function ClientsPage() {
 
 function ClientsPageContent() {
   const { state, dispatch } = useApp()
-  const { addNotification, createClient, updateClient, deleteClient, showSuccessToast } = useAppActions()
-  const { currentUser, clients, projects } = state
+  const { addNotification, createClient, updateClient, deleteClient, showSuccessToast, showErrorToast } = useAppActions()
+  const { currentUser, clients, projects, users } = state
   const router = useRouter()
 
   const [filteredClients, setFilteredClients] = useState<Client[]>(clients)
@@ -189,7 +189,7 @@ function ClientsPageContent() {
 
   const handleCreateClient = async () => {
     if (!hasPermission(currentUser?.role || "", "create", "clients")) {
-      setAlert({ type: "error", message: "ليس لديك صلاحية لإنشاء عملاء جدد" })
+      showErrorToast("خطأ في إنشاء العميل", "ليس لديك صلاحية لإنشاء عملاء جدد")
       return
     }
     const missingFields = {
@@ -236,10 +236,10 @@ function ClientsPageContent() {
       // Add notification to admin when client is created
       if (currentUser?.role !== "admin") {
         // إرسال إشعار لجميع المديرين
-        const adminUsers = users.filter(user => user.role === "admin");
-        adminUsers.forEach(admin => {
+        const adminUsers = users.filter((user: any) => user.role === "admin");
+        adminUsers.forEach((admin: any) => {
           addNotification({
-            userId: admin._id || admin.id,
+            userId: admin.id,
             title: "عميل جديد تم إضافته",
             message: `تم إضافة عميل جديد "${formData.name}" بواسطة ${currentUser?.name}`,
             type: "client",
@@ -251,13 +251,13 @@ function ClientsPageContent() {
       }
     } catch (error) {
       logger.error('Error creating client:', { error }, 'CLIENTS');
-      setAlert({ type: "error", message: "حدث خطأ أثناء حفظ العميل في قاعدة البيانات" });
+      showErrorToast("خطأ في إنشاء العميل", "حدث خطأ أثناء حفظ العميل في قاعدة البيانات");
     }
   }
 
   const handleUpdateClient = async () => {
     if (!editingClient || !hasPermission(currentUser?.role || "", "edit", "clients")) {
-      setAlert({ type: "error", message: "ليس لديك صلاحية لتعديل العملاء" })
+      showErrorToast("خطأ في تحديث العميل", "ليس لديك صلاحية لتعديل العملاء")
       return
     }
 
@@ -291,10 +291,10 @@ function ClientsPageContent() {
     // Add notification to admin when client is updated
     if (currentUser?.role !== "admin") {
       // إرسال إشعار لجميع المديرين
-      const adminUsers = users.filter(user => user.role === "admin");
-      adminUsers.forEach(admin => {
+      const adminUsers = users.filter((user: any) => user.role === "admin");
+      adminUsers.forEach((admin: any) => {
         addNotification({
-          userId: admin._id || admin.id,
+          userId: admin.id,
           title: "عميل تم تحديثه",
           message: `تم تحديث عميل "${formData.name}" بواسطة ${currentUser?.name}`,
           type: "client",
@@ -308,9 +308,7 @@ function ClientsPageContent() {
 
   const handleDeleteClient = (clientId: string) => {
     if (!hasPermission(currentUser?.role || "", "delete", "clients")) {
-      setDeleteError("ليس لديك صلاحية لحذف العملاء")
-      setClientToDelete(clientId)
-      setDeleteDialogOpen(true)
+      showErrorToast("خطأ في حذف العميل", "ليس لديك صلاحية لحذف العملاء")
       return
     }
 
@@ -324,25 +322,25 @@ function ClientsPageContent() {
     try {
       const client = clients.find(c => c.id === clientToDelete)
       if (!client) {
-        setDeleteError("العميل غير موجود")
+        showErrorToast("خطأ في حذف العميل", "العميل غير موجود")
         return
       }
 
       // Check if client has projects
       const clientProjects = projects.filter(p => p.clientId === clientToDelete)
       if (clientProjects.length > 0) {
-        setDeleteError("لا يمكن حذف العميل لأنه مرتبط بمشاريع")
+        showErrorToast("خطأ في حذف العميل", "لا يمكن حذف العميل لأنه مرتبط بمشاريع")
         return
       }
 
-      // استخدام وظيفة AppContext
+      // استخدام وظيفة AppContext مع إرسال معلومات المستخدم
       await deleteClient(clientToDelete)
 
       setDeleteDialogOpen(false)
       setClientToDelete(null)
       setDeleteError("")
     } catch (error) {
-      setDeleteError("حدث خطأ أثناء حذف العميل")
+      showErrorToast("خطأ في حذف العميل", "حدث خطأ أثناء حذف العميل")
     }
   }
 

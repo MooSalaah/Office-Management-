@@ -31,7 +31,7 @@ router.get('/', async (req, res) => {
 // Get client by ID (public for testing)
 router.get('/:id', async (req, res) => {
   try {
-    const client = await Client.findById(req.params.id);
+    const client = await Client.findOne({ id: req.params.id });
     if (!client) return res.status(404).json({ success: false, error: 'Client not found' });
     res.json({ success: true, data: client });
   } catch (err) {
@@ -107,11 +107,11 @@ router.post('/', async (req, res) => {
 // Update client (public for testing)
 router.put('/:id', async (req, res) => {
   try {
-    const originalClient = await Client.findById(req.params.id);
+    const originalClient = await Client.findOne({ id: req.params.id });
     if (!originalClient) return res.status(404).json({ success: false, error: 'Client not found' });
     
-    const updatedClient = await Client.findByIdAndUpdate(
-      req.params.id,
+    const updatedClient = await Client.findOneAndUpdate(
+      { id: req.params.id },
       req.body,
       { new: true }
     );
@@ -184,7 +184,7 @@ router.put('/:id', async (req, res) => {
 // Delete client (public for testing)
 router.delete('/:id', async (req, res) => {
   try {
-    const deletedClient = await Client.findByIdAndDelete(req.params.id);
+    const deletedClient = await Client.findOneAndDelete({ id: req.params.id });
     if (!deletedClient) return res.status(404).json({ success: false, error: 'Client not found' });
     
     // Send notifications for client deletion
