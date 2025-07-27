@@ -144,32 +144,143 @@ router.put('/:id', async (req, res) => {
       { new: true }
     );
     
-    // Create notification if assigned engineer changed
-    if (originalProject.assignedEngineerId !== updatedProject.assignedEngineerId && updatedProject.assignedEngineerId) {
-      try {
-        const Notification = require('../models/Notification');
-        const notification = new Notification({
-          userId: updatedProject.assignedEngineerId,
-          title: "مشروع مسند إليك",
-          message: `تم إسناد مشروع إليك: "${updatedProject.name}"`,
-          type: "project",
-          isRead: false,
-          actionUrl: `/projects`,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+    // Send notifications for various project updates
+    try {
+      const Notification = require('../models/Notification');
+      const User = require('../models/User');
+      
+      // Get user who updated the project
+      const updatedBy = req.body.updatedBy || req.user?.id || 'system';
+      const updatedByName = req.body.updatedByName || req.user?.name || 'مستخدم';
+      
+      // 1. Notification for assigned engineer change
+      if (originalProject.assignedEngineerId !== updatedProject.assignedEngineerId && updatedProject.assignedEngineerId) {
+        const engineer = await User.findOne({ 
+          $or: [{ id: updatedProject.assignedEngineerId }, { _id: updatedProject.assignedEngineerId }] 
         });
-        await notification.save();
-        logger.info('Notification created for project reassignment', { 
-          projectId: updatedProject.id, 
-          engineerId: updatedProject.assignedEngineerId,
-          notificationId: notification._id 
-        }, 'PROJECTS');
-      } catch (notificationError) {
-        logger.error('Failed to create notification for project reassignment', { 
-          error: notificationError.message,
-          projectId: updatedProject.id 
-        }, 'PROJECTS');
+        
+        if (engineer) {
+          const notification = new Notification({
+            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+            userId: engineer._id.toString(),
+            title: "مشروع مسند إليك",
+            message: `تم إسناد مشروع "${updatedProject.name}" إليك بواسطة ${updatedByName}`,
+            type: "project",
+            isRead: false,
+            actionUrl: `/projects`,
+            triggeredBy: updatedBy,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          });
+          await notification.save();
+          
+          logger.info('Notification sent for project reassignment', { 
+            projectId: updatedProject.id, 
+            engineerId: updatedProject.assignedEngineerId,
+            engineerName: engineer.name,
+            notificationId: notification._id 
+          }, 'PROJECTS');
+        }
       }
+      
+      // 2. Notification for status change
+      if (originalProject.status !== updatedProject.status) {
+        const statusText = {
+          'in-progress': 'قيد التنفيذ',
+          'completed': 'مكتمل',
+          'on-hold': 'معلق',
+          'cancelled': 'ملغي'
+        };
+        
+        // Notify all team members about status change
+        if (updatedProject.team && Array.isArray(updatedProject.team)) {
+          for (const teamMemberId of updatedProject.team) {
+            if (teamMemberId !== updatedBy) {
+              const teamMember = await User.findOne({ 
+                $or: [{ id: teamMemberId }, { _id: teamMemberId }] 
+              });
+              
+              if (teamMember) {
+                const notification = new Notification({
+                  id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                  userId: teamMember._id.toString(),
+                  title: "تحديث حالة المشروع",
+                  message: `تم تحديث حالة مشروع "${updatedProject.name}" إلى ${statusText[updatedProject.status] || updatedProject.status} بواسطة ${updatedByName}`,
+                  type: "project",
+                  isRead: false,
+                  actionUrl: `/projects`,
+                  triggeredBy: updatedBy,
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString()
+                });
+                await notification.save();
+              }
+            }
+          }
+        }
+      }
+      
+      // 3. Notification for team changes
+      const originalTeam = originalProject.team || [];
+      const updatedTeam = updatedProject.team || [];
+      const newTeamMembers = updatedTeam.filter(id => !originalTeam.includes(id));
+      const removedTeamMembers = originalTeam.filter(id => !updatedTeam.includes(id));
+      
+      // Notify new team members
+      for (const newMemberId of newTeamMembers) {
+        if (newMemberId !== updatedBy) {
+          const newMember = await User.findOne({ 
+            $or: [{ id: newMemberId }, { _id: newMemberId }] 
+          });
+          
+          if (newMember) {
+            const notification = new Notification({
+              id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+              userId: newMember._id.toString(),
+              title: "تم إضافتك لفريق مشروع",
+              message: `تم إضافتك لفريق مشروع "${updatedProject.name}" بواسطة ${updatedByName}`,
+              type: "project",
+              isRead: false,
+              actionUrl: `/projects`,
+              triggeredBy: updatedBy,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            });
+            await notification.save();
+          }
+        }
+      }
+      
+      // Notify removed team members
+      for (const removedMemberId of removedTeamMembers) {
+        if (removedMemberId !== updatedBy) {
+          const removedMember = await User.findOne({ 
+            $or: [{ id: removedMemberId }, { _id: removedMemberId }] 
+          });
+          
+          if (removedMember) {
+            const notification = new Notification({
+              id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+              userId: removedMember._id.toString(),
+              title: "تم إزالتك من فريق مشروع",
+              message: `تم إزالتك من فريق مشروع "${updatedProject.name}" بواسطة ${updatedByName}`,
+              type: "project",
+              isRead: false,
+              actionUrl: `/projects`,
+              triggeredBy: updatedBy,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            });
+            await notification.save();
+          }
+        }
+      }
+      
+    } catch (notificationError) {
+      logger.error('Failed to send project update notifications', { 
+        error: notificationError.message,
+        projectId: updatedProject.id 
+      }, 'PROJECTS');
     }
     
     res.json({ success: true, data: updatedProject });
@@ -183,6 +294,55 @@ router.delete('/:id', async (req, res) => {
   try {
     const deletedProject = await Project.findOneAndDelete({ id: req.params.id });
     if (!deletedProject) return res.status(404).json({ success: false, error: 'Project not found' });
+    
+    // Send notifications to all team members about project deletion
+    if (deletedProject.team && Array.isArray(deletedProject.team)) {
+      try {
+        const Notification = require('../models/Notification');
+        const User = require('../models/User');
+        
+        // Get user who deleted the project (from request or default to system)
+        const deletedBy = req.body.deletedBy || req.user?.id || 'system';
+        const deletedByName = req.body.deletedByName || req.user?.name || 'مستخدم';
+        
+        for (const teamMemberId of deletedProject.team) {
+          if (teamMemberId !== deletedBy) { // Don't notify the person who deleted
+            const teamMember = await User.findOne({ 
+              $or: [{ id: teamMemberId }, { _id: teamMemberId }] 
+            });
+            
+            if (teamMember) {
+              const notification = new Notification({
+                id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                userId: teamMember._id.toString(),
+                title: "تم حذف مشروع كنت مسؤول عنه",
+                message: `تم حذف مشروع "${deletedProject.name}" بواسطة ${deletedByName}`,
+                type: "project",
+                isRead: false,
+                actionUrl: `/projects`,
+                triggeredBy: deletedBy,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+              });
+              await notification.save();
+              
+              logger.info(`Notification sent to ${teamMember.name} about project deletion`, {
+                projectId: deletedProject.id,
+                projectName: deletedProject.name,
+                userId: teamMember._id,
+                userName: teamMember.name
+              }, 'PROJECTS');
+            }
+          }
+        }
+      } catch (notificationError) {
+        logger.error('Failed to send project deletion notifications', {
+          error: notificationError.message,
+          projectId: deletedProject.id
+        }, 'PROJECTS');
+      }
+    }
+    
     res.json({ success: true, message: 'Project deleted' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

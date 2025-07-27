@@ -109,32 +109,139 @@ router.put('/:id', async (req, res) => {
       { new: true }
     );
     
-    // Create notification if assignee changed
-    if (originalTask.assigneeId !== updatedTask.assigneeId && updatedTask.assigneeId) {
-      try {
-        const Notification = require('../models/Notification');
-        const notification = new Notification({
-          userId: updatedTask.assigneeId,
-          title: "مهمة مسندة إليك",
-          message: `تم إسناد مهمة إليك: "${updatedTask.title}"`,
-          type: "task",
-          isRead: false,
-          actionUrl: `/tasks`,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+    // Send notifications for task updates
+    try {
+      const Notification = require('../models/Notification');
+      const User = require('../models/User');
+      
+      // Get user who updated the task
+      const updatedBy = req.body.updatedBy || req.user?.id || 'system';
+      const updatedByName = req.body.updatedByName || req.user?.name || 'مستخدم';
+      
+      // 1. Notification for assignee change
+      if (originalTask.assigneeId !== updatedTask.assigneeId && updatedTask.assigneeId) {
+        const assignee = await User.findOne({ 
+          $or: [{ id: updatedTask.assigneeId }, { _id: updatedTask.assigneeId }] 
         });
-        await notification.save();
-        logger.info('Notification created for task reassignment', { 
-          taskId: updatedTask.id, 
-          assigneeId: updatedTask.assigneeId,
-          notificationId: notification._id 
-        }, 'TASKS');
-      } catch (notificationError) {
-        logger.error('Failed to create notification for task reassignment', { 
-          error: notificationError.message,
-          taskId: updatedTask.id 
-        }, 'TASKS');
+        
+        if (assignee) {
+          const notification = new Notification({
+            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+            userId: assignee._id.toString(),
+            title: "مهمة مسندة إليك",
+            message: `تم إسناد مهمة "${updatedTask.title}" إليك بواسطة ${updatedByName}`,
+            type: "task",
+            isRead: false,
+            actionUrl: `/tasks`,
+            triggeredBy: updatedBy,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          });
+          await notification.save();
+          
+          logger.info('Notification sent for task reassignment', { 
+            taskId: updatedTask.id, 
+            assigneeId: updatedTask.assigneeId,
+            assigneeName: assignee.name,
+            notificationId: notification._id 
+          }, 'TASKS');
+        }
       }
+      
+      // 2. Notification for status change
+      if (originalTask.status !== updatedTask.status) {
+        const statusText = {
+          'todo': 'قيد الانتظار',
+          'in-progress': 'قيد التنفيذ',
+          'completed': 'مكتملة',
+          'cancelled': 'ملغية'
+        };
+        
+        // Notify assignee about status change
+        if (updatedTask.assigneeId && updatedTask.assigneeId !== updatedBy) {
+          const assignee = await User.findOne({ 
+            $or: [{ id: updatedTask.assigneeId }, { _id: updatedTask.assigneeId }] 
+          });
+          
+          if (assignee) {
+            const notification = new Notification({
+              id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+              userId: assignee._id.toString(),
+              title: "تحديث حالة المهمة",
+              message: `تم تحديث حالة مهمة "${updatedTask.title}" إلى ${statusText[updatedTask.status] || updatedTask.status} بواسطة ${updatedByName}`,
+              type: "task",
+              isRead: false,
+              actionUrl: `/tasks`,
+              triggeredBy: updatedBy,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            });
+            await notification.save();
+          }
+        }
+        
+        // Notify task creator about status change
+        if (updatedTask.createdBy && updatedTask.createdBy !== updatedBy) {
+          const creator = await User.findOne({ 
+            $or: [{ id: updatedTask.createdBy }, { _id: updatedTask.createdBy }] 
+          });
+          
+          if (creator) {
+            const notification = new Notification({
+              id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+              userId: creator._id.toString(),
+              title: "تحديث حالة مهمة",
+              message: `تم تحديث حالة مهمة "${updatedTask.title}" إلى ${statusText[updatedTask.status] || updatedTask.status} بواسطة ${updatedByName}`,
+              type: "task",
+              isRead: false,
+              actionUrl: `/tasks`,
+              triggeredBy: updatedBy,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            });
+            await notification.save();
+          }
+        }
+      }
+      
+      // 3. Notification for priority change
+      if (originalTask.priority !== updatedTask.priority) {
+        const priorityText = {
+          'low': 'منخفضة',
+          'medium': 'متوسطة',
+          'high': 'عالية',
+          'urgent': 'عاجلة'
+        };
+        
+        // Notify assignee about priority change
+        if (updatedTask.assigneeId && updatedTask.assigneeId !== updatedBy) {
+          const assignee = await User.findOne({ 
+            $or: [{ id: updatedTask.assigneeId }, { _id: updatedTask.assigneeId }] 
+          });
+          
+          if (assignee) {
+            const notification = new Notification({
+              id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+              userId: assignee._id.toString(),
+              title: "تحديث أولوية المهمة",
+              message: `تم تحديث أولوية مهمة "${updatedTask.title}" إلى ${priorityText[updatedTask.priority] || updatedTask.priority} بواسطة ${updatedByName}`,
+              type: "task",
+              isRead: false,
+              actionUrl: `/tasks`,
+              triggeredBy: updatedBy,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            });
+            await notification.save();
+          }
+        }
+      }
+      
+    } catch (notificationError) {
+      logger.error('Failed to send task update notifications', { 
+        error: notificationError.message,
+        taskId: updatedTask.id 
+      }, 'TASKS');
     }
     
     // Broadcast update to all clients
@@ -165,6 +272,74 @@ router.delete('/:id', async (req, res) => {
   try {
     const deletedTask = await Task.findByIdAndDelete(req.params.id);
     if (!deletedTask) return res.status(404).json({ success: false, error: 'Task not found' });
+    
+    // Send notifications for task deletion
+    try {
+      const Notification = require('../models/Notification');
+      const User = require('../models/User');
+      
+      // Get user who deleted the task
+      const deletedBy = req.body.deletedBy || req.user?.id || 'system';
+      const deletedByName = req.body.deletedByName || req.user?.name || 'مستخدم';
+      
+      // Notify assignee about task deletion
+      if (deletedTask.assigneeId && deletedTask.assigneeId !== deletedBy) {
+        const assignee = await User.findOne({ 
+          $or: [{ id: deletedTask.assigneeId }, { _id: deletedTask.assigneeId }] 
+        });
+        
+        if (assignee) {
+          const notification = new Notification({
+            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+            userId: assignee._id.toString(),
+            title: "تم حذف مهمة مسندة إليك",
+            message: `تم حذف مهمة "${deletedTask.title}" بواسطة ${deletedByName}`,
+            type: "task",
+            isRead: false,
+            actionUrl: `/tasks`,
+            triggeredBy: deletedBy,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          });
+          await notification.save();
+        }
+      }
+      
+      // Notify task creator about task deletion
+      if (deletedTask.createdBy && deletedTask.createdBy !== deletedBy) {
+        const creator = await User.findOne({ 
+          $or: [{ id: deletedTask.createdBy }, { _id: deletedTask.createdBy }] 
+        });
+        
+        if (creator) {
+          const notification = new Notification({
+            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+            userId: creator._id.toString(),
+            title: "تم حذف مهمة أنشأتها",
+            message: `تم حذف مهمة "${deletedTask.title}" بواسطة ${deletedByName}`,
+            type: "task",
+            isRead: false,
+            actionUrl: `/tasks`,
+            triggeredBy: deletedBy,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          });
+          await notification.save();
+        }
+      }
+      
+      logger.info('Notifications sent for task deletion', { 
+        taskId: deletedTask.id,
+        taskTitle: deletedTask.title,
+        deletedBy: deletedByName
+      }, 'TASKS');
+    } catch (notificationError) {
+      logger.error('Failed to send task deletion notifications', { 
+        error: notificationError.message,
+        taskId: deletedTask.id 
+      }, 'TASKS');
+    }
+    
     // Broadcast update to all clients
     try {
       const broadcastResponse = await fetch(`${req.protocol}://${req.get('host')}/api/realtime/broadcast`, {

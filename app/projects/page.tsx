@@ -405,7 +405,11 @@ function ProjectsPageContent() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
         },
-        body: JSON.stringify(updatedProject),
+        body: JSON.stringify({
+          ...updatedProject,
+          updatedBy: currentUser?.id,
+          updatedByName: currentUser?.name
+        }),
       });
 
       if (!response.ok) {
@@ -520,8 +524,13 @@ function ProjectsPageContent() {
       const response = await fetch(`${apiUrl}/api/projects/${projectToDelete}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
-        }
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          deletedBy: currentUser?.id,
+          deletedByName: currentUser?.name
+        })
       });
 
       if (!response.ok) {
