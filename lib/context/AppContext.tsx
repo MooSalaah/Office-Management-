@@ -1246,6 +1246,12 @@ export function useAppActions() {
   };
 
   const deleteNotification = async (notificationId: string) => {
+    // التحقق من وجود notificationId
+    if (!notificationId || notificationId === 'undefined') {
+      logger.error('Cannot delete notification: invalid notificationId', { notificationId }, 'NOTIFICATIONS');
+      return;
+    }
+    
     // حذف الإشعار من state
     dispatch({ type: "DELETE_NOTIFICATION", payload: notificationId });
     

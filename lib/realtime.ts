@@ -1,301 +1,141 @@
-// Real-time updates management
-import { logger } from "./logger";
+// Realtime updates using Server-Sent Events
+export class RealtimeUpdates {
+  private eventSource: EventSource | null = null;
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 5;
+  private reconnectDelay = 1000;
+  private isConnected = false;
+  private listeners: Map<string, Function[]> = new Map();
 
-import { Project, Task, Client, Transaction, Notification, User, AttendanceRecord } from './types';
+  constructor() {
+    this.initialize();
+  }
 
-export type RealtimeDataType = Project | Task | Client | Transaction | Notification | User | AttendanceRecord;
+  private initialize() {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
+      this.eventSource = new EventSource(`${apiUrl}/api/realtime`);
+      
+      this.eventSource.onopen = () => {
+        console.log('✅ Realtime connection established');
+        this.isConnected = true;
+        this.reconnectAttempts = 0;
+      };
 
-export interface RealtimeUpdate {
-	type:
-		| "project"
-		| "task"
-		| "client"
-		| "transaction"
-		| "notification"
-		| "user"
-		| "attendance";
-	action: "create" | "update" | "delete";
-	data: RealtimeDataType;
-	userId: string;
-	timestamp: number;
+      this.eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          this.handleMessage(data);
+        } catch (error) {
+          console.error('Error parsing realtime message:', error);
+        }
+      };
+
+      this.eventSource.onerror = (error) => {
+        console.warn('⚠️ Realtime connection error:', error);
+        this.isConnected = false;
+        this.handleReconnect();
+      };
+
+      this.eventSource.addEventListener('error', (event) => {
+        console.warn('⚠️ Realtime EventSource error:', event);
+        this.isConnected = false;
+        this.handleReconnect();
+      });
+
+    } catch (error) {
+      console.error('❌ Failed to initialize realtime connection:', error);
+      this.handleReconnect();
+    }
+  }
+
+  private handleReconnect() {
+    if (this.reconnectAttempts < this.maxReconnectAttempts) {
+      this.reconnectAttempts++;
+      console.log(`🔄 Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
+      
+      setTimeout(() => {
+        this.cleanup();
+        this.initialize();
+      }, this.reconnectDelay * this.reconnectAttempts);
+    } else {
+      console.error('❌ Max reconnection attempts reached');
+    }
+  }
+
+  private handleMessage(data: any) {
+    const { type, action, ...payload } = data;
+    const eventKey = `${type}:${action}`;
+    
+    if (this.listeners.has(eventKey)) {
+      this.listeners.get(eventKey)?.forEach(callback => {
+        try {
+          callback(payload);
+        } catch (error) {
+          console.error('Error in realtime callback:', error);
+        }
+      });
+    }
+  }
+
+  public on(event: string, callback: Function) {
+    if (!this.listeners.has(event)) {
+      this.listeners.set(event, []);
+    }
+    this.listeners.get(event)?.push(callback);
+  }
+
+  public off(event: string, callback: Function) {
+    const callbacks = this.listeners.get(event);
+    if (callbacks) {
+      const index = callbacks.indexOf(callback);
+      if (index > -1) {
+        callbacks.splice(index, 1);
+      }
+    }
+  }
+
+  public sendUpdate(type: string, action: string, data: any) {
+    if (!this.isConnected) {
+      console.warn('⚠️ Realtime not connected, update not sent');
+      return;
+    }
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
+      fetch(`${apiUrl}/api/realtime/broadcast`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type,
+          action,
+          data,
+          timestamp: Date.now()
+        })
+      }).catch(error => {
+        console.error('Error sending realtime update:', error);
+      });
+    } catch (error) {
+      console.error('Error sending realtime update:', error);
+    }
+  }
+
+  public cleanup() {
+    if (this.eventSource) {
+      this.eventSource.close();
+      this.eventSource = null;
+    }
+    this.isConnected = false;
+  }
+
+  public getConnectionStatus() {
+    return this.isConnected;
+  }
 }
 
-class RealtimeManager {
-	private listeners: Map<string, Set<(update: RealtimeUpdate) => void>> =
-		new Map();
-	private eventSource: EventSource | null = null;
-	private reconnectAttempts = 0;
-	private maxReconnectAttempts = 10;
-	private reconnectDelay = 1000;
-	private maxReconnectDelay = 30000;
-	private isConnected = false;
-	private connectionCheckInterval: NodeJS.Timeout | null = null;
-	private pollingInterval: NodeJS.Timeout | null = null;
-	private lastUpdateTimestamp = 0;
-
-	constructor() {
-		// Only initialize on client side
-		if (typeof window !== "undefined") {
-			this.initializeEventSource();
-			this.startConnectionCheck();
-			this.startPolling(); // Always start polling as backup
-		}
-	}
-
-	private initializeEventSource() {
-		try {
-			// Close existing connection if any
-			if (this.eventSource) {
-				this.eventSource.close();
-			}
-
-			// Use Server-Sent Events for real-time updates
-			const apiUrl =
-				process.env.NEXT_PUBLIC_API_URL ||
-				"https://office-management-fsy7.onrender.com";
-			this.eventSource = new EventSource(`${apiUrl}/api/realtime`);
-
-			this.eventSource.onmessage = (event) => {
-				try {
-					const update: RealtimeUpdate = JSON.parse(event.data);
-					this.lastUpdateTimestamp = update.timestamp;
-					this.notifyListeners(update);
-				} catch (error) {
-					console.error("Error parsing realtime update:", error);
-				}
-			};
-
-			this.eventSource.onerror = (error) => {
-				console.error("EventSource error:", error);
-				this.isConnected = false;
-				this.handleReconnect();
-			};
-
-			this.eventSource.onopen = () => {
-				logger.info("✅ Realtime connection established", undefined, 'REALTIME');
-				this.isConnected = true;
-				this.reconnectAttempts = 0;
-			};
-		} catch (error) {
-			console.error("Failed to initialize EventSource:", error);
-			this.isConnected = false;
-			this.handleReconnect();
-		}
-	}
-
-	private handleReconnect() {
-		if (this.reconnectAttempts < this.maxReconnectAttempts) {
-			this.reconnectAttempts++;
-			const delay = Math.min(
-				this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1),
-				this.maxReconnectDelay
-			);
-
-			logger.info(
-				`🔄 Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts}) in ${delay}ms...`,
-				{ reconnectAttempts: this.reconnectAttempts, maxReconnectAttempts: this.maxReconnectAttempts, delay },
-				'REALTIME'
-			);
-
-			setTimeout(() => {
-				this.initializeEventSource();
-			}, delay);
-		} else {
-			console.error("❌ Max reconnection attempts reached");
-			this.fallbackToPolling();
-		}
-	}
-
-	private fallbackToPolling() {
-		logger.info("🔄 Falling back to polling mode", undefined, 'REALTIME');
-		// Polling is already running as backup
-	}
-
-	private startPolling() {
-		// Poll every 5 seconds as backup
-		this.pollingInterval = setInterval(async () => {
-			try {
-				const apiUrl =
-					process.env.NEXT_PUBLIC_API_URL ||
-					"https://office-management-fsy7.onrender.com";
-				const response = await fetch(
-					`${apiUrl}/api/realtime/poll?since=${this.lastUpdateTimestamp}`
-				);
-				if (response.ok) {
-					const data = await response.json();
-					if (data.updates && Array.isArray(data.updates)) {
-						data.updates.forEach((update: RealtimeUpdate) => {
-							this.lastUpdateTimestamp = Math.max(
-								this.lastUpdateTimestamp,
-								update.timestamp
-							);
-							this.notifyListeners(update);
-						});
-					}
-				}
-			} catch (error) {
-				console.error("Polling error:", error);
-			}
-		}, 5000);
-	}
-
-	private startConnectionCheck() {
-		// Check connection health every 30 seconds
-		this.connectionCheckInterval = setInterval(() => {
-			if (
-				!this.isConnected &&
-				this.reconnectAttempts < this.maxReconnectAttempts
-			) {
-				logger.info("🔍 Connection check: attempting to reconnect...", undefined, 'REALTIME');
-				this.initializeEventSource();
-			}
-		}, 30000);
-	}
-
-	private notifyListeners(update: RealtimeUpdate) {
-		const listeners = this.listeners.get(update.type);
-		if (listeners) {
-			listeners.forEach((listener) => {
-				try {
-					listener(update);
-				} catch (error) {
-					console.error("Error in realtime listener:", error);
-				}
-			});
-		}
-	}
-
-	public subscribe(type: string, listener: (update: RealtimeUpdate) => void) {
-		if (!this.listeners.has(type)) {
-			this.listeners.set(type, new Set());
-		}
-		this.listeners.get(type)!.add(listener);
-
-		// Return unsubscribe function
-		return () => {
-			const listeners = this.listeners.get(type);
-			if (listeners) {
-				listeners.delete(listener);
-				if (listeners.size === 0) {
-					this.listeners.delete(type);
-				}
-			}
-		};
-	}
-
-	public unsubscribe(type: string, listener: (update: RealtimeUpdate) => void) {
-		const listeners = this.listeners.get(type);
-		if (listeners) {
-			listeners.delete(listener);
-			if (listeners.size === 0) {
-				this.listeners.delete(type);
-			}
-		}
-	}
-
-	public getConnectionStatus() {
-		return {
-			isConnected: this.isConnected,
-			reconnectAttempts: this.reconnectAttempts,
-			maxReconnectAttempts: this.maxReconnectAttempts,
-		};
-	}
-
-	public disconnect() {
-		if (this.eventSource) {
-			this.eventSource.close();
-			this.eventSource = null;
-		}
-		if (this.connectionCheckInterval) {
-			clearInterval(this.connectionCheckInterval);
-			this.connectionCheckInterval = null;
-		}
-		if (this.pollingInterval) {
-			clearInterval(this.pollingInterval);
-			this.pollingInterval = null;
-		}
-		this.isConnected = false;
-	}
+// Create global instance
+if (typeof window !== 'undefined') {
+  (window as any).realtimeUpdates = new RealtimeUpdates();
 }
-
-// Create singleton instance only on client side
-export const realtimeManager =
-	typeof window !== "undefined" ? new RealtimeManager() : null;
-
-// Helper function to broadcast updates
-export const broadcastUpdate = async (
-	update: Omit<RealtimeUpdate, "timestamp">
-) => {
-	const fullUpdate: RealtimeUpdate = {
-		...update,
-		timestamp: Date.now(),
-	};
-
-	try {
-		// Send update to server
-		const apiUrl =
-			process.env.NEXT_PUBLIC_API_URL ||
-			"https://office-management-fsy7.onrender.com";
-		const response = await fetch(`${apiUrl}/api/realtime/broadcast`, {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				"Cache-Control": "no-cache",
-			},
-			body: JSON.stringify(fullUpdate),
-		});
-
-		if (!response.ok) {
-			throw new Error(`HTTP error! status: ${response.status}`);
-		}
-
-		return await response.json();
-	} catch (error) {
-		console.error("Failed to broadcast update:", error);
-		throw error;
-	}
-};
-
-// Hook for using realtime updates in components
-export const useRealtime = (
-	type: string,
-	callback: (update: RealtimeUpdate) => void
-) => {
-	const { useEffect } = require("react");
-
-	useEffect(() => {
-		if (!realtimeManager) return;
-
-		const unsubscribe = realtimeManager.subscribe(type, callback);
-		return unsubscribe;
-	}, [type, callback]);
-};
-
-// Hook for connection status
-export const useRealtimeConnection = () => {
-	const { useState, useEffect } = require("react");
-
-	const [status, setStatus] = useState({
-		isConnected: false,
-		reconnectAttempts: 0,
-		maxReconnectAttempts: 10,
-	});
-
-	useEffect(() => {
-		if (!realtimeManager) return;
-
-		const updateStatus = () => {
-			setStatus(realtimeManager.getConnectionStatus());
-		};
-
-		// Update immediately
-		updateStatus();
-
-		// Update every 5 seconds
-		const interval = setInterval(updateStatus, 5000);
-
-		return () => clearInterval(interval);
-	}, []);
-
-	return status;
-};

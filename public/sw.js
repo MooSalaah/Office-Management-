@@ -98,6 +98,13 @@ self.addEventListener('fetch', (event) => {
 
 // Handle API requests
 async function handleApiRequest(request) {
+  const url = new URL(request.url)
+  
+  // Skip external API requests (Backend API)
+  if (url.hostname === 'office-management-fsy7.onrender.com') {
+    return fetch(request)
+  }
+  
   // Skip chrome-extension and other unsupported schemes
   if (request.url.startsWith('chrome-extension://') || 
       request.url.startsWith('moz-extension://') || 
