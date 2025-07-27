@@ -550,24 +550,40 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           dispatch({ type: "SET_CURRENT_USER", payload: updatedUser })
         }
 
-        // Load users from localStorage
-        const usersData = localStorage.getItem("users")
-        if (usersData) {
-          const users = JSON.parse(usersData)
-          logger.debug("Loading users from localStorage", { users }, 'STORAGE');
-          // Replace all users with localStorage data
-          users.forEach((user: User) => {
-            // Update user permissions based on current role
-            const updatedUser = updateUserPermissionsByRole(user)
-            const existingUser = state.users.find(u => u.id === user.id)
-            if (existingUser) {
-              // Update existing user
-              dispatch({ type: "UPDATE_USER", payload: updatedUser })
-            } else {
-              // Add new user
-              dispatch({ type: "ADD_USER", payload: updatedUser })
+        // Load users from database first, then fallback to localStorage
+        try {
+          const response = await fetch('/api/users');
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success && Array.isArray(data.data)) {
+              logger.debug("Loading users from database", { users: data.data }, 'DATABASE');
+              // Replace all users with database data
+              data.data.forEach((user: User) => {
+                const updatedUser = updateUserPermissionsByRole(user)
+                dispatch({ type: "UPDATE_USER", payload: updatedUser })
+              })
+              // Save to localStorage for offline access
+              localStorage.setItem("users", JSON.stringify(data.data))
             }
-          })
+          }
+        } catch (error) {
+          logger.error("Failed to load users from database, falling back to localStorage", { error }, 'DATABASE');
+          // Fallback to localStorage
+          const usersData = localStorage.getItem("users")
+          if (usersData) {
+            const users = JSON.parse(usersData)
+            logger.debug("Loading users from localStorage", { users }, 'STORAGE');
+            // Replace all users with localStorage data
+            users.forEach((user: User) => {
+              const updatedUser = updateUserPermissionsByRole(user)
+              const existingUser = state.users.find(u => u.id === user.id)
+              if (existingUser) {
+                dispatch({ type: "UPDATE_USER", payload: updatedUser })
+              } else {
+                dispatch({ type: "ADD_USER", payload: updatedUser })
+              }
+            })
+          }
         }
 
         // Load projects - always load from localStorage to ensure all users see all projects

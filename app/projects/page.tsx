@@ -1084,25 +1084,31 @@ function ProjectsPageContent() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent className="max-h-60 overflow-y-auto w-64">
-                      {users.filter((u) => u.role === "engineer" || u.role === "admin").map((engineer) => (
-                        <DropdownMenuCheckboxItem
-                          key={engineer.id}
-                          checked={formData.team.includes(engineer.id)}
-                          onCheckedChange={(checked) => {
-                            setFormData((prev) => {
-                              let newTeam = prev.team.includes(engineer.id)
-                                ? prev.team.filter((id) => id !== engineer.id)
-                                : [...prev.team, engineer.id];
-                              return { ...prev, team: newTeam };
-                            });
-                          }}
-                        >
-                          {engineer.name}
-                          {formData.team[0] === engineer.id && (
-                            <Badge variant="outline" className="text-xs bg-blue-100 text-blue-800 ml-2">قائد المشروع</Badge>
-                          )}
-                        </DropdownMenuCheckboxItem>
-                      ))}
+                      {users
+                        .filter((u) => u.role === "engineer" || u.role === "admin")
+                        .filter((user, index, self) => 
+                          // إزالة التكرار بناءً على المعرف
+                          index === self.findIndex(u => u.id === user.id)
+                        )
+                        .map((engineer) => (
+                          <DropdownMenuCheckboxItem
+                            key={engineer.id}
+                            checked={formData.team.includes(engineer.id)}
+                            onCheckedChange={(checked) => {
+                              setFormData((prev) => {
+                                let newTeam = prev.team.includes(engineer.id)
+                                  ? prev.team.filter((id) => id !== engineer.id)
+                                  : [...prev.team, engineer.id];
+                                return { ...prev, team: newTeam };
+                              });
+                            }}
+                          >
+                            {engineer.name}
+                            {formData.team[0] === engineer.id && (
+                              <Badge variant="outline" className="text-xs bg-blue-100 text-blue-800 ml-2">قائد المشروع</Badge>
+                            )}
+                          </DropdownMenuCheckboxItem>
+                        ))}
                     </DropdownMenuContent>
                   </DropdownMenu>
                   <p className="text-xs text-muted-foreground mt-1">أول مهندس يتم اختياره هو قائد المشروع تلقائيًا.</p>
@@ -1312,9 +1318,14 @@ function ProjectsPageContent() {
                                     <SelectValue placeholder="اختر المسؤول" />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    {users.map((user) => (
-                                      <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
-                                    ))}
+                                    {users
+                                      .filter((user, index, self) => 
+                                        // إزالة التكرار بناءً على المعرف
+                                        index === self.findIndex(u => u.id === user.id)
+                                      )
+                                      .map((user) => (
+                                        <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
+                                      ))}
                                   </SelectContent>
                                 </Select>
                               )}
