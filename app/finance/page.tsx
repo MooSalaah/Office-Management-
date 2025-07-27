@@ -66,9 +66,10 @@ export default function FinancePage() {
 function FinancePageContent() {
   const { state, dispatch } = useApp()
   const { addNotification, broadcastTransactionUpdate, broadcastNotificationUpdate, showSuccessToast } = useAppActions()
-  const { currentUser, transactions, projects, clients } = state
+  const { currentUser, transactions, projects, clients, users } = state
 
-  const actionParam = useSearchParams().get("action")
+  const searchParams = useSearchParams()
+  const actionParam = searchParams?.get("action")
 
   const [searchTerm, setSearchTerm] = useState("")
   const [filterType, setFilterType] = useState("all")
@@ -103,7 +104,7 @@ function FinancePageContent() {
       | "renovation"
       | "inspection"
       | "other",
-    paymentMethod: "cash" as "cash" | "transfer" | "pos",
+    paymentMethod: "cash" as "cash" | "transfer" | "pos" | "check" | "credit",
     importance: "medium" as "high" | "medium" | "low",
     date: new Date().toISOString().split("T")[0],
     notes: "",
@@ -1221,7 +1222,7 @@ function FinancePageContent() {
                           const newType = prompt("أدخل نوع المعاملة الجديد:");
                           if (newType && newType.trim()) {
                             // يمكن إضافة منطق لحفظ النوع الجديد
-                            alert(`تم إضافة النوع الجديد: ${newType}`);
+                            setAlert({ type: "success", message: `تم إضافة النوع الجديد: ${newType}` });
                           }
                         }}
                       >
@@ -1277,7 +1278,7 @@ function FinancePageContent() {
                           const newMethod = prompt("أدخل طريقة الدفع الجديدة:");
                           if (newMethod && newMethod.trim()) {
                             // يمكن إضافة منطق لحفظ طريقة الدفع الجديدة
-                            alert(`تم إضافة طريقة الدفع الجديدة: ${newMethod}`);
+                            setAlert({ type: "success", message: `تم إضافة طريقة الدفع الجديدة: ${newMethod}` });
                           }
                         }}
                       >

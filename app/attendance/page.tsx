@@ -329,10 +329,10 @@ function AttendancePageContent() {
         userId: "admin", // إرسال لجميع المديرين
         title: `تسجيل ${actionText}`,
         message: `${currentUser?.name} قام بتسجيل ${actionText} في الفترة ${sessionText}`,
-        type: "attendance",
-        actionUrl: `/attendance`,
+            type: "attendance",
+            actionUrl: `/attendance`,
         triggeredBy: currentUser?.id || "",
-        isRead: false,
+            isRead: false,
       });
     } catch (error) {
       console.error('Error sending notification to manager:', error);

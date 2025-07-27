@@ -49,13 +49,7 @@ const nextConfig = {
         process: false,
       }
       
-      // تحسين Tree Shaking
-      config.optimization = {
-        ...config.optimization,
-        usedExports: true,
-        sideEffects: false,
-        innerGraph: true,
-      }
+      // تحسين Tree Shaking - تم دمجها مع الإعدادات أدناه
     }
     
     // إزالة console.log في الإنتاج
@@ -76,6 +70,9 @@ const nextConfig = {
     // تحسين الأداء - تقسيم الحزم بشكل أفضل
     config.optimization = {
       ...config.optimization,
+      usedExports: true,
+      sideEffects: false,
+      innerGraph: true,
       splitChunks: {
         chunks: 'all',
         cacheGroups: {
