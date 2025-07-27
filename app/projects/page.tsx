@@ -1272,7 +1272,7 @@ function ProjectsPageContent() {
                     onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-2 md:col-span-2">
                   <Label>المهام الافتراضية للمشروع</Label>
                   <div className="border rounded p-4 bg-muted w-full">
                     <div className="mb-3 text-xs text-muted-foreground">اختر أنواع المهام وحدد المسؤول عن كل مهمة (اختياري)</div>
