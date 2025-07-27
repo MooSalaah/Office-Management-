@@ -585,7 +585,8 @@ function TasksPageContent() {
     currentUserRole: currentUser?.role,
     currentUserId: currentUser?.id,
     searchedTasks: searchedTasks.length,
-    projectFilter
+    projectFilter,
+    tasks: tasks.map(t => ({ id: t.id, title: t.title, assigneeId: t.assigneeId, status: t.status }))
   });
   
   // Filter by user role and project - المدير يرى جميع المهام، المستخدم يرى مهامه المخصصة له فقط

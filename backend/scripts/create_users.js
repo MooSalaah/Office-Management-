@@ -26,14 +26,20 @@ async function createUsers() {
       },
       {
         name: 'عمرو رمضان',
-        email: 'ar@nc',
-        password: 'ar123',
+        email: 'ar@nc.com',
+        password: 'ar@nc.com',
         role: 'engineer'
       },
       {
         name: 'محمد مجدي',
-        email: 'mm@nc',
-        password: 'mm123',
+        email: 'mm@nc.com',
+        password: 'mm@nc.com',
+        role: 'engineer'
+      },
+      {
+        name: 'كرم عبدالرحمن',
+        email: 'ka@nc.com',
+        password: 'ka@nc.com',
         role: 'engineer'
       }
     ];
