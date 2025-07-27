@@ -8,10 +8,40 @@ export const mockUsers: User[] = [
 	{
 		id: "1",
 		name: "مصطفى صلاح",
-		email: "admin@newcorner.sa",
-		password: "admin123",
+		email: "ms@nc",
+		password: "ms123",
 		role: "admin",
 		phone: "+966501234567",
+		isActive: true,
+		createdAt: "2024-01-01",
+	},
+	{
+		id: "2",
+		name: "محمد قطب",
+		email: "mk@nc",
+		password: "mk123",
+		role: "admin",
+		phone: "+966501234568",
+		isActive: true,
+		createdAt: "2024-01-01",
+	},
+	{
+		id: "3",
+		name: "عمرو رمضان",
+		email: "ar@nc",
+		password: "ar123",
+		role: "engineer",
+		phone: "+966501234569",
+		isActive: true,
+		createdAt: "2024-01-01",
+	},
+	{
+		id: "4",
+		name: "محمد مجدي",
+		email: "mm@nc",
+		password: "mm123",
+		role: "engineer",
+		phone: "+966501234570",
 		isActive: true,
 		createdAt: "2024-01-01",
 	},
@@ -164,22 +194,22 @@ export const updateUserPermissionsByRole = (user: User): User => {
 export const login = async (email: string, password: string): Promise<User | null> => {
 	try {
 		const response = await api.auth.login({ email, password });
-		if (response && response.token && response.user) {
+		if (response && (response as any).token && (response as any).user) {
 			const user = {
-				id: response.user.id || response.user._id || "",
-				name: response.user.name,
-				email: response.user.email,
-				role: response.user.role,
+				id: (response as any).user.id || (response as any).user._id || "",
+				name: (response as any).user.name,
+				email: (response as any).user.email,
+				role: (response as any).user.role,
 				isActive: true,
-				createdAt: response.user.createdAt || "",
-				permissions: response.user.permissions || [],
-				phone: response.user.phone || "",
-				avatar: response.user.avatar || undefined,
-				monthlySalary: response.user.monthlySalary || undefined,
-				workingHours: response.user.workingHours || undefined,
+				createdAt: (response as any).user.createdAt || "",
+				permissions: (response as any).user.permissions || [],
+				phone: (response as any).user.phone || "",
+				avatar: (response as any).user.avatar || undefined,
+				monthlySalary: (response as any).user.monthlySalary || undefined,
+				workingHours: (response as any).user.workingHours || undefined,
 			};
 			localStorage.setItem("currentUser", JSON.stringify(user));
-			localStorage.setItem("token", response.token);
+			localStorage.setItem("token", (response as any).token);
 			return user;
 		}
 		return null;

@@ -80,35 +80,35 @@ function ProjectsPageContent() {
   useEffect(() => {
     if (projectUpdates.length > 0) {
       const lastUpdate = projectUpdates[projectUpdates.length - 1];
-      if (!lastUpdate.project) return;
-      const updateId = `${lastUpdate.project.id || ''}_${lastUpdate.action}_${lastUpdate.timestamp || ''}`;
+      if (!lastUpdate || !(lastUpdate as any).project) return;
+      const updateId = `${(lastUpdate as any).project.id || ''}_${(lastUpdate as any).action}_${(lastUpdate as any).timestamp || ''}`;
       if (handledProjectUpdateIdsRef.current.has(updateId)) return;
       handledProjectUpdateIdsRef.current.add(updateId);
       
       logger.debug('=== PROJECT UPDATE RECEIVED ===', { lastUpdate, projectsCount: state.projects.length }, 'PROJECTS');
       
-      if (lastUpdate.action === 'create') {
-        const exists = state.projects.some(p => p.id === lastUpdate.project.id);
-        logger.debug('Project exists in state', { exists, projectId: lastUpdate.project.id }, 'PROJECTS');
+      if ((lastUpdate as any).action === 'create') {
+        const exists = state.projects.some(p => p.id === (lastUpdate as any).project.id);
+        logger.debug('Project exists in state', { exists, projectId: (lastUpdate as any).project.id }, 'PROJECTS');
         if (!exists) {
-          logger.debug('Adding project to state', { projectId: lastUpdate.project.id }, 'PROJECTS');
-          dispatch({ type: "ADD_PROJECT", payload: lastUpdate.project });
-          logger.debug('Project added to state successfully', { projectId: lastUpdate.project.id }, 'PROJECTS');
+          logger.debug('Adding project to state', { projectId: (lastUpdate as any).project.id }, 'PROJECTS');
+          dispatch({ type: "ADD_PROJECT", payload: (lastUpdate as any).project });
+          logger.debug('Project added to state successfully', { projectId: (lastUpdate as any).project.id }, 'PROJECTS');
         }
-      } else if (lastUpdate.action === 'update') {
-        logger.debug('Updating project in state', { projectId: lastUpdate.project.id }, 'PROJECTS');
-        dispatch({ type: "UPDATE_PROJECT", payload: lastUpdate.project });
-        logger.debug('Project updated in state successfully', { projectId: lastUpdate.project.id }, 'PROJECTS');
-      } else if (lastUpdate.action === 'delete') {
-        logger.debug('Deleting project from state', { projectId: lastUpdate.project.id }, 'PROJECTS');
-        dispatch({ type: "DELETE_PROJECT", payload: lastUpdate.project.id });
-        logger.debug('Project deleted from state successfully', { projectId: lastUpdate.project.id }, 'PROJECTS');
+      } else if ((lastUpdate as any).action === 'update') {
+        logger.debug('Updating project in state', { projectId: (lastUpdate as any).project.id }, 'PROJECTS');
+        dispatch({ type: "UPDATE_PROJECT", payload: (lastUpdate as any).project });
+        logger.debug('Project updated in state successfully', { projectId: (lastUpdate as any).project.id }, 'PROJECTS');
+      } else if ((lastUpdate as any).action === 'delete') {
+        logger.debug('Deleting project from state', { projectId: (lastUpdate as any).project.id }, 'PROJECTS');
+        dispatch({ type: "DELETE_PROJECT", payload: (lastUpdate as any).project.id });
+        logger.debug('Project deleted from state successfully', { projectId: (lastUpdate as any).project.id }, 'PROJECTS');
       }
       
-      if (lastUpdate.userId && lastUpdate.userId !== currentUser?.id && lastUpdate.userName) {
+      if ((lastUpdate as any).userId && (lastUpdate as any).userId !== currentUser?.id && (lastUpdate as any).userName) {
         toast({
           title: "تحديث مشروع جديد",
-          description: `تمت إضافة/تعديل/حذف مشروع بواسطة ${lastUpdate.userName}`
+          description: `تمت إضافة/تعديل/حذف مشروع بواسطة ${(lastUpdate as any).userName}`
         });
       }
     }
@@ -1706,7 +1706,11 @@ function ProjectsPageContent() {
                           type="number"
                           min="0"
                           max="100"
-                          value={selectedProject.progress}
+                          value={(() => {
+                            const projectTasks = tasks.filter(t => t.projectId === selectedProject.id);
+                            const completedTasks = projectTasks.filter(t => t.status === "completed").length;
+                            return projectTasks.length > 0 ? Math.round((completedTasks / projectTasks.length) * 100) : 0;
+                          })()}
                           onChange={(e) => {
                             const newProgress = Math.min(100, Math.max(0, parseInt(e.target.value) || 0))
                             let newStatus = selectedProject.status
@@ -1727,7 +1731,11 @@ function ProjectsPageContent() {
                         type="range"
                         min="0"
                         max="100"
-                        value={selectedProject.progress}
+                        value={(() => {
+                          const projectTasks = tasks.filter(t => t.projectId === selectedProject.id);
+                          const completedTasks = projectTasks.filter(t => t.status === "completed").length;
+                          return projectTasks.length > 0 ? Math.round((completedTasks / projectTasks.length) * 100) : 0;
+                        })()}
                         onChange={e => {
                           const newProgress = Math.min(100, Math.max(0, parseInt(e.target.value) || 0))
                           let newStatus = selectedProject.status
