@@ -123,6 +123,33 @@ function TasksPageContent() {
     }
   }, [userUpdates, dispatch])
 
+  // تحميل المهام من قاعدة البيانات عند بدء الصفحة
+  useEffect(() => {
+    const loadTasksFromDatabase = async () => {
+      try {
+        console.log('🔄 Loading tasks from database...');
+        const response = await fetch('/api/tasks');
+        const data = await response.json();
+        
+        if (data.success && Array.isArray(data.data)) {
+          console.log('✅ Tasks loaded from database:', data.data.length);
+          dispatch({ type: "LOAD_TASKS", payload: data.data });
+        } else {
+          console.log('❌ Failed to load tasks from database:', data);
+        }
+      } catch (error) {
+        console.error('❌ Error loading tasks from database:', error);
+      }
+    };
+
+    // تحميل المهام فقط إذا لم تكن موجودة بالفعل
+    if (tasks.length === 0) {
+      loadTasksFromDatabase();
+    } else {
+      console.log('📋 Tasks already loaded:', tasks.length);
+    }
+  }, [dispatch, tasks.length]);
+
   const [searchTerm, setSearchTerm] = useState("")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [alert, setAlert] = useState<{ type: "success" | "error"; message: string } | null>(null)
@@ -551,6 +578,16 @@ function TasksPageContent() {
   // استخدام التحسينات الجديدة للبحث والفلترة
   const searchedTasks = useTaskSearch(tasks, searchTerm)
   
+  // Debug: Log tasks for troubleshooting
+  console.log('🔍 Tasks Debug:', {
+    totalTasks: tasks.length,
+    currentUser: currentUser?.name,
+    currentUserRole: currentUser?.role,
+    currentUserId: currentUser?.id,
+    searchedTasks: searchedTasks.length,
+    projectFilter
+  });
+  
   // Filter by user role and project - المدير يرى جميع المهام، المستخدم يرى مهامه المخصصة له فقط
   const filteredTasks = searchedTasks.filter((task) => {
     // Filter by user role
@@ -560,12 +597,26 @@ function TasksPageContent() {
     }
     
     // Filter by project
-    let projectFilter = true
+    let projectFilterResult = true
     if (projectFilter !== "all") {
-      projectFilter = task.projectId === projectFilter
+      projectFilterResult = task.projectId === projectFilter
     }
     
-    return userFilter && projectFilter
+    const result = userFilter && projectFilterResult;
+    
+    // Debug: Log filtered task
+    if (result) {
+      console.log('✅ Task passed filter:', {
+        taskId: task.id,
+        taskTitle: task.title,
+        assigneeId: task.assigneeId,
+        currentUserId: currentUser?.id,
+        userFilter,
+        projectFilterResult
+      });
+    }
+    
+    return result;
   })
 
   // إضافة فحص للمهام المتأخرة
