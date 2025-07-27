@@ -98,6 +98,13 @@ self.addEventListener('fetch', (event) => {
 
 // Handle API requests
 async function handleApiRequest(request) {
+  // Skip chrome-extension and other unsupported schemes
+  if (request.url.startsWith('chrome-extension://') || 
+      request.url.startsWith('moz-extension://') || 
+      request.url.startsWith('safari-extension://')) {
+    return fetch(request)
+  }
+
   try {
     // Try network first for API requests
     const response = await fetch(request)
@@ -129,6 +136,13 @@ async function handleApiRequest(request) {
 
 // Handle static files
 async function handleStaticFile(request) {
+  // Skip chrome-extension and other unsupported schemes
+  if (request.url.startsWith('chrome-extension://') || 
+      request.url.startsWith('moz-extension://') || 
+      request.url.startsWith('safari-extension://')) {
+    return fetch(request)
+  }
+
   // Try cache first for static files
   const cachedResponse = await caches.match(request)
   if (cachedResponse) {
@@ -150,6 +164,13 @@ async function handleStaticFile(request) {
 
 // Handle navigation requests
 async function handleNavigation(request) {
+  // Skip chrome-extension and other unsupported schemes
+  if (request.url.startsWith('chrome-extension://') || 
+      request.url.startsWith('moz-extension://') || 
+      request.url.startsWith('safari-extension://')) {
+    return fetch(request)
+  }
+
   try {
     // Try network first for navigation
     const response = await fetch(request)
@@ -175,6 +196,13 @@ async function handleNavigation(request) {
 
 // Handle other requests
 async function handleOtherRequest(request) {
+  // Skip chrome-extension and other unsupported schemes
+  if (request.url.startsWith('chrome-extension://') || 
+      request.url.startsWith('moz-extension://') || 
+      request.url.startsWith('safari-extension://')) {
+    return fetch(request)
+  }
+
   try {
     const response = await fetch(request)
     
