@@ -31,14 +31,14 @@ export async function PUT(
     const database = client.db('test');
     const notifications = database.collection('notifications');
     
-    // Update notification in database
+    // Update notification in database - search by id field instead of _id
     const updateData = {
       ...body,
       updatedAt: new Date().toISOString()
     };
     
     const result = await notifications.updateOne(
-      { _id: new ObjectId(notificationId) },
+      { id: notificationId }, // البحث بالـ id بدلاً من _id
       { $set: updateData }
     );
     
@@ -88,7 +88,7 @@ export async function DELETE(
     }
 
     // Connect to MongoDB and delete notification
-    const { MongoClient, ObjectId } = require('mongodb');
+    const { MongoClient } = require('mongodb');
     const uri = process.env.MONGODB_URI;
     
     if (!uri) {
@@ -102,8 +102,8 @@ export async function DELETE(
     const database = client.db('test');
     const notifications = database.collection('notifications');
     
-    // Delete notification from database
-    const result = await notifications.deleteOne({ _id: new ObjectId(notificationId) });
+    // Delete notification from database - search by id field instead of _id
+    const result = await notifications.deleteOne({ id: notificationId }); // البحث بالـ id بدلاً من _id
     
     await client.close();
     

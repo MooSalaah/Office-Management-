@@ -1219,24 +1219,28 @@ export function useAppActions() {
       const notification = { ...updatedNotification, isRead: true };
       dispatch({ type: "UPDATE_NOTIFICATION", payload: notification });
       
-      // حفظ التحديث في قاعدة البيانات
+      // حفظ التحديث في قاعدة البيانات عبر Backend API
       try {
-        const response = await fetch(`/api/notifications/${notificationId}`, {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
+        const response = await fetch(`${apiUrl}/api/notifications/${notificationId}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+          },
           body: JSON.stringify({ isRead: true }),
         });
         
         if (!response.ok) {
-          logger.error('Failed to update notification in database', { 
+          logger.error('Failed to update notification in database via Backend API', { 
             status: response.status, 
             notificationId 
           }, 'NOTIFICATIONS');
         } else {
-          logger.info('Notification marked as read in database', { notificationId }, 'NOTIFICATIONS');
+          logger.info('Notification marked as read in database via Backend API', { notificationId }, 'NOTIFICATIONS');
         }
       } catch (error) {
-        logger.error('Error updating notification in database', { error, notificationId }, 'NOTIFICATIONS');
+        logger.error('Error updating notification in database via Backend API', { error, notificationId }, 'NOTIFICATIONS');
       }
     }
   };
@@ -1245,22 +1249,26 @@ export function useAppActions() {
     // حذف الإشعار من state
     dispatch({ type: "DELETE_NOTIFICATION", payload: notificationId });
     
-    // حذف الإشعار من قاعدة البيانات
+    // حذف الإشعار من قاعدة البيانات عبر Backend API
     try {
-      const response = await fetch(`/api/notifications/${notificationId}`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
+      const response = await fetch(`${apiUrl}/api/notifications/${notificationId}`, {
         method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+        }
       });
       
       if (!response.ok) {
-        logger.error('Failed to delete notification from database', { 
+        logger.error('Failed to delete notification from database via Backend API', { 
           status: response.status, 
           notificationId 
         }, 'NOTIFICATIONS');
       } else {
-        logger.info('Notification deleted from database', { notificationId }, 'NOTIFICATIONS');
+        logger.info('Notification deleted from database via Backend API', { notificationId }, 'NOTIFICATIONS');
       }
     } catch (error) {
-      logger.error('Error deleting notification from database', { error, notificationId }, 'NOTIFICATIONS');
+      logger.error('Error deleting notification from database via Backend API', { error, notificationId }, 'NOTIFICATIONS');
     }
   };
 
