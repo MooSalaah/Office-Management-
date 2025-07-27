@@ -423,20 +423,40 @@ function SettingsPageContent() {
       try {
         // Save to backend database
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
-        const response = await fetch(`${apiUrl}/api/users?id=${currentUser.id}`, {
+        
+        // تحضير البيانات للإرسال
+        const userDataToSend = {
+          id: currentUser.id,
+          name: profileData.name,
+          email: profileData.email,
+          phone: profileData.phone,
+          avatar: profileData.avatar,
+          password: profileData.newPassword || currentUser.password || "",
+          role: currentUser.role,
+          isActive: currentUser.isActive,
+          permissions: currentUser.permissions,
+          monthlySalary: currentUser.monthlySalary,
+          createdAt: currentUser.createdAt,
+          workingHours: currentUser.workingHours
+        };
+
+        const response = await fetch(`${apiUrl}/api/users`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
           },
-          body: JSON.stringify(updatedUser),
+          body: JSON.stringify(userDataToSend),
         });
 
         if (!response.ok) {
-          throw new Error('Failed to update profile in database');
+          const errorData = await response.json().catch(() => ({}));
+          console.error('API Error:', errorData);
+          throw new Error(errorData.error || 'Failed to update profile in database');
         }
 
         const result = await response.json();
+        console.log('Profile update result:', result);
         logger.info('Profile updated in database', { result }, 'SETTINGS');
 
         // Save to localStorage
@@ -473,7 +493,7 @@ function SettingsPageContent() {
         }
       } catch (error) {
         console.error('Error updating profile:', error);
-        setAlert({ type: "error", message: "حدث خطأ أثناء تحديث الملف الشخصي في قاعدة البيانات" });
+        setAlert({ type: "error", message: `حدث خطأ أثناء تحديث الملف الشخصي: ${error instanceof Error ? error.message : 'خطأ غير معروف'}` });
       }
     }
   }
@@ -738,15 +758,40 @@ function SettingsPageContent() {
     try {
       // Save to backend database
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
-      const response = await fetch(`${apiUrl}/api/users?id=${editingUser.id}`, {
+      
+      // تحضير البيانات للإرسال
+      const userDataToSend = {
+        id: editingUser.id,
+        name: userFormData.name,
+        email: userFormData.email,
+        password: userFormData.password || editingUser.password || "",
+        phone: userFormData.phone,
+        role: userFormData.role,
+        isActive: userFormData.isActive,
+        permissions: userFormData.permissions,
+        monthlySalary: userFormData.monthlySalary,
+        avatar: userFormData.avatar,
+        createdAt: editingUser.createdAt,
+        workingHours: editingUser.workingHours
+      };
+
+      const response = await fetch(`${apiUrl}/api/users`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
         },
-        body: JSON.stringify(updatedUser),
+        body: JSON.stringify(userDataToSend),
       });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('API Error:', errorData);
+        throw new Error(errorData.error || 'Failed to update user in database');
+      }
+
       const result = await response.json();
+      console.log('User update result:', result);
+      
       if (result.success && result.data) {
         // تحديث state
         dispatch({ type: "UPDATE_USER", payload: result.data });
@@ -768,7 +813,8 @@ function SettingsPageContent() {
         setAlert({ type: "error", message: result.error || "فشل تحديث المستخدم في قاعدة البيانات" });
       }
     } catch (error) {
-      setAlert({ type: "error", message: "حدث خطأ أثناء تحديث المستخدم في قاعدة البيانات" });
+      console.error('Error updating user:', error);
+      setAlert({ type: "error", message: `حدث خطأ أثناء تحديث المستخدم: ${error instanceof Error ? error.message : 'خطأ غير معروف'}` });
     }
   }
 
