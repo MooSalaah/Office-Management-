@@ -38,7 +38,7 @@ import {
   Moon,
   Palette,
   Settings,
-  Wifi,
+  // تم إزالة Wifi من الاستيرادات
 } from "lucide-react"
 import { getCurrentUser, hasPermission, rolePermissions, getAllRoles, getRolePermissions } from "@/lib/auth"
 import { mockUsers } from "@/lib/data"
@@ -49,7 +49,7 @@ import { PermissionGuard } from "@/components/ui/permission-guard"
 import { realtimeUpdates } from "@/lib/realtime-updates"
 import { DeleteDialog } from "@/components/ui/delete-dialog"
 import { transliterateArabicToEnglish } from "@/lib/utils"
-import { ConnectionTest } from "@/components/ui/connection-test"
+// تم إزالة اختبار الاتصال من صفحة الإعدادات
 import { logger } from "@/lib/logger"
 import { Checkbox } from "@/components/ui/checkbox"
 
@@ -2339,23 +2339,7 @@ function SettingsPageContent() {
         </Dialog>
       )}
 
-      {/* Connection Test Section - Only for admin */}
-      {isAdmin && (
-        <Card className="bg-card text-card-foreground border border-border">
-          <CardHeader>
-            <CardTitle className="flex items-center text-foreground">
-              <Wifi className="w-5 h-5 mr-2" />
-              اختبار الاتصال
-            </CardTitle>
-            <CardDescription className="text-muted-foreground">
-              اختبار الاتصال مع الخادم وقاعدة البيانات والتحديثات المباشرة
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ConnectionTest />
-          </CardContent>
-        </Card>
-      )}
+      {/* تم إزالة كرت اختبار الاتصال من صفحة الإعدادات */}
     </div>
   )
 }
