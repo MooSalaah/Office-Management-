@@ -127,21 +127,17 @@ function TasksPageContent() {
   useEffect(() => {
     const loadTasksFromDatabase = async () => {
       try {
-        console.log('🔄 Loading tasks from database...');
         const response = await fetch('/api/tasks');
         const data = await response.json();
         
         if (data.success && Array.isArray(data.data)) {
-          console.log('✅ Tasks loaded from database:', data.data.length);
           dispatch({ type: "LOAD_TASKS", payload: data.data });
           
           // حفظ المهام في localStorage للتحديثات الفورية
           localStorage.setItem("tasks", JSON.stringify(data.data));
-        } else {
-          console.log('❌ Failed to load tasks from database:', data);
         }
       } catch (error) {
-        console.error('❌ Error loading tasks from database:', error);
+        console.error('Error loading tasks from database:', error);
       }
     };
 
@@ -572,16 +568,7 @@ function TasksPageContent() {
   // استخدام التحسينات الجديدة للبحث والفلترة
   const searchedTasks = useTaskSearch(tasks, searchTerm)
   
-  // Debug: Log tasks for troubleshooting
-  console.log('🔍 Tasks Debug:', {
-    totalTasks: tasks.length,
-    currentUser: currentUser?.name,
-    currentUserRole: currentUser?.role,
-    currentUserId: currentUser?.id,
-    searchedTasks: searchedTasks.length,
-    projectFilter,
-    tasks: tasks.map(t => ({ id: t.id, title: t.title, assigneeId: t.assigneeId, status: t.status }))
-  });
+
   
   // Filter by user role and project - المدير يرى جميع المهام، المستخدم يرى مهامه المخصصة له فقط
   const filteredTasks = searchedTasks.filter((task) => {
@@ -611,18 +598,7 @@ function TasksPageContent() {
     
     const result = userFilter && projectFilterResult;
     
-    // Debug: Log filtered task
-    if (result) {
-      console.log('✅ Task passed filter:', {
-        taskId: task.id,
-        taskTitle: task.title,
-        assigneeId: task.assigneeId,
-        currentUserId: currentUser?.id,
-        currentUserEmail: currentUser?.email,
-        userFilter,
-        projectFilterResult
-      });
-    }
+
     
     return result;
   })
