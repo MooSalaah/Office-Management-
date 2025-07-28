@@ -220,7 +220,7 @@ function ClientDialog({ open, onClose }: { open: boolean; onClose: () => void })
 // Upcoming Payment Dialog Component
 function UpcomingPaymentDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { state, dispatch } = useApp()
-  const { addNotification } = useAppActions()
+  const { addNotification, showSuccessToast, showErrorToast } = useAppActions()
   const [formData, setFormData] = useState({
     client: "",
     amount: "",
@@ -230,30 +230,19 @@ function UpcomingPaymentDialog({ open, onClose }: { open: boolean; onClose: () =
   })
 
   const handleSubmit = async () => {
-    if (!formData.client || !formData.amount || !formData.dueDate) {
-      // إضافة إشعار خطأ
-      addNotification({
-        userId: state.currentUser?.id || "1",
-        title: "خطأ في البيانات",
-        message: "يرجى ملء جميع الحقول المطلوبة",
-        type: "system",
-        actionUrl: `/dashboard`,
-        triggeredBy: state.currentUser?.id || "",
-        isRead: false,
-      })
+    const missingFields = [];
+    if (!formData.client) missingFields.push("العميل");
+    if (!formData.amount) missingFields.push("المبلغ");
+    if (!formData.dueDate) missingFields.push("تاريخ الاستحقاق");
+    
+    if (missingFields.length > 0) {
+      // إضافة توست خطأ
+      showErrorToast("حقول مطلوبة", `يرجى ملء الحقول التالية: ${missingFields.join("، ")}`);
       return
     }
 
     if (Number.parseFloat(formData.amount) <= 0) {
-      addNotification({
-        userId: state.currentUser?.id || "1",
-        title: "خطأ في المبلغ",
-        message: "يجب أن يكون المبلغ أكبر من صفر",
-        type: "system",
-        actionUrl: `/dashboard`,
-        triggeredBy: state.currentUser?.id || "",
-        isRead: false,
-      })
+      showErrorToast("خطأ في المبلغ", "يجب أن يكون المبلغ أكبر من صفر");
       return
     }
 
@@ -289,16 +278,8 @@ function UpcomingPaymentDialog({ open, onClose }: { open: boolean; onClose: () =
         const existingPayments = JSON.parse(localStorage.getItem("upcomingPayments") || "[]");
         localStorage.setItem("upcomingPayments", JSON.stringify([...existingPayments, result.data]));
 
-        // إضافة إشعار نجاح
-        addNotification({
-          userId: "1",
-          title: "دفعة قادمة جديدة",
-          message: `تم إضافة دفعة قادمة لـ ${formData.client} بقيمة ${formData.amount} ريال`,
-          type: "finance",
-          actionUrl: `/finance`,
-          triggeredBy: state.currentUser?.id || "",
-          isRead: false,
-        })
+        // إضافة توست نجاح
+        showSuccessToast("دفعة قادمة جديدة", `تم إضافة دفعة قادمة لـ ${formData.client} بقيمة ${formData.amount} ريال`);
 
         // إعادة تعيين النموذج
         setFormData({
@@ -311,27 +292,11 @@ function UpcomingPaymentDialog({ open, onClose }: { open: boolean; onClose: () =
 
         onClose()
       } else {
-        addNotification({
-          userId: state.currentUser?.id || "1",
-          title: "خطأ في الحفظ",
-          message: "فشل في حفظ الدفعة القادمة في قاعدة البيانات",
-          type: "system",
-          actionUrl: `/dashboard`,
-          triggeredBy: state.currentUser?.id || "",
-          isRead: false,
-        })
+        showErrorToast("خطأ في الحفظ", "فشل في حفظ الدفعة القادمة في قاعدة البيانات");
       }
     } catch (error) {
       console.error('Error saving upcoming payment:', error);
-      addNotification({
-        userId: state.currentUser?.id || "1",
-        title: "خطأ في الاتصال",
-        message: "حدث خطأ أثناء حفظ الدفعة القادمة",
-        type: "system",
-        actionUrl: `/dashboard`,
-        triggeredBy: state.currentUser?.id || "",
-        isRead: false,
-      })
+      showErrorToast("خطأ في الاتصال", "حدث خطأ أثناء حفظ الدفعة القادمة");
     }
   }
 
@@ -344,7 +309,10 @@ function UpcomingPaymentDialog({ open, onClose }: { open: boolean; onClose: () =
         </DialogHeader>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
           <div className="space-y-2">
-            <Label htmlFor="payment-client">العميل</Label>
+            <Label htmlFor="payment-client" className="flex items-center">
+              العميل
+              <span className="text-red-500 mr-1">*</span>
+            </Label>
             <Input
               id="payment-client"
               placeholder="اسم العميل"
@@ -353,7 +321,10 @@ function UpcomingPaymentDialog({ open, onClose }: { open: boolean; onClose: () =
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="payment-amount">المبلغ</Label>
+            <Label htmlFor="payment-amount" className="flex items-center">
+              المبلغ
+              <span className="text-red-500 mr-1">*</span>
+            </Label>
             <div className="relative">
               <Input
                 id="payment-amount"
@@ -370,7 +341,10 @@ function UpcomingPaymentDialog({ open, onClose }: { open: boolean; onClose: () =
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="payment-type">نوع الدفعة</Label>
+            <Label htmlFor="payment-type" className="flex items-center">
+              نوع الدفعة
+              <span className="text-red-500 mr-1">*</span>
+            </Label>
             <Select
               value={formData.type}
               onValueChange={(value: "income" | "expense") => setFormData((prev) => ({ ...prev, type: value }))}
@@ -385,7 +359,10 @@ function UpcomingPaymentDialog({ open, onClose }: { open: boolean; onClose: () =
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="payment-due-date">تاريخ الاستحقاق</Label>
+            <Label htmlFor="payment-due-date" className="flex items-center">
+              تاريخ الاستحقاق
+              <span className="text-red-500 mr-1">*</span>
+            </Label>
             <Input
               id="payment-due-date"
               type="date"
@@ -426,7 +403,7 @@ export default function DashboardPage() {
 
 function DashboardPageContent() {
   const { state, dispatch } = useApp()
-  const { addNotification, createProjectWithDownPayment, markNotificationAsRead, deleteNotification } = useAppActions()
+  const { addNotification, createProjectWithDownPayment, markNotificationAsRead, deleteNotification, showSuccessToast, showErrorToast } = useAppActions()
   const { currentUser, projects, clients, tasks, transactions, notifications, users, isLoading, loadingStates } = state
   const router = useRouter()
   const { toast } = useToast();
@@ -1437,17 +1414,17 @@ function DashboardPageContent() {
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span className="text-gray-600">السعر الإجمالي:</span>
-                        <span className="font-medium">₪ {selectedProject.price.toLocaleString()}<img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 block dark:hidden" loading="lazy" />
+                        <span className="font-medium">{selectedProject.price.toLocaleString()}<img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 block dark:hidden" loading="lazy" />
 <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 hidden dark:block" loading="lazy" /></span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">الدفعة المقدمة:</span>
-                        <span className="text-green-600">₪ {selectedProject.downPayment.toLocaleString()}<img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 block dark:hidden" loading="lazy" />
+                        <span className="text-green-600">{selectedProject.downPayment.toLocaleString()}<img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 block dark:hidden" loading="lazy" />
 <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 hidden dark:block" loading="lazy" /></span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">المبلغ المتبقي:</span>
-                        <span className="text-red-600">₪ {selectedProject.remainingBalance.toLocaleString()}<img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 block dark:hidden" loading="lazy" />
+                        <span className="text-red-600">{selectedProject.remainingBalance.toLocaleString()}<img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 block dark:hidden" loading="lazy" />
 <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 hidden dark:block" loading="lazy" /></span>
                       </div>
                     </div>
