@@ -591,7 +591,7 @@ function AttendancePageContent() {
     setAlert({ type: "success", message: `تم تسجيل الانصراف بنجاح للفترة ${session === 'morning' ? 'الصباحية' : 'المسائية'}` });
   };
 
-  const handleManualCheckInOut = () => {
+  const handleManualCheckInOut = async () => {
     if (!manualFormData.employeeId) {
       setAlert({ type: "error", message: "يرجى اختيار الموظف" })
       return
@@ -626,6 +626,13 @@ function AttendancePageContent() {
         updatedAt: actionTime.toISOString(),
       }
 
+      // حفظ في قاعدة البيانات
+      try {
+        await handleCreateAttendance(newRecord);
+      } catch (error) {
+        console.error('Error saving manual attendance to database:', error);
+      }
+      
       setAttendanceRecords((prev) => [...prev, newRecord])
       
       // بث تحديث فوري لجميع المستخدمين
@@ -647,10 +654,33 @@ function AttendancePageContent() {
         totalHours: Math.round(totalHours * 100) / 100,
       }
 
+      // حفظ في قاعدة البيانات
+      try {
+        await handleUpdateAttendance(existingRecord.id, updatedRecord);
+      } catch (error) {
+        console.error('Error updating manual checkout in database:', error);
+      }
+      
       setAttendanceRecords((prev) => prev.map((record) => (record.id === existingRecord.id ? updatedRecord : record)))
       
-              // بث تحديث فوري لجميع المستخدمين
-        realtimeUpdates.sendAttendanceUpdate({ action: 'update', attendance: updatedRecord, userId: employee.id, userName: employee.name || "" })
+      // بث تحديث فوري لجميع المستخدمين
+      realtimeUpdates.sendAttendanceUpdate({ action: 'update', attendance: updatedRecord, userId: employee.id, userName: employee.name || "" })
+    }
+
+    // إرسال إشعار للمدير إذا كان المستخدم الحالي هو الموارد البشرية
+    if (currentUser?.role === 'hr') {
+      const adminUsers = users.filter(user => user.role === 'admin');
+      for (const adminUser of adminUsers) {
+        addNotification({
+          userId: adminUser.id,
+          title: "تسجيل يدوي للحضور",
+          message: `تم تسجيل ${manualFormData.action === "checkin" ? "الحضور" : "الانصراف"} يدوياً للموظف "${employee.name}" بواسطة الموارد البشرية`,
+          type: "attendance",
+          actionUrl: `/attendance`,
+          triggeredBy: currentUser?.id || "",
+          isRead: false,
+        });
+      }
     }
 
     setAlert({ type: "success", message: `تم تسجيل ${manualFormData.action === "checkin" ? "الحضور" : "الانصراف"} بنجاح` })
@@ -954,7 +984,7 @@ function AttendancePageContent() {
           <p className="text-muted-foreground mt-1">تتبع حضور الموظفين وساعات العمل</p>
         </div>
         <div className="flex space-x-2 space-x-reverse">
-          {canManageAttendance && (
+          {(canManageAttendance || currentUser?.role === 'hr') && (
             <div className="flex items-center gap-2">
               <Select
                 value={selectedEmployeeForReport}
@@ -984,8 +1014,8 @@ function AttendancePageContent() {
               </Button>
             </div>
           )}
-          {/* Manual Check-in/out Section - للمدير فقط */}
-          {currentUser?.role === "admin" && (
+          {/* Manual Check-in/out Section - للمدير والموارد البشرية */}
+          {(currentUser?.role === "admin" || currentUser?.role === "hr") && (
             <Dialog open={isManualDialogOpen} onOpenChange={setIsManualDialogOpen}>
               <DialogTrigger asChild>
                 <Button>
@@ -1062,7 +1092,7 @@ function AttendancePageContent() {
               </DialogContent>
             </Dialog>
           )}
-          {canManageAttendance && (
+          {(canManageAttendance || currentUser?.role === 'hr') && (
             <Button variant="outline" onClick={exportAttendancePDF}>
               <Download className="w-4 h-4 mr-2" />
               تصدير التقرير
