@@ -997,7 +997,14 @@ function FinancePageContent() {
   const confirmDelete = async () => {
     if (!transactionToDelete) return;
     try {
-      const res = await fetch(`${API_BASE_URL}/api/transactions/transaction/${transactionToDelete}`, {
+      // البحث عن المعاملة في state للحصول على _id
+      const transaction = transactions.find(t => t.id === transactionToDelete);
+      if (!transaction) {
+        setDeleteError("لم يتم العثور على المعاملة");
+        return;
+      }
+
+      const res = await fetch(`${API_BASE_URL}/api/transactions/${transaction._id || transaction.id}`, {
         method: "DELETE",
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
