@@ -518,19 +518,18 @@ function FinancePageContent() {
                 // إضافة المعاملة المالية
                 dispatch({ type: "ADD_TRANSACTION", payload: data.data.transaction });
                 
-                // تحديث الدفعة القادمة
-                dispatch({ type: "UPDATE_UPCOMING_PAYMENT", payload: data.data.payment });
+                // حذف الدفعة القادمة من القائمة
+                dispatch({ type: "DELETE_UPCOMING_PAYMENT", payload: payment.id });
                 
                 // حفظ في localStorage
                 const existingTransactions = JSON.parse(localStorage.getItem("transactions") || "[]");
                 const updatedTransactions = [...existingTransactions, data.data.transaction];
                 localStorage.setItem("transactions", JSON.stringify(updatedTransactions));
                 
+                // حذف الدفعة من localStorage
                 const existingPayments = JSON.parse(localStorage.getItem("upcomingPayments") || "[]");
-                const updatedPayments = existingPayments.map((p: any) => 
-                  p.id === data.data.payment.id ? data.data.payment : p
-                );
-                localStorage.setItem("upcomingPayments", JSON.stringify(updatedPayments));
+                const filteredPayments = existingPayments.filter((p: any) => p.id !== payment.id);
+                localStorage.setItem("upcomingPayments", JSON.stringify(filteredPayments));
                 
                 setSuccessMessage("تم إكمال الدفعة وإنشاء المعاملة المالية بنجاح");
                 setIsSuccessDialogOpen(true);
