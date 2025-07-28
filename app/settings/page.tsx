@@ -440,7 +440,7 @@ function SettingsPageContent() {
           workingHours: currentUser.workingHours
         };
 
-        const response = await fetch(`${apiUrl}/api/users`, {
+        const response = await fetch(`${apiUrl}/api/users/${currentUser.id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -775,7 +775,7 @@ function SettingsPageContent() {
         workingHours: editingUser.workingHours
       };
 
-      const response = await fetch(`${apiUrl}/api/users`, {
+      const response = await fetch(`${apiUrl}/api/users/${editingUser.id}`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
