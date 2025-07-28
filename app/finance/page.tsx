@@ -110,15 +110,23 @@ function FinancePageContent() {
     notes: "",
     remainingAmount: "",
     payerName: currentUser?.name || "",
+    recipientName: currentUser?.name || "",
   })
 
   const [paymentFormData, setPaymentFormData] = useState({
     client: "",
+    clientId: "",
     amount: "",
     type: "income" as "income" | "expense",
     dueDate: "",
     description: "",
     payerName: currentUser?.name || "",
+    projectId: "",
+    projectName: "",
+    category: "general",
+    paymentMethod: "cash" as "cash" | "transfer" | "pos" | "check" | "credit",
+    importance: "medium" as "low" | "medium" | "high",
+    notes: "",
   })
 
   // Calculate financial summary

@@ -10,9 +10,9 @@ export interface InvoiceData {
 	description?: string;
 	transactionDate: string;
 	invoiceNumber: string;
-	companyLogo?: string;
-	companyStamp?: string;
-	companySignature?: string;
+	companyLogo?: string | undefined;
+	companyStamp?: string | undefined;
+	companySignature?: string | undefined;
 	remainingAmount?: number;
 	payerName?: string;
 	recipientName?: string;
@@ -120,7 +120,7 @@ export class InvoiceGenerator {
 		return paymentMethods[method.toLowerCase()] || method;
 	}
 
-	static generateInvoiceHTML(data: InvoiceData & { address?: string; phone?: string; email?: string; website?: string }): string {
+	static generateInvoiceHTML(data: InvoiceData & { address?: string; phone?: string; email?: string; website?: string | undefined }): string {
 		const formattedDate = this.convertToArabicDate(data.transactionDate);
 		const hijriDate = this.convertToHijriDate(data.transactionDate);
 		const translatedPaymentMethod = this.translatePaymentMethod(data.paymentMethod);
@@ -251,7 +251,7 @@ export class InvoiceGenerator {
 		client: Client,
 		companySettings: CompanySettings
 	): string {
-		const invoiceData: InvoiceData & { address?: string; phone?: string; email?: string; website?: string } = {
+		const invoiceData: InvoiceData & { address?: string; phone?: string; email?: string; website?: string | undefined } = {
 			companyName: companySettings.name || "الركن الجديد للاستشارات الهندسية",
 			clientName: client?.name || transaction.clientName || "غير محدد",
 			amount: transaction.amount,

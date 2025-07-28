@@ -95,13 +95,15 @@ export interface Transaction {
 		| "inspection"
 		| "other";
 	importance: "low" | "medium" | "high";
-	paymentMethod?: "cash" | "transfer" | "pos";
+	paymentMethod?: "cash" | "transfer" | "pos" | "check" | "credit";
 	date: string;
 	status: "completed" | "pending" | "draft" | "canceled";
 	createdBy: string;
 	createdAt: string;
 	remainingAmount?: number;
 	payerName?: string;
+	recipientName?: string;
+	isAdvancePayment?: boolean;
 }
 
 export interface Notification {
@@ -148,6 +150,8 @@ export interface AttendanceRecord {
 export interface CompanySettings {
 	name: string;
 	logo?: string;
+	stamp?: string;
+	signature?: string;
 	phone: string;
 	email: string;
 	address: string;
