@@ -1396,9 +1396,10 @@ function SettingsPageContent() {
   const canManageUsers = hasPermission(currentUser?.role || "", "edit", "users")
   const canManageRoles = hasPermission(currentUser?.role || "", "edit", "roles")
   const isAdmin = currentUser?.role === "admin"
+  const isHR = currentUser?.role === "hr"
 
-  // Show only profile settings for non-admin users
-  if (!isAdmin) {
+  // Show only profile settings for non-admin and non-HR users
+  if (!isAdmin && !isHR) {
     return (
       <div className="max-w-screen-xl mx-auto space-y-6">
         {alert && (
@@ -1565,7 +1566,7 @@ function SettingsPageContent() {
         <div>
           <h1 className="text-3xl font-bold text-foreground mb-1">الإعدادات</h1>
           <p className="text-muted-foreground mt-1">
-            {isAdmin ? "إدارة إعدادات النظام والمستخدمين" : "إدارة الملف الشخصي والإعدادات"}
+            {(isAdmin || isHR) ? "إدارة إعدادات النظام والمستخدمين" : "إدارة الملف الشخصي والإعدادات"}
           </p>
         </div>
       </div>

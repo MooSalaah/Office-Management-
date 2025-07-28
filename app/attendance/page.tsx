@@ -348,8 +348,8 @@ function AttendancePageContent() {
 
   // تعديل الكروت الإحصائية بناءً على دور المستخدم
   const renderStatsCards = () => {
-    // للمدير: عرض إحصائيات جميع الموظفين
-    if (currentUser?.role === 'admin') {
+    // للمدير والموارد البشرية: عرض إحصائيات جميع الموظفين
+    if (currentUser?.role === 'admin' || currentUser?.role === 'hr') {
       return (
         <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
           <Card>
@@ -769,8 +769,8 @@ function AttendancePageContent() {
   const filteredRecords = attendanceRecords
     .filter((record) => record.date === selectedDate)
     .filter((record) => 
-      // للمدير: عرض جميع السجلات، للموظفين: عرض سجلاتهم فقط
-      currentUser?.role === 'admin' ? 
+      // للمدير والموارد البشرية: عرض جميع السجلات، للموظفين: عرض سجلاتهم فقط
+      (currentUser?.role === 'admin' || currentUser?.role === 'hr') ? 
         record.userName.toLowerCase().includes(searchTerm.toLowerCase()) :
         record.userId === currentUser?.id
     )
@@ -1320,10 +1320,10 @@ function AttendancePageContent() {
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle>
-                {currentUser?.role === 'admin' ? 'سجل الحضور' : 'سجل الحضور الشخصي'}
+                {(currentUser?.role === 'admin' || currentUser?.role === 'hr') ? 'سجل الحضور' : 'سجل الحضور الشخصي'}
               </CardTitle>
               <CardDescription>
-                {currentUser?.role === 'admin' ? 'تفاصيل حضور الموظفين' : 'تفاصيل حضورك الشخصي'}
+                {(currentUser?.role === 'admin' || currentUser?.role === 'hr') ? 'تفاصيل حضور الموظفين' : 'تفاصيل حضورك الشخصي'}
               </CardDescription>
             </div>
             <div className="flex items-center space-x-2 space-x-reverse">
