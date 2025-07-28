@@ -1252,15 +1252,15 @@ function SettingsPageContent() {
       realtimeUpdates.broadcastUpdate('role', { action: 'update', role: savedRole })
       
       // Show success dialog with confirmation
-      setSuccessDialog("تم تحديث الدور الوظيفي بنجاح وتم حفظ البيانات في قاعدة البيانات")
+      showSuccessToast("تم تحديث الدور الوظيفي بنجاح", "تم حفظ البيانات في قاعدة البيانات")
       
       setEditingJobRole(null)
-      showSuccessToast("تم تحديث الدور الوظيفي بنجاح", "تم حفظ البيانات في قاعدة البيانات")
+      setAlert({ type: "success", message: "تم تحديث الدور الوظيفي بنجاح" })
       setIsJobRoleDialogOpen(false)
       resetJobRoleForm()
     } catch (error) {
       console.error('Error updating role:', error);
-      showErrorToast("خطأ في تحديث الدور", error instanceof Error ? error.message : 'خطأ غير معروف')
+      setAlert({ type: "error", message: `خطأ في تحديث الدور: ${error instanceof Error ? error.message : 'خطأ غير معروف'}` })
     }
   }
 
@@ -1319,12 +1319,12 @@ function SettingsPageContent() {
       realtimeUpdates.broadcastUpdate('role', { action: 'delete', roleId: roleToDelete._id })
       
       // Show success dialog with confirmation
-      setSuccessDialog("تم حذف الدور الوظيفي بنجاح وتم حفظ البيانات في قاعدة البيانات")
-      
       showSuccessToast("تم حذف الدور الوظيفي بنجاح", "تم حفظ البيانات في قاعدة البيانات")
+      
+      setAlert({ type: "success", message: "تم حذف الدور الوظيفي بنجاح" })
     } catch (error) {
       console.error('Error deleting role:', error);
-      showErrorToast("خطأ في حذف الدور", error instanceof Error ? error.message : 'خطأ غير معروف')
+      setAlert({ type: "error", message: `خطأ في حذف الدور: ${error instanceof Error ? error.message : 'خطأ غير معروف'}` })
     }
   }
 
@@ -1339,7 +1339,7 @@ function SettingsPageContent() {
   // Task Types Management Functions
   const handleCreateTaskType = async () => {
     if (!hasPermission(currentUser?.role || "", "create", "taskTypes")) {
-      showErrorToast("خطأ في الصلاحيات", "ليس لديك صلاحية لإنشاء أنواع المهام")
+      setAlert({ type: "error", message: "ليس لديك صلاحية لإنشاء أنواع المهام" })
       return
     }
 
@@ -1373,6 +1373,7 @@ function SettingsPageContent() {
       // إرسال تحديث فوري
       realtimeUpdates.broadcastUpdate('taskType', { action: 'create', taskType: savedTaskType })
       
+      setAlert({ type: "success", message: "تم إنشاء نوع المهمة بنجاح" })
       showSuccessToast("تم إنشاء نوع المهمة بنجاح", "تم حفظ البيانات في قاعدة البيانات")
       setIsTaskTypeDialogOpen(false)
       resetTaskTypeForm()
@@ -1386,7 +1387,7 @@ function SettingsPageContent() {
 
   const handleUpdateTaskType = async () => {
     if (!editingTaskType || !hasPermission(currentUser?.role || "", "edit", "taskTypes")) {
-      showErrorToast("خطأ في الصلاحيات", "ليس لديك صلاحية لتعديل أنواع المهام")
+      setAlert({ type: "error", message: "ليس لديك صلاحية لتعديل أنواع المهام" })
       return
     }
 
@@ -1421,17 +1422,18 @@ function SettingsPageContent() {
       realtimeUpdates.broadcastUpdate('taskType', { action: 'update', taskType: updatedTaskType })
 
       showSuccessToast("تم تحديث نوع المهمة بنجاح", "تم حفظ البيانات في قاعدة البيانات")
+      setAlert({ type: "success", message: "تم تحديث نوع المهمة بنجاح" })
       setIsTaskTypeDialogOpen(false)
       resetTaskTypeForm()
     } catch (error) {
       console.error('Error updating task type:', error);
-      showErrorToast("خطأ في تحديث نوع المهمة", error instanceof Error ? error.message : 'خطأ غير معروف')
+      setAlert({ type: "error", message: `خطأ في تحديث نوع المهمة: ${error instanceof Error ? error.message : 'خطأ غير معروف'}` })
     }
   }
 
   const handleDeleteTaskType = async (taskTypeId: string) => {
     if (!hasPermission(currentUser?.role || "", "delete", "taskTypes")) {
-      showErrorToast("خطأ في الصلاحيات", "ليس لديك صلاحية لحذف أنواع المهام")
+      setAlert({ type: "error", message: "ليس لديك صلاحية لحذف أنواع المهام" })
       return
     }
 
@@ -1457,16 +1459,17 @@ function SettingsPageContent() {
       realtimeUpdates.broadcastUpdate('taskType', { action: 'delete', taskTypeId })
       
       showSuccessToast("تم حذف نوع المهمة بنجاح", "تم حفظ البيانات في قاعدة البيانات")
+      setAlert({ type: "success", message: "تم حذف نوع المهمة بنجاح" })
       setTaskTypeToDelete(null)
     } catch (error) {
       console.error('Error deleting task type:', error);
-      showErrorToast("خطأ في حذف نوع المهمة", error instanceof Error ? error.message : 'خطأ غير معروف')
+      setAlert({ type: "error", message: `خطأ في حذف نوع المهمة: ${error instanceof Error ? error.message : 'خطأ غير معروف'}` })
     }
   }
 
   const handleSeedTaskTypes = async () => {
     if (!hasPermission(currentUser?.role || "", "create", "taskTypes")) {
-      showErrorToast("خطأ في الصلاحيات", "ليس لديك صلاحية لإضافة أنواع المهام الافتراضية")
+      setAlert({ type: "error", message: "ليس لديك صلاحية لإضافة أنواع المهام الافتراضية" })
       return
     }
 
@@ -1488,10 +1491,10 @@ function SettingsPageContent() {
       // حفظ في localStorage
       localStorage.setItem("taskTypes", JSON.stringify(result.data))
       
-      showSuccessToast("تم إضافة أنواع المهام الافتراضية بنجاح", "تم حفظ البيانات في قاعدة البيانات")
+      setAlert({ type: "success", message: "تم إضافة أنواع المهام الافتراضية بنجاح" })
     } catch (error) {
       console.error('Error seeding task types:', error);
-      showErrorToast("خطأ في إضافة أنواع المهام الافتراضية", error instanceof Error ? error.message : 'خطأ غير معروف')
+      setAlert({ type: "error", message: `خطأ في إضافة أنواع المهام الافتراضية: ${error instanceof Error ? error.message : 'خطأ غير معروف'}` })
     }
   }
 

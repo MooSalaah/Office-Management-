@@ -54,7 +54,7 @@ export default function AttendancePage() {
 
 function AttendancePageContent() {
   const { state, dispatch } = useApp()
-  const { addNotification, showSuccessToast } = useAppActions()
+  const { addNotification, showSuccessToast, showErrorToast } = useAppActions()
   const [currentUser, setCurrentUser] = useState<UserType | null>(null)
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([])
   const [isCheckedIn, setIsCheckedIn] = useState(false)
@@ -182,10 +182,13 @@ function AttendancePageContent() {
         }
       } else {
         setAlert({ type: "error", message: data.error || "فشل حفظ الحضور في قاعدة البيانات" });
+        showErrorToast("خطأ في حفظ الحضور", data.error || "فشل حفظ الحضور في قاعدة البيانات");
       }
     } catch (err) {
       console.error('❌ Error saving attendance:', err);
-      setAlert({ type: "error", message: `حدث خطأ أثناء حفظ الحضور في قاعدة البيانات: ${err instanceof Error ? err.message : 'خطأ غير معروف'}` });
+      const errorMessage = `حدث خطأ أثناء حفظ الحضور في قاعدة البيانات: ${err instanceof Error ? err.message : 'خطأ غير معروف'}`;
+      setAlert({ type: "error", message: errorMessage });
+      showErrorToast("خطأ في حفظ الحضور", errorMessage);
     }
   }
 
@@ -271,10 +274,13 @@ function AttendancePageContent() {
         }
       } else {
         setAlert({ type: "error", message: data.error || "فشل حذف سجل الحضور من قاعدة البيانات" });
+        showErrorToast("خطأ في حذف سجل الحضور", data.error || "فشل حذف سجل الحضور من قاعدة البيانات");
       }
     } catch (err) {
       console.error('خطأ في حذف سجل الحضور:', err);
-      setAlert({ type: "error", message: "حدث خطأ أثناء حذف سجل الحضور من قاعدة البيانات" });
+      const errorMessage = "حدث خطأ أثناء حذف سجل الحضور من قاعدة البيانات";
+      setAlert({ type: "error", message: errorMessage });
+      showErrorToast("خطأ في حذف سجل الحضور", errorMessage);
     }
   }
 

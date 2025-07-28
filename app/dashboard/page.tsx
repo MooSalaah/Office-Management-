@@ -78,7 +78,7 @@ function ProjectCard({ project }: { project: Project }) {
             {project.startDate}
           </span>
           <span>
-            ﷼ {project.price.toLocaleString()}
+            {project.price.toLocaleString()}
             <img src="/Saudi_Riyal_Symbol.svg" alt="ريال" width={16} height={16} className="inline align-middle opacity-60 ml-1 block dark:hidden" loading="lazy" />
             <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" width={16} height={16} className="inline align-middle opacity-60 ml-1 hidden dark:block" loading="lazy" />
           </span>
@@ -228,21 +228,46 @@ function UpcomingPaymentDialog({ open, onClose }: { open: boolean; onClose: () =
     dueDate: "",
     description: "",
   })
+  const [errors, setErrors] = useState({
+    client: "",
+    amount: "",
+    type: "",
+    dueDate: "",
+  })
 
-  const handleSubmit = async () => {
-    const missingFields = [];
-    if (!formData.client) missingFields.push("العميل");
-    if (!formData.amount) missingFields.push("المبلغ");
-    if (!formData.dueDate) missingFields.push("تاريخ الاستحقاق");
-    
-    if (missingFields.length > 0) {
-      // إضافة توست خطأ
-      showErrorToast("حقول مطلوبة", `يرجى ملء الحقول التالية: ${missingFields.join("، ")}`);
-      return
+  const validateForm = () => {
+    const newErrors = {
+      client: "",
+      amount: "",
+      type: "",
+      dueDate: "",
     }
 
-    if (Number.parseFloat(formData.amount) <= 0) {
-      showErrorToast("خطأ في المبلغ", "يجب أن يكون المبلغ أكبر من صفر");
+    if (!formData.client.trim()) {
+      newErrors.client = "اسم العميل مطلوب"
+    }
+
+    if (!formData.amount.trim()) {
+      newErrors.amount = "المبلغ مطلوب"
+    } else if (Number.parseFloat(formData.amount) <= 0) {
+      newErrors.amount = "يجب أن يكون المبلغ أكبر من صفر"
+    }
+
+    if (!formData.type) {
+      newErrors.type = "نوع الدفعة مطلوب"
+    }
+
+    if (!formData.dueDate) {
+      newErrors.dueDate = "تاريخ الاستحقاق مطلوب"
+    }
+
+    setErrors(newErrors)
+    return !Object.values(newErrors).some(error => error !== "")
+  }
+
+  const handleSubmit = async () => {
+    if (!validateForm()) {
+      showErrorToast("خطأ في البيانات", "يرجى ملء جميع الحقول المطلوبة")
       return
     }
 
@@ -272,14 +297,24 @@ function UpcomingPaymentDialog({ open, onClose }: { open: boolean; onClose: () =
 
       if (result.success) {
         // إضافة الدفعة القادمة إلى state
-        dispatch({ type: "ADD_UPCOMING_PAYMENT", payload: result.data })
+        dispatch({ type: "ADD_UPCOMING_PAYMENT", payload: result.data || newPayment })
 
         // حفظ في localStorage
         const existingPayments = JSON.parse(localStorage.getItem("upcomingPayments") || "[]");
-        localStorage.setItem("upcomingPayments", JSON.stringify([...existingPayments, result.data]));
+        localStorage.setItem("upcomingPayments", JSON.stringify([...existingPayments, result.data || newPayment]));
 
-        // إضافة توست نجاح
-        showSuccessToast("دفعة قادمة جديدة", `تم إضافة دفعة قادمة لـ ${formData.client} بقيمة ${formData.amount} ريال`);
+        // إضافة إشعار نجاح
+        addNotification({
+          userId: "1",
+          title: "دفعة قادمة جديدة",
+          message: `تم إضافة دفعة قادمة لـ ${formData.client} بقيمة ${formData.amount} ريال`,
+          type: "finance",
+          actionUrl: `/finance`,
+          triggeredBy: state.currentUser?.id || "",
+          isRead: false,
+        })
+
+        showSuccessToast("تم إضافة الدفعة القادمة بنجاح", "تم حفظ البيانات في قاعدة البيانات")
 
         // إعادة تعيين النموذج
         setFormData({
@@ -289,14 +324,20 @@ function UpcomingPaymentDialog({ open, onClose }: { open: boolean; onClose: () =
           dueDate: "",
           description: "",
         })
+        setErrors({
+          client: "",
+          amount: "",
+          type: "",
+          dueDate: "",
+        })
 
         onClose()
       } else {
-        showErrorToast("خطأ في الحفظ", "فشل في حفظ الدفعة القادمة في قاعدة البيانات");
+        showErrorToast("خطأ في الحفظ", "فشل في حفظ الدفعة القادمة في قاعدة البيانات")
       }
     } catch (error) {
       console.error('Error saving upcoming payment:', error);
-      showErrorToast("خطأ في الاتصال", "حدث خطأ أثناء حفظ الدفعة القادمة");
+      showErrorToast("خطأ في الاتصال", "حدث خطأ أثناء حفظ الدفعة القادمة")
     }
   }
 
@@ -309,21 +350,24 @@ function UpcomingPaymentDialog({ open, onClose }: { open: boolean; onClose: () =
         </DialogHeader>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
           <div className="space-y-2">
-            <Label htmlFor="payment-client" className="flex items-center">
-              العميل
-              <span className="text-red-500 mr-1">*</span>
+            <Label htmlFor="payment-client">
+              العميل <span className="text-red-500">*</span>
             </Label>
             <Input
               id="payment-client"
               placeholder="اسم العميل"
               value={formData.client}
-              onChange={(e) => setFormData((prev) => ({ ...prev, client: e.target.value }))}
+              onChange={(e) => {
+                setFormData((prev) => ({ ...prev, client: e.target.value }))
+                if (errors.client) setErrors(prev => ({ ...prev, client: "" }))
+              }}
+              className={errors.client ? "border-red-500" : ""}
             />
+            {errors.client && <p className="text-red-500 text-sm">{errors.client}</p>}
           </div>
           <div className="space-y-2">
-            <Label htmlFor="payment-amount" className="flex items-center">
-              المبلغ
-              <span className="text-red-500 mr-1">*</span>
+            <Label htmlFor="payment-amount">
+              المبلغ <span className="text-red-500">*</span>
             </Label>
             <div className="relative">
               <Input
@@ -331,25 +375,31 @@ function UpcomingPaymentDialog({ open, onClose }: { open: boolean; onClose: () =
                 type="number"
                 placeholder="0"
                 value={formData.amount}
-                onChange={(e) => setFormData((prev) => ({ ...prev, amount: e.target.value }))}
-                className="pr-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                onChange={(e) => {
+                  setFormData((prev) => ({ ...prev, amount: e.target.value }))
+                  if (errors.amount) setErrors(prev => ({ ...prev, amount: "" }))
+                }}
+                className={`pr-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${errors.amount ? "border-red-500" : ""}`}
               />
               <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
                 <img src="/Saudi_Riyal_Symbol.svg" alt="ريال" width={16} height={16} className="opacity-60 block dark:hidden" />
                 <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" width={16} height={16} className="opacity-60 hidden dark:block" />
               </div>
             </div>
+            {errors.amount && <p className="text-red-500 text-sm">{errors.amount}</p>}
           </div>
           <div className="space-y-2">
-            <Label htmlFor="payment-type" className="flex items-center">
-              نوع الدفعة
-              <span className="text-red-500 mr-1">*</span>
+            <Label htmlFor="payment-type">
+              نوع الدفعة <span className="text-red-500">*</span>
             </Label>
             <Select
               value={formData.type}
-              onValueChange={(value: "income" | "expense") => setFormData((prev) => ({ ...prev, type: value }))}
+              onValueChange={(value: "income" | "expense") => {
+                setFormData((prev) => ({ ...prev, type: value }))
+                if (errors.type) setErrors(prev => ({ ...prev, type: "" }))
+              }}
             >
-              <SelectTrigger>
+              <SelectTrigger className={errors.type ? "border-red-500" : ""}>
                 <SelectValue placeholder="اختر النوع" />
               </SelectTrigger>
               <SelectContent>
@@ -357,18 +407,23 @@ function UpcomingPaymentDialog({ open, onClose }: { open: boolean; onClose: () =
                 <SelectItem value="expense">مصروف متوقع</SelectItem>
               </SelectContent>
             </Select>
+            {errors.type && <p className="text-red-500 text-sm">{errors.type}</p>}
           </div>
           <div className="space-y-2">
-            <Label htmlFor="payment-due-date" className="flex items-center">
-              تاريخ الاستحقاق
-              <span className="text-red-500 mr-1">*</span>
+            <Label htmlFor="payment-due-date">
+              تاريخ الاستحقاق <span className="text-red-500">*</span>
             </Label>
             <Input
               id="payment-due-date"
               type="date"
               value={formData.dueDate}
-              onChange={(e) => setFormData((prev) => ({ ...prev, dueDate: e.target.value }))}
+              onChange={(e) => {
+                setFormData((prev) => ({ ...prev, dueDate: e.target.value }))
+                if (errors.dueDate) setErrors(prev => ({ ...prev, dueDate: "" }))
+              }}
+              className={errors.dueDate ? "border-red-500" : ""}
             />
+            {errors.dueDate && <p className="text-red-500 text-sm">{errors.dueDate}</p>}
           </div>
           <div className="space-y-2 md:col-span-2">
             <Label htmlFor="payment-description">الوصف</Label>
@@ -403,7 +458,7 @@ export default function DashboardPage() {
 
 function DashboardPageContent() {
   const { state, dispatch } = useApp()
-  const { addNotification, createProjectWithDownPayment, markNotificationAsRead, deleteNotification, showSuccessToast, showErrorToast } = useAppActions()
+  const { addNotification, createProjectWithDownPayment, markNotificationAsRead, deleteNotification } = useAppActions()
   const { currentUser, projects, clients, tasks, transactions, notifications, users, isLoading, loadingStates } = state
   const router = useRouter()
   const { toast } = useToast();
@@ -1414,17 +1469,17 @@ function DashboardPageContent() {
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span className="text-gray-600">السعر الإجمالي:</span>
-                        <span className="font-medium">{selectedProject.price.toLocaleString()}<img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 block dark:hidden" loading="lazy" />
+                        <span className="font-medium">₪ {selectedProject.price.toLocaleString()}<img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 block dark:hidden" loading="lazy" />
 <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 hidden dark:block" loading="lazy" /></span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">الدفعة المقدمة:</span>
-                        <span className="text-green-600">{selectedProject.downPayment.toLocaleString()}<img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 block dark:hidden" loading="lazy" />
+                        <span className="text-green-600">₪ {selectedProject.downPayment.toLocaleString()}<img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 block dark:hidden" loading="lazy" />
 <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 hidden dark:block" loading="lazy" /></span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">المبلغ المتبقي:</span>
-                        <span className="text-red-600">{selectedProject.remainingBalance.toLocaleString()}<img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 block dark:hidden" loading="lazy" />
+                        <span className="text-red-600">₪ {selectedProject.remainingBalance.toLocaleString()}<img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 block dark:hidden" loading="lazy" />
 <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 hidden dark:block" loading="lazy" /></span>
                       </div>
                     </div>
@@ -1478,8 +1533,8 @@ function DashboardPageContent() {
           </DialogHeader>
           <TaskForm 
             onClose={() => setIsTaskDialogOpen(false)} 
-            defaultAssigneeId={defaultTaskForm.assigneeId} 
-            defaultDueDate={defaultTaskForm.dueDate} 
+            defaultAssigneeId={defaultTaskForm.assigneeId || undefined} 
+            defaultDueDate={defaultTaskForm.dueDate || undefined} 
           />
         </DialogContent>
       </Dialog>

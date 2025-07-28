@@ -69,7 +69,7 @@ export class InvoiceGenerator {
 		// خوارزمية تحويل دقيقة للتاريخ الهجري
 		// التاريخ الحالي: 28 يوليو 2025 = 3 صفر 1447
 		const baseGregorianDate = new Date(2025, 6, 28); // 28 يوليو 2025
-		const baseHijriDate = { year: 1447, month: 1, day: 3 }; // 3 صفر 1447
+		const baseHijriDate = { year: 1447, month: 2, day: 3 }; // 3 صفر 1447 (صفر = الشهر الثاني)
 		
 		// حساب الفرق بالأيام
 		const diffTime = date.getTime() - baseGregorianDate.getTime();
