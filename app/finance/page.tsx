@@ -34,6 +34,7 @@ import {
   AlertCircle,
   AlertTriangle,
   FileText,
+  X,
 } from "lucide-react"
 import { useApp, useAppActions } from "@/lib/context/AppContext"
 import { hasPermission } from "@/lib/auth"
@@ -84,23 +85,21 @@ function FinancePageContent() {
   const [successMessage, setSuccessMessage] = useState("")
   const [alert, setAlert] = useState<{ type: "success" | "error"; message: string } | null>(null)
 
+  // متغيرات لإضافة أنواع جديدة
+  const [showNewTransactionTypeInput, setShowNewTransactionTypeInput] = useState(false)
+  const [newTransactionType, setNewTransactionType] = useState("")
+  const [newTransactionTypeError, setNewTransactionTypeError] = useState("")
+  const [showNewPaymentMethodInput, setShowNewPaymentMethodInput] = useState(false)
+  const [newPaymentMethod, setNewPaymentMethod] = useState("")
+  const [newPaymentMethodError, setNewPaymentMethodError] = useState("")
+
   const [formData, setFormData] = useState({
     type: "income" as "income" | "expense",
     amount: "",
     description: "",
     projectId: "",
-    transactionType: "other" as
-      | "license"
-      | "certificate"
-      | "safety"
-      | "consultation"
-      | "design"
-      | "supervision"
-      | "maintenance"
-      | "renovation"
-      | "inspection"
-      | "other",
-    paymentMethod: "cash" as "cash" | "transfer" | "pos" | "check" | "credit",
+    transactionType: "other" as string,
+    paymentMethod: "cash" as string,
     importance: "medium" as "high" | "medium" | "low",
     date: new Date().toISOString().split("T")[0],
     notes: "",
@@ -120,7 +119,7 @@ function FinancePageContent() {
     projectId: "",
     projectName: "",
     category: "general",
-    paymentMethod: "cash" as "cash" | "transfer" | "pos" | "check" | "credit",
+    paymentMethod: "cash" as string,
     importance: "medium" as "low" | "medium" | "high",
     notes: "",
   })
@@ -268,6 +267,37 @@ function FinancePageContent() {
         const data = await response.json();
         if (data.success) {
           dispatch({ type: "ADD_TRANSACTION", payload: data.data || newTransaction });
+          
+          // إضافة المعاملة تلقائياً للدفعات القادمة إذا كانت من نوع "income"
+          if (formData.type === "income" && formData.amount) {
+            const newUpcomingPayment = {
+              id: `upcoming_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              client: project?.client || "عميل عام",
+              clientId: project?.clientId || "",
+              amount: parseFloat(formData.amount),
+              type: "income" as "income" | "expense",
+              dueDate: formData.date,
+              description: formData.description,
+              payerName: formData.payerName || currentUser?.name || "",
+              projectId: formData.projectId || "",
+              projectName: project?.name || "",
+              category: "general",
+              paymentMethod: formData.paymentMethod || "cash",
+              importance: formData.importance || "medium",
+              notes: formData.notes || "",
+              status: "pending" as "pending" | "overdue",
+              createdAt: new Date().toISOString(),
+            };
+            
+            // إضافة للدفعات القادمة
+            dispatch({ type: "ADD_UPCOMING_PAYMENT", payload: newUpcomingPayment });
+            
+            // حفظ في localStorage
+            const existingPayments = JSON.parse(localStorage.getItem("upcomingPayments") || "[]");
+            existingPayments.push(newUpcomingPayment);
+            localStorage.setItem("upcomingPayments", JSON.stringify(existingPayments));
+          }
+          
           setAlert({ type: "success", message: "تم إضافة المعاملة المالية بنجاح" });
           resetForm();
         } else {
@@ -891,6 +921,76 @@ function FinancePageContent() {
     })
   }
 
+  // دالة إضافة نوع معاملة جديد
+  const handleAddNewTransactionType = () => {
+    if (!newTransactionType.trim()) {
+      setNewTransactionTypeError("يرجى إدخال نوع المعاملة الجديد");
+      return;
+    }
+    setNewTransactionTypeError("");
+    
+    // تحديث بيانات النموذج بالنوع الجديد
+    setFormData(prev => ({ ...prev, transactionType: newTransactionType.trim() }))
+    
+    // حفظ أنواع المعاملات في localStorage
+    const existingTypes = JSON.parse(localStorage.getItem("transactionTypes") || "[]")
+    if (!existingTypes.includes(newTransactionType.trim())) {
+      existingTypes.push(newTransactionType.trim())
+      localStorage.setItem("transactionTypes", JSON.stringify(existingTypes))
+    }
+    
+    // إرسال إشعار للمدير
+    if (currentUser?.role !== "admin") {
+      addNotification({
+        userId: "1", // معرف المدير
+        title: "تم إضافة نوع معاملة جديد",
+        message: `تم إضافة نوع المعاملة "${newTransactionType.trim()}" بواسطة ${currentUser?.name}`,
+        type: "finance",
+        isRead: false,
+        triggeredBy: currentUser?.id || "",
+      })
+    }
+    
+    // إعادة تعيين الحقول
+    setShowNewTransactionTypeInput(false)
+    setNewTransactionType("")
+  }
+
+  // دالة إضافة طريقة دفع جديدة
+  const handleAddNewPaymentMethod = () => {
+    if (!newPaymentMethod.trim()) {
+      setNewPaymentMethodError("يرجى إدخال طريقة الدفع الجديدة");
+      return;
+    }
+    setNewPaymentMethodError("");
+    
+    // تحديث بيانات النموذج بالطريقة الجديدة
+    setFormData(prev => ({ ...prev, paymentMethod: newPaymentMethod.trim() }))
+    
+    // حفظ طرق الدفع في localStorage
+    const existingMethods = JSON.parse(localStorage.getItem("paymentMethods") || "[]")
+    if (!existingMethods.includes(newPaymentMethod.trim())) {
+      existingMethods.push(newPaymentMethod.trim())
+      localStorage.setItem("paymentMethods", JSON.stringify(existingMethods))
+    }
+    
+    // إرسال إشعار للمدير
+    if (currentUser?.role !== "admin") {
+      addNotification({
+        userId: "1", // معرف المدير
+        title: "تم إضافة طريقة دفع جديدة",
+        message: `تم إضافة طريقة الدفع "${newPaymentMethod.trim()}" بواسطة ${currentUser?.name}`,
+        type: "finance",
+        isRead: false,
+        triggeredBy: currentUser?.id || "",
+      })
+    }
+    
+    // إعادة تعيين الحقول
+    setShowNewPaymentMethodInput(false)
+    setNewPaymentMethod("")
+  }
+
   const getTransactionCategory = (type: string) => {
     switch (type) {
       case "license":
@@ -934,7 +1034,7 @@ function FinancePageContent() {
   const paymentMethods = [
     { value: "cash", label: "نقداً" },
     { value: "transfer", label: "تحويل بنكي" },
-    { value: "pos", label: "POS" },
+    { value: "pos", label: "شبكة" },
     { value: "check", label: "شيك" },
     { value: "credit", label: "بطاقة ائتمان" },
   ]
@@ -1306,40 +1406,78 @@ function FinancePageContent() {
                   <div className="space-y-2">
                     <Label htmlFor="transaction-category" className="flex items-center">
                       نوع المعاملة
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 w-6 p-0 mr-2"
-                        onClick={() => {
-                          // إضافة نوع جديد
-                          const newType = prompt("أدخل نوع المعاملة الجديد:");
-                          if (newType && newType.trim()) {
-                            // يمكن إضافة منطق لحفظ النوع الجديد
-                            setAlert({ type: "success", message: `تم إضافة النوع الجديد: ${newType}` });
-                          }
-                        }}
-                      >
-                        <Plus className="w-4 h-4" />
-                      </Button>
                     </Label>
-                    <Select
-                      value={formData.transactionType}
-                      onValueChange={(value: typeof formData.transactionType) =>
-                        setFormData((prev) => ({ ...prev, transactionType: value }))
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="اختر النوع" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {transactionTypes.map((type) => (
-                          <SelectItem key={type.value} value={type.value}>
-                            {type.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {!showNewTransactionTypeInput ? (
+                      <div className="flex space-x-2 space-x-reverse">
+                        <Select
+                          value={formData.transactionType}
+                          onValueChange={(value: string) =>
+                            setFormData((prev) => ({ ...prev, transactionType: value }))
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="اختر النوع" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {transactionTypes.map((type) => (
+                              <SelectItem key={type.value} value={type.value}>
+                                {type.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => setShowNewTransactionTypeInput(true)}
+                          className="shrink-0"
+                          title="إضافة نوع معاملة جديد"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="flex space-x-2 space-x-reverse">
+                          <Input
+                            placeholder="نوع المعاملة الجديد"
+                            value={newTransactionType}
+                            onChange={(e) => setNewTransactionType(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && newTransactionType.trim()) {
+                                handleAddNewTransactionType()
+                              }
+                            }}
+                            className={newTransactionTypeError ? "border-red-500" : ""}
+                          />
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={handleAddNewTransactionType}
+                            disabled={!newTransactionType.trim()}
+                            className="shrink-0"
+                            title="حفظ نوع المعاملة"
+                          >
+                            <CheckCircle className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => {
+                              setShowNewTransactionTypeInput(false)
+                              setNewTransactionType("")
+                            }}
+                            className="shrink-0"
+                            title="إلغاء"
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                        {newTransactionTypeError && (
+                          <p className="text-xs text-red-500 mt-1">{newTransactionTypeError}</p>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="importance">الأهمية</Label>
@@ -1362,40 +1500,78 @@ function FinancePageContent() {
                   <div className="space-y-2">
                     <Label htmlFor="payment-method" className="flex items-center">
                       طريقة الدفع
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 w-6 p-0 mr-2"
-                        onClick={() => {
-                          // إضافة طريقة دفع جديدة
-                          const newMethod = prompt("أدخل طريقة الدفع الجديدة:");
-                          if (newMethod && newMethod.trim()) {
-                            // يمكن إضافة منطق لحفظ طريقة الدفع الجديدة
-                            setAlert({ type: "success", message: `تم إضافة طريقة الدفع الجديدة: ${newMethod}` });
-                          }
-                        }}
-                      >
-                        <Plus className="w-4 h-4" />
-                      </Button>
                     </Label>
-                    <Select
-                      value={formData.paymentMethod}
-                      onValueChange={(value: "cash" | "transfer" | "pos" | "check" | "credit") =>
-                        setFormData((prev) => ({ ...prev, paymentMethod: value }))
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="اختر طريقة الدفع" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {paymentMethods.map((method) => (
-                          <SelectItem key={method.value} value={method.value}>
-                            {method.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {!showNewPaymentMethodInput ? (
+                      <div className="flex space-x-2 space-x-reverse">
+                        <Select
+                          value={formData.paymentMethod}
+                          onValueChange={(value: string) =>
+                            setFormData((prev) => ({ ...prev, paymentMethod: value }))
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="اختر طريقة الدفع" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {paymentMethods.map((method) => (
+                              <SelectItem key={method.value} value={method.value}>
+                                {method.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => setShowNewPaymentMethodInput(true)}
+                          className="shrink-0"
+                          title="إضافة طريقة دفع جديدة"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="flex space-x-2 space-x-reverse">
+                          <Input
+                            placeholder="طريقة الدفع الجديدة"
+                            value={newPaymentMethod}
+                            onChange={(e) => setNewPaymentMethod(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && newPaymentMethod.trim()) {
+                                handleAddNewPaymentMethod()
+                              }
+                            }}
+                            className={newPaymentMethodError ? "border-red-500" : ""}
+                          />
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={handleAddNewPaymentMethod}
+                            disabled={!newPaymentMethod.trim()}
+                            className="shrink-0"
+                            title="حفظ طريقة الدفع"
+                          >
+                            <CheckCircle className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => {
+                              setShowNewPaymentMethodInput(false)
+                              setNewPaymentMethod("")
+                            }}
+                            className="shrink-0"
+                            title="إلغاء"
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                        {newPaymentMethodError && (
+                          <p className="text-xs text-red-500 mt-1">{newPaymentMethodError}</p>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="related-project">المشروع المرتبط</Label>
@@ -1479,9 +1655,6 @@ function FinancePageContent() {
                         <SelectValue placeholder="اختر المستلم" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value={currentUser?.name || ""}>
-                          {currentUser?.name || "المستخدم الحالي"}
-                        </SelectItem>
                         {users.map((user) => (
                           <SelectItem key={user.id} value={user.name}>
                             {user.name}
