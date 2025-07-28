@@ -24,13 +24,13 @@ export class RealtimeUpdates {
 			// إرسال التحديث للمستمعين المحليين فقط
 			this.notifyListeners(type, data);
 			
-			// تجنب إرسال عبر SSE لتجنب الأخطاء
-			// if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
-			//   const realtimeUpdates = (window as any).realtimeUpdates;
-			//   if (realtimeUpdates.sendUpdate) {
-			//     realtimeUpdates.sendUpdate(type, data.action || "update", data);
-			//   }
-			// }
+			// إرسال عبر SSE إذا كان متاحاً
+			if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
+				const realtimeUpdates = (window as any).realtimeUpdates;
+				if (realtimeUpdates.sendUpdate && typeof realtimeUpdates.sendUpdate === 'function') {
+					realtimeUpdates.sendUpdate(type, data.action || "update", data);
+				}
+			}
 		} catch (error) {
 			console.error("ERROR [NOTIFICATIONS] Error broadcasting notification update | Data:", { error });
 			// Fallback: إرسال للمستمعين المحليين فقط
@@ -124,7 +124,7 @@ export class RealtimeUpdates {
 
 	// إرسال إشعار فوري
 	sendNotification(notification: Notification) {
-		this.broadcastUpdate("notification", notification);
+		this.broadcastUpdate("notification", { action: "create", data: notification });
 	}
 
 	// إرسال تحديث مهمة

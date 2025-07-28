@@ -1317,10 +1317,13 @@ export function useAppActions() {
     // إرسال تحديث فوري (إذا كان متاحاً)
     try {
       if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
-        (window as any).realtimeUpdates.broadcastUpdate('notification', newNotification);
-        logger.info('Notification broadcasted via realtime updates', { 
-          id: newNotification.id 
-        }, 'NOTIFICATIONS');
+        const realtimeUpdates = (window as any).realtimeUpdates;
+        if (realtimeUpdates.sendUpdate && typeof realtimeUpdates.sendUpdate === 'function') {
+          realtimeUpdates.sendUpdate('notification', 'create', newNotification);
+          logger.info('Notification broadcasted via realtime updates', { 
+            id: newNotification.id 
+          }, 'NOTIFICATIONS');
+        }
       }
     } catch (error) {
       logger.error('Error broadcasting notification update', { error }, 'NOTIFICATIONS');
@@ -1958,8 +1961,8 @@ export function useAppActions() {
   }
 
   const broadcastNotificationUpdate = async (action: 'create' | 'update' | 'delete', data: Notification) => {
-    if (typeof window !== 'undefined' && window.realtimeUpdates && typeof window.realtimeUpdates === 'object' && typeof (window.realtimeUpdates as any).broadcastUpdate === 'function') {
-      (window.realtimeUpdates as any).broadcastUpdate('notification', { action, data });
+    if (typeof window !== 'undefined' && window.realtimeUpdates && typeof window.realtimeUpdates === 'object' && typeof (window.realtimeUpdates as any).sendUpdate === 'function') {
+      (window.realtimeUpdates as any).sendUpdate('notification', action, data);
     }
   }
 

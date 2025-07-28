@@ -34,8 +34,8 @@ router.post('/', async (req, res) => {
 // Update upcoming payment
 router.put('/:id', async (req, res) => {
   try {
-    const updatedPayment = await UpcomingPayment.findByIdAndUpdate(
-      req.params.id,
+    const updatedPayment = await UpcomingPayment.findOneAndUpdate(
+      { id: req.params.id },
       { ...req.body, updatedAt: new Date().toISOString() },
       { new: true }
     );
@@ -49,7 +49,7 @@ router.put('/:id', async (req, res) => {
 // Complete upcoming payment and create transaction
 router.post('/:id/complete', async (req, res) => {
   try {
-    const payment = await UpcomingPayment.findById(req.params.id);
+    const payment = await UpcomingPayment.findOne({ id: req.params.id });
     if (!payment) {
       return res.status(404).json({ success: false, error: 'Upcoming payment not found' });
     }
@@ -103,7 +103,7 @@ router.post('/:id/complete', async (req, res) => {
 // Delete upcoming payment
 router.delete('/:id', async (req, res) => {
   try {
-    const deletedPayment = await UpcomingPayment.findByIdAndDelete(req.params.id);
+    const deletedPayment = await UpcomingPayment.findOneAndDelete({ id: req.params.id });
     if (!deletedPayment) return res.status(404).json({ success: false, error: 'Upcoming payment not found' });
     res.json({ success: true, message: 'Upcoming payment deleted' });
   } catch (err) {

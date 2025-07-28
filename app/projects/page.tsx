@@ -521,15 +521,18 @@ function ProjectsPageContent() {
           // إرسال تحديث فوري للمهندس الجديد
           try {
             if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
-              (window as any).realtimeUpdates.broadcastUpdate('notification', {
-                userId: assignee._id || assignee.id,
-                title: "تم تعيين مشروع لك",
-                message: `تم تعيين مشروع "${formData.name}" لك`,
-                type: "project",
-                actionUrl: `/projects/${updatedProject.id}`,
-                triggeredBy: currentUser?.id || "",
-                isRead: false,
-              });
+              const realtimeUpdates = (window as any).realtimeUpdates;
+              if (realtimeUpdates.sendUpdate && typeof realtimeUpdates.sendUpdate === 'function') {
+                realtimeUpdates.sendUpdate('notification', 'create', {
+                  userId: assignee._id || assignee.id,
+                  title: "تم تعيين مشروع لك",
+                  message: `تم تعيين مشروع "${formData.name}" لك`,
+                  type: "project",
+                  actionUrl: `/projects/${updatedProject.id}`,
+                  triggeredBy: currentUser?.id || "",
+                  isRead: false,
+                });
+              }
             }
           } catch (error) {
             console.error('Error broadcasting project notification:', error);
