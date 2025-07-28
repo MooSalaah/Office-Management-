@@ -138,6 +138,8 @@ export class RealtimeUpdates {
 // Create global instance
 if (typeof window !== 'undefined') {
   const realtimeUpdates = new RealtimeUpdates();
+  
+  // تعيين مباشر بدون getter/setter
   (window as any).realtimeUpdates = realtimeUpdates;
   
   // Expose methods on window for compatibility

@@ -70,7 +70,8 @@ const nextConfig = {
     // تحسين الأداء - تقسيم الحزم بشكل أفضل
     config.optimization = {
       ...config.optimization,
-      usedExports: true,
+      // تعطيل usedExports مؤقتاً لتجنب مشاكل التوافق
+      // usedExports: true,
       sideEffects: false,
       innerGraph: true,
       splitChunks: {

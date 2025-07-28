@@ -233,11 +233,6 @@ export function useRealtimeUpdatesByType(type: string) {
 
 // تعريف window.realtimeUpdates للوصول من الواجهة الأمامية
 if (typeof window !== 'undefined') {
+	// تعيين مباشر بدون getter/setter لتجنب التضارب
 	(window as any).realtimeUpdates = realtimeUpdates;
-	
-	// إضافة getter للوصول الآمن
-	Object.defineProperty(window, 'realtimeUpdates', {
-		get: () => realtimeUpdates,
-		configurable: true
-	});
 }

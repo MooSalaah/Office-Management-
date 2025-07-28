@@ -232,6 +232,28 @@ class ApiClient {
 		});
 	}
 
+	// Notifications API
+	async getNotifications() {
+		return this.request("/api/notifications");
+	}
+	async createNotification(notificationData: any) {
+		return this.request("/api/notifications", {
+			method: "POST",
+			body: JSON.stringify(notificationData),
+		});
+	}
+	async updateNotification(id: string, notificationData: any) {
+		return this.request(`/api/notifications/${id}`, {
+			method: "PUT",
+			body: JSON.stringify(notificationData),
+		});
+	}
+	async deleteNotification(id: string) {
+		return this.request(`/api/notifications/${id}`, {
+			method: "DELETE",
+		});
+	}
+
 	// Auth API
 	async login(credentials: { email: string; password: string }) {
 		return this.request("/api/users/login", {
@@ -315,6 +337,12 @@ export const api = {
 		create: (data: any) => apiClient.createTransaction(data),
 		update: (id: string, data: any) => apiClient.updateTransaction(id, data),
 		delete: (id: string) => apiClient.deleteTransaction(id),
+	},
+	notifications: {
+		getAll: () => apiClient.getNotifications(),
+		create: (data: any) => apiClient.createNotification(data),
+		update: (id: string, data: any) => apiClient.updateNotification(id, data),
+		delete: (id: string) => apiClient.deleteNotification(id),
 	},
 	roles: {
 		getAll: () => apiClient.getRoles(),

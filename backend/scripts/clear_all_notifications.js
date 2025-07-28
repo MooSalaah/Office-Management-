@@ -1,45 +1,45 @@
-const { MongoClient } = require('mongodb');
+const mongoose = require('mongoose');
+const Notification = require('../models/Notification');
 require('dotenv').config();
 
-async function clearAllNotifications() {
-  const client = new MongoClient(process.env.MONGODB_URI);
-  
+const clearAllNotifications = async () => {
   try {
-    await client.connect();
-    console.log('✅ Connected to MongoDB');
-    
-    const database = client.db();
-    const notifications = database.collection('notifications');
-    
-    // Count notifications before deletion
-    const countBefore = await notifications.countDocuments();
-    console.log(`📊 Found ${countBefore} notifications in database`);
-    
-    if (countBefore === 0) {
-      console.log('✅ No notifications to delete');
-      return;
+    // الاتصال بقاعدة البيانات
+    const mongoURI = process.env.MONGODB_URI;
+    if (!mongoURI) {
+      console.error('❌ MONGODB_URI not found in environment variables');
+      process.exit(1);
     }
+
+    console.log('🔗 Connecting to MongoDB...');
+    await mongoose.connect(mongoURI, {
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+      maxPoolSize: 10,
+      serverApi: {
+        version: '1',
+        strict: true,
+        deprecationErrors: true,
+      }
+    });
+
+    console.log('✅ Connected to MongoDB successfully!');
+
+    // حذف جميع الإشعارات
+    console.log('🗑️ Deleting all notifications...');
+    const result = await Notification.deleteMany({});
     
-    // Delete all notifications
-    const result = await notifications.deleteMany({});
-    console.log(`🗑️ Deleted ${result.deletedCount} notifications`);
+    console.log(`✅ Successfully deleted ${result.deletedCount} notifications from database`);
     
-    // Verify deletion
-    const countAfter = await notifications.countDocuments();
-    console.log(`📊 Remaining notifications: ${countAfter}`);
-    
-    if (countAfter === 0) {
-      console.log('✅ All notifications deleted successfully!');
-    } else {
-      console.log('⚠️ Some notifications may still exist');
-    }
+    // إغلاق الاتصال
+    await mongoose.connection.close();
+    console.log('🔌 Database connection closed');
     
   } catch (error) {
     console.error('❌ Error clearing notifications:', error);
-  } finally {
-    await client.close();
-    console.log('🔌 Disconnected from MongoDB');
+    process.exit(1);
   }
-}
+};
 
+// تشغيل الدالة
 clearAllNotifications(); 

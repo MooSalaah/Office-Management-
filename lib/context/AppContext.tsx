@@ -675,13 +675,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
 
         logger.info('All data loaded from Database successfully', { 
-          users: usersResponse?.data?.length || 0,
-          projects: projectsResponse?.data?.length || 0,
-          clients: clientsResponse?.data?.length || 0,
-          tasks: tasksResponse?.data?.length || 0,
-          transactions: transactionsResponse?.data?.length || 0,
-          notifications: notificationsResponse?.data?.length || 0,
-          upcomingPayments: result?.data?.length || 0
+          users: (usersResponse?.data as any[])?.length || 0,
+          projects: (projectsResponse?.data as any[])?.length || 0,
+          clients: (clientsResponse?.data as any[])?.length || 0,
+          tasks: (tasksResponse?.data as any[])?.length || 0,
+          transactions: (transactionsResponse?.data as any[])?.length || 0,
+          notifications: (notificationsResponse?.data as any[])?.length || 0,
+          upcomingPayments: 0
         }, 'DATABASE');
 
       } catch (error) {
@@ -1120,8 +1120,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // عند أي تغيير في البيانات، إذا online أرسل broadcast، إذا offline أضف لقائمة الانتظار:
   const broadcastOrQueue = (type: string, data: unknown, isOnline: boolean, setPendingUpdates: React.Dispatch<React.SetStateAction<unknown[]>>) => {
     if (isOnline) {
-      if (typeof window !== 'undefined' && window.realtimeUpdates && typeof window.realtimeUpdates === 'object' && typeof (window.realtimeUpdates as any).sendUpdate === 'function') {
-        (window.realtimeUpdates as any).sendUpdate(type, data.action || 'update', data)
+      		if (typeof window !== 'undefined' && window.realtimeUpdates && typeof window.realtimeUpdates === 'object' && typeof (window.realtimeUpdates as any).sendUpdate === 'function') {
+			(window.realtimeUpdates as any).sendUpdate(type, (data as any).action || 'update', data)
       }
     } else {
               setPendingUpdates((prev: unknown[]) => [...prev, { type, data }])
@@ -1153,9 +1153,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  // @ts-ignore
+  // تهيئة window.realtimeUpdates إذا لم يكن موجوداً
   if (typeof window !== 'undefined' && !window.realtimeUpdates) {
-    window.realtimeUpdates = undefined;
+    // لا نقوم بتعيين undefined لتجنب المشاكل
+    // سيتم تهيئته من خلال ملف realtime.ts
   }
 
   // تحميل بيانات المكتب تلقائياً عند بدء التطبيق أو تغيير المستخدم
