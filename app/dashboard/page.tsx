@@ -229,7 +229,7 @@ function UpcomingPaymentDialog({ open, onClose }: { open: boolean; onClose: () =
     description: "",
   })
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!formData.client || !formData.amount || !formData.dueDate) {
       // إضافة إشعار خطأ
       addNotification({
@@ -257,40 +257,82 @@ function UpcomingPaymentDialog({ open, onClose }: { open: boolean; onClose: () =
       return
     }
 
-    const newPayment = {
-      id: Date.now().toString(),
-      client: formData.client,
-      amount: Number.parseFloat(formData.amount),
-      type: formData.type,
-      dueDate: formData.dueDate,
-      status: "pending" as "pending" | "overdue",
-      description: formData.description || `دفعة ${formData.client}`,
+    try {
+      const newPayment = {
+        id: `upcoming_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        client: formData.client,
+        amount: Number.parseFloat(formData.amount),
+        type: formData.type,
+        dueDate: formData.dueDate,
+        status: "pending" as "pending" | "overdue",
+        description: formData.description || `دفعة ${formData.client}`,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }
+
+      // حفظ في قاعدة البيانات
+      const response = await fetch('/api/upcomingPayments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newPayment),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // إضافة الدفعة القادمة إلى state
+        dispatch({ type: "ADD_UPCOMING_PAYMENT", payload: result.data })
+
+        // حفظ في localStorage
+        const existingPayments = JSON.parse(localStorage.getItem("upcomingPayments") || "[]");
+        localStorage.setItem("upcomingPayments", JSON.stringify([...existingPayments, result.data]));
+
+        // إضافة إشعار نجاح
+        addNotification({
+          userId: "1",
+          title: "دفعة قادمة جديدة",
+          message: `تم إضافة دفعة قادمة لـ ${formData.client} بقيمة ${formData.amount} ريال`,
+          type: "finance",
+          actionUrl: `/finance`,
+          triggeredBy: state.currentUser?.id || "",
+          isRead: false,
+        })
+
+        // إعادة تعيين النموذج
+        setFormData({
+          client: "",
+          amount: "",
+          type: "income",
+          dueDate: "",
+          description: "",
+        })
+
+        onClose()
+      } else {
+        addNotification({
+          userId: state.currentUser?.id || "1",
+          title: "خطأ في الحفظ",
+          message: "فشل في حفظ الدفعة القادمة في قاعدة البيانات",
+          type: "system",
+          actionUrl: `/dashboard`,
+          triggeredBy: state.currentUser?.id || "",
+          isRead: false,
+        })
+      }
+    } catch (error) {
+      console.error('Error saving upcoming payment:', error);
+      addNotification({
+        userId: state.currentUser?.id || "1",
+        title: "خطأ في الاتصال",
+        message: "حدث خطأ أثناء حفظ الدفعة القادمة",
+        type: "system",
+        actionUrl: `/dashboard`,
+        triggeredBy: state.currentUser?.id || "",
+        isRead: false,
+      })
     }
-
-    // إضافة الدفعة القادمة إلى state
-    dispatch({ type: "ADD_UPCOMING_PAYMENT", payload: newPayment })
-
-    // إضافة إشعار نجاح
-    addNotification({
-      userId: "1",
-      title: "دفعة قادمة جديدة",
-      message: `تم إضافة دفعة قادمة لـ ${formData.client} بقيمة ${formData.amount} ريال`,
-      type: "finance",
-      actionUrl: `/finance`,
-      triggeredBy: state.currentUser?.id || "",
-      isRead: false,
-    })
-
-    // إعادة تعيين النموذج
-    setFormData({
-      client: "",
-      amount: "",
-      type: "income",
-      dueDate: "",
-      description: "",
-    })
-
-    onClose()
   }
 
   return (
