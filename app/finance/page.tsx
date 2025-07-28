@@ -54,7 +54,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 export default function FinancePage() {
   const { state, dispatch } = useApp()
   const { addNotification } = useAppActions()
-  const { currentUser, transactions, projects, clients } = state
+  const { currentUser, transactions, projects, clients, users } = state
 
   return (
     <PermissionGuard requiredPermission="view_finance" requiredAction="view" requiredModule="finance" moduleName="صفحة المالية">
@@ -245,9 +245,9 @@ function FinancePageContent() {
       importance: formData.importance || "medium",
       paymentMethod: formData.paymentMethod,
       projectId: formData.projectId,
-      clientId: project?.clientId,
-      clientName: project?.client,
-      projectName: project?.name,
+      clientId: project?.clientId || "",
+      clientName: project?.client || "",
+      projectName: project?.name || "",
       createdBy: currentUser?.id || "",
       createdAt: new Date().toISOString(),
       remainingAmount: formData.remainingAmount ? parseFloat(formData.remainingAmount) : 0,
@@ -311,10 +311,10 @@ function FinancePageContent() {
       type: formData.type,
       amount: Number.parseFloat(formData.amount),
       description: formData.description,
-      projectId: formData.projectId || undefined,
-      projectName: project?.name,
-      clientId: project?.clientId,
-      clientName: project?.client,
+      projectId: formData.projectId || "",
+      projectName: project?.name || "",
+      clientId: project?.clientId || "",
+      clientName: project?.client || "",
       category: getTransactionCategory(formData.transactionType),
       transactionType: formData.transactionType,
       paymentMethod: formData.paymentMethod,
@@ -393,12 +393,13 @@ function FinancePageContent() {
     }))
     
     // Broadcast lock to other users
-    realtimeUpdates.sendTransactionUpdate({ 
-      action: 'lock', 
-      transaction: { id: transactionId }, 
-      userId: currentUser?.id, 
-      userName: currentUser?.name 
-    })
+    if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
+      (window as any).realtimeUpdates.sendUpdate('transaction', 'lock', { 
+        transactionId, 
+        userId: currentUser?.id, 
+        userName: currentUser?.name 
+      })
+    }
     
     return true
   }
@@ -411,12 +412,13 @@ function FinancePageContent() {
     })
     
     // Broadcast lock release to other users
-    realtimeUpdates.sendTransactionUpdate({ 
-      action: 'unlock', 
-      transaction: { id: transactionId }, 
-      userId: currentUser?.id, 
-      userName: currentUser?.name 
-    })
+    if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
+      (window as any).realtimeUpdates.sendUpdate('transaction', 'unlock', { 
+        transactionId, 
+        userId: currentUser?.id, 
+        userName: currentUser?.name 
+      })
+    }
   }
 
   const openEditDialog = (transaction: Transaction) => {
@@ -425,7 +427,7 @@ function FinancePageContent() {
       const lock = transactionLocks[transaction.id]
       setAlert({ 
         type: "error", 
-        message: `هذه المعاملة محجوزة للتعديل بواسطة ${lock.userName}. يرجى المحاولة لاحقاً.` 
+        message: `هذه المعاملة محجوزة للتعديل بواسطة ${lock?.userName || "مستخدم آخر"}. يرجى المحاولة لاحقاً.` 
       })
       return
     }
@@ -443,6 +445,7 @@ function FinancePageContent() {
       notes: "",
       remainingAmount: transaction.remainingAmount ? transaction.remainingAmount.toString() : "",
       payerName: transaction.payerName || "",
+      recipientName: transaction.recipientName || currentUser?.name || "",
     })
     setIsDialogOpen(true)
   }
@@ -466,11 +469,18 @@ function FinancePageContent() {
         setSelectedPayment(payment)
         setPaymentFormData({
           client: payment.client,
+          clientId: payment.clientId || "",
           amount: payment.amount.toString(),
           type: payment.type,
           dueDate: payment.dueDate,
           description: payment.description || "",
           payerName: payment.payerName || currentUser?.name || "",
+          projectId: payment.projectId || "",
+          projectName: payment.projectName || "",
+          category: payment.category || "general",
+          paymentMethod: payment.paymentMethod || "cash",
+          importance: payment.importance || "medium",
+          notes: payment.notes || "",
         })
         setIsAddPaymentDialogOpen(true)
         break
@@ -677,11 +687,18 @@ function FinancePageContent() {
         setSelectedPayment(null);
         setPaymentFormData({
           client: "",
+          clientId: "",
           amount: "",
           type: "income",
           dueDate: "",
           description: "",
           payerName: currentUser?.name || "",
+          projectId: "",
+          projectName: "",
+          category: "general",
+          paymentMethod: "cash",
+          importance: "medium",
+          notes: "",
         });
       }
     } catch (err) {}
@@ -875,6 +892,7 @@ function FinancePageContent() {
       notes: "",
       remainingAmount: "",
       payerName: currentUser?.name || "",
+      recipientName: currentUser?.name || "",
     })
   }
 
@@ -1070,14 +1088,18 @@ function FinancePageContent() {
     const project = projects.find(p => p.id === transaction.projectId)
     const client = clients.find(c => c.id === transaction.clientId || c.id === project?.clientId)
     
-    const htmlContent = InvoiceGenerator.generateInvoiceFromTransaction(
-      transaction,
-      project,
-      client,
-      state.companySettings
-    )
-    
-    InvoiceGenerator.openInvoiceInNewTab(htmlContent)
+    if (project && client) {
+      const htmlContent = InvoiceGenerator.generateInvoiceFromTransaction(
+        transaction,
+        project,
+        client,
+        state.companySettings
+      )
+      
+      InvoiceGenerator.openInvoiceInNewTab(htmlContent)
+    } else {
+      setAlert({ type: "error", message: "لا يمكن إنشاء الفاتورة: المشروع أو العميل غير موجود" })
+    }
   }
 
   const confirmDelete = async () => {
@@ -1090,7 +1112,7 @@ function FinancePageContent() {
         return;
       }
 
-      const res = await fetch(`${API_BASE_URL}/api/transactions/${transaction._id || transaction.id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/transactions/${transaction.id}`, {
         method: "DELETE",
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
@@ -1759,11 +1781,18 @@ function FinancePageContent() {
                   setSelectedPayment(null)
                   setPaymentFormData({
                     client: "",
+                    clientId: "",
                     amount: "",
                     type: "income",
                     dueDate: "",
                     description: "",
                     payerName: currentUser?.name || "",
+                    projectId: "",
+                    projectName: "",
+                    category: "general",
+                    paymentMethod: "cash",
+                    importance: "medium",
+                    notes: "",
                   })
                   setIsAddPaymentDialogOpen(true)
                 }}
