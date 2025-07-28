@@ -434,10 +434,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
       const realtimeUpdates = (window as any).realtimeUpdates;
       if (realtimeUpdates && typeof realtimeUpdates.on === 'function') {
-        realtimeUpdates.on('notification', (notification: Notification) => {
-          // تحقق إذا كان الإشعار موجود مسبقاً
-          if (!state.notifications.some(n => n.id === notification.id)) {
-            dispatch({ type: 'ADD_NOTIFICATION', payload: notification })
+        realtimeUpdates.on('notification', (notification: any) => {
+          try {
+            // تحقق من وجود البيانات المطلوبة
+            if (!notification || !notification.id) {
+              console.warn('Invalid notification data received:', notification);
+              return;
+            }
+            
+            // تحقق إذا كان الإشعار موجود مسبقاً
+            if (!state.notifications.some(n => n.id === notification.id)) {
+              dispatch({ type: 'ADD_NOTIFICATION', payload: notification })
+            }
+          } catch (error) {
+            console.error('Error in realtime update callback:', error);
           }
         });
       }
@@ -1182,8 +1192,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const realtimeUpdates = (window as any).realtimeUpdates;
       if (realtimeUpdates && typeof realtimeUpdates.on === 'function') {
         realtimeUpdates.on('companySettings', (settings: any) => {
-          dispatch({ type: 'UPDATE_COMPANY_SETTINGS', payload: settings });
-          localStorage.setItem('companySettings', JSON.stringify(settings));
+          try {
+            // تحقق من وجود البيانات المطلوبة
+            if (!settings) {
+              console.warn('Invalid company settings data received:', settings);
+              return;
+            }
+            
+            dispatch({ type: 'UPDATE_COMPANY_SETTINGS', payload: settings });
+            localStorage.setItem('companySettings', JSON.stringify(settings));
+          } catch (error) {
+            console.error('Error in company settings update callback:', error);
+          }
         });
       }
     }
