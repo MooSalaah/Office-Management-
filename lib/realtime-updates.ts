@@ -21,6 +21,12 @@ export class RealtimeUpdates {
 	// إرسال تحديث لجميع المستخدمين عبر SSE
 	async broadcastUpdate(type: string, data: RealtimeDataType) {
 		try {
+			// التحقق من وجود البيانات قبل الإرسال
+			if (!data) {
+				console.warn("Attempting to broadcast empty data");
+				return;
+			}
+
 			// إرسال التحديث للمستمعين المحليين فقط
 			this.notifyListeners(type, data);
 			
@@ -82,6 +88,11 @@ export class RealtimeUpdates {
 		if (typeListeners) {
 			typeListeners.forEach((callback) => {
 				try {
+					// التحقق من وجود البيانات قبل إرسالها
+					if (!data) {
+						console.warn("Attempting to notify listeners with empty data");
+						return;
+					}
 					callback(data);
 				} catch (error) {
 					console.error("Error in realtime update callback:", error);
@@ -211,17 +222,27 @@ export function useRealtimeUpdatesByType(type: string) {
 
 	useEffect(() => {
 		const unsubscribe = realtimeUpdates.subscribe(type, (data) => {
-			// منع إضافة نفس التحديث أكثر من مرة
-			const updateId = `${type}_${data.id || ""}_${Date.now()}`;
-			if (processedUpdatesRef.current.has(updateId)) return;
-			processedUpdatesRef.current.add(updateId);
+			try {
+				// التحقق من وجود البيانات قبل الوصول إليها
+				if (!data) {
+					console.warn("Received empty data in realtime update");
+					return;
+				}
 
-			// إضافة التحديث للمصفوفة
-			setUpdates((prev) => [...prev, data]);
+				// منع إضافة نفس التحديث أكثر من مرة
+				const updateId = `${type}_${data.id || data.userId || data.user?.id || ""}_${Date.now()}`;
+				if (processedUpdatesRef.current.has(updateId)) return;
+				processedUpdatesRef.current.add(updateId);
 
-			// تنظيف التحديثات القديمة (احتفظ بآخر 10 تحديثات فقط)
-			if (updates.length > 10) {
-				setUpdates((prev) => prev.slice(-10));
+				// إضافة التحديث للمصفوفة
+				setUpdates((prev) => [...prev, data]);
+
+				// تنظيف التحديثات القديمة (احتفظ بآخر 10 تحديثات فقط)
+				if (updates.length > 10) {
+					setUpdates((prev) => prev.slice(-10));
+				}
+			} catch (error) {
+				console.error("Error in realtime update callback:", error);
 			}
 		});
 

@@ -124,7 +124,7 @@ export default function SettingsPage() {
 
 function SettingsPageContent() {
   const { state, dispatch } = useApp()
-  const { addNotification, showSuccessToast } = useAppActions()
+  const { addNotification, showSuccessToast, showErrorToast } = useAppActions()
   const { currentUser, users, companySettings } = state
 
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false)
@@ -341,46 +341,74 @@ function SettingsPageContent() {
   // استماع للتحديثات الفورية للمستخدمين
   useEffect(() => {
     const handleUserUpdate = (data: any) => {
-      if (data.action === 'create') {
-        // إضافة المستخدم الجديد إلى state
-        dispatch({ type: "ADD_USER", payload: data.user })
-        
-        // إضافة إشعار للمدير
-        if (currentUser?.role === "admin" && data.user.id !== currentUser.id) {
-          addNotification({
-            userId: currentUser.id,
-            title: "مستخدم جديد",
-            message: `تم إنشاء المستخدم "${data.user.name}" بواسطة ${currentUser.name}`,
-            type: "system",
-            isRead: false,
-            triggeredBy: data.user.id,
-          })
+      try {
+        // التحقق من وجود البيانات
+        if (!data) {
+          console.warn("Received empty user update data");
+          return;
         }
-      } else if (data.action === 'update') {
-        // تحديث المستخدم في state
-        dispatch({ type: "UPDATE_USER", payload: data.user })
-        
-        // إذا كان المستخدم المحدث هو المستخدم الحالي، تحديث currentUser أيضاً
-        if (currentUser && data.user.id === currentUser.id) {
-          dispatch({ type: "SET_CURRENT_USER", payload: data.user })
-          localStorage.setItem("currentUser", JSON.stringify(data.user))
+
+        if (data.action === 'create') {
+          // التحقق من وجود بيانات المستخدم
+          if (!data.user || !data.user.id) {
+            console.warn("Invalid user data in create action");
+            return;
+          }
+
+          // إضافة المستخدم الجديد إلى state
+          dispatch({ type: "ADD_USER", payload: data.user })
           
-          // تحديث بيانات الملف الشخصي في النموذج
-          setProfileData({
-            name: data.user.name,
-            email: data.user.email,
-            phone: data.user.phone || "",
-            currentPassword: "",
-            newPassword: "",
-            confirmPassword: "",
-            avatar: data.user.avatar || "",
-          });
+          // إضافة إشعار للمدير
+          if (currentUser?.role === "admin" && data.user.id !== currentUser.id) {
+            addNotification({
+              userId: currentUser.id,
+              title: "مستخدم جديد",
+              message: `تم إنشاء المستخدم "${data.user.name}" بواسطة ${currentUser.name}`,
+              type: "system",
+              isRead: false,
+              triggeredBy: data.user.id,
+            })
+          }
+        } else if (data.action === 'update') {
+          // التحقق من وجود بيانات المستخدم
+          if (!data.user || !data.user.id) {
+            console.warn("Invalid user data in update action");
+            return;
+          }
+
+          // تحديث المستخدم في state
+          dispatch({ type: "UPDATE_USER", payload: data.user })
           
-          logger.info("تم تحديث بيانات الملف الشخصي من realtime update", { user: data.user }, 'SETTINGS');
+          // إذا كان المستخدم المحدث هو المستخدم الحالي، تحديث currentUser أيضاً
+          if (currentUser && data.user.id === currentUser.id) {
+            dispatch({ type: "SET_CURRENT_USER", payload: data.user })
+            localStorage.setItem("currentUser", JSON.stringify(data.user))
+            
+            // تحديث بيانات الملف الشخصي في النموذج
+            setProfileData({
+              name: data.user.name,
+              email: data.user.email,
+              phone: data.user.phone || "",
+              currentPassword: "",
+              newPassword: "",
+              confirmPassword: "",
+              avatar: data.user.avatar || "",
+            });
+            
+            logger.info("تم تحديث بيانات الملف الشخصي من realtime update", { user: data.user }, 'SETTINGS');
+          }
+        } else if (data.action === 'delete') {
+          // التحقق من وجود معرف المستخدم
+          if (!data.userId) {
+            console.warn("Missing userId in delete action");
+            return;
+          }
+
+          // حذف المستخدم من state
+          dispatch({ type: "DELETE_USER", payload: data.userId })
         }
-      } else if (data.action === 'delete') {
-        // حذف المستخدم من state
-        dispatch({ type: "DELETE_USER", payload: data.userId })
+      } catch (error) {
+        console.error("Error in handleUserUpdate:", error);
       }
     }
 
@@ -634,7 +662,8 @@ function SettingsPageContent() {
           action: 'update', 
           data: updatedUser,
           userId: currentUser.id,
-          userName: currentUser.name 
+          userName: currentUser.name,
+          id: currentUser.id // إضافة id للتأكد من وجوده
         })
         
         // إظهار رسالة نجاح
@@ -658,7 +687,9 @@ function SettingsPageContent() {
         }
       } catch (error) {
         console.error('Error updating profile:', error);
-        setAlert({ type: "error", message: `حدث خطأ أثناء تحديث الملف الشخصي: ${error instanceof Error ? error.message : 'خطأ غير معروف'}` });
+        const errorMessage = error instanceof Error ? error.message : 'خطأ غير معروف';
+        setAlert({ type: "error", message: `حدث خطأ أثناء تحديث الملف الشخصي: ${errorMessage}` });
+        showErrorToast("خطأ في تحديث الملف الشخصي", errorMessage);
       }
     }
   }
@@ -797,6 +828,7 @@ function SettingsPageContent() {
       console.error('Error saving company settings:', error);
       const errorMessage = error instanceof Error ? error.message : 'خطأ غير معروف';
       setAlert({ type: "error", message: `حدث خطأ أثناء حفظ إعدادات المكتب في قاعدة البيانات: ${errorMessage}` });
+      showErrorToast("خطأ في حفظ بيانات المكتب", errorMessage);
     }
   };
 
@@ -902,10 +934,14 @@ function SettingsPageContent() {
         setIsUserDialogOpen(false)
         resetUserForm()
       } else {
-        setAlert({ type: "error", message: result.error || "فشل حفظ المستخدم في قاعدة البيانات" });
+        const errorMessage = result.error || "فشل حفظ المستخدم في قاعدة البيانات";
+        setAlert({ type: "error", message: errorMessage });
+        showErrorToast("خطأ في إنشاء المستخدم", errorMessage);
       }
     } catch (error) {
-      setAlert({ type: "error", message: "حدث خطأ أثناء حفظ المستخدم في قاعدة البيانات" });
+      const errorMessage = "حدث خطأ أثناء حفظ المستخدم في قاعدة البيانات";
+      setAlert({ type: "error", message: errorMessage });
+      showErrorToast("خطأ في إنشاء المستخدم", errorMessage);
     }
   }
 
@@ -998,11 +1034,15 @@ function SettingsPageContent() {
         resetUserForm()
         reloadUsersFromStorage()
       } else {
-        setAlert({ type: "error", message: result.error || "فشل تحديث المستخدم في قاعدة البيانات" });
+        const errorMessage = result.error || "فشل تحديث المستخدم في قاعدة البيانات";
+        setAlert({ type: "error", message: errorMessage });
+        showErrorToast("خطأ في تحديث المستخدم", errorMessage);
       }
     } catch (error) {
       console.error('Error updating user:', error);
-      setAlert({ type: "error", message: `حدث خطأ أثناء تحديث المستخدم: ${error instanceof Error ? error.message : 'خطأ غير معروف'}` });
+      const errorMessage = error instanceof Error ? error.message : 'خطأ غير معروف';
+      setAlert({ type: "error", message: `حدث خطأ أثناء تحديث المستخدم: ${errorMessage}` });
+      showErrorToast("خطأ في تحديث المستخدم", errorMessage);
     }
   }
 
@@ -1129,7 +1169,9 @@ function SettingsPageContent() {
       resetJobRoleForm()
     } catch (error) {
       console.error('Error creating role:', error);
-      setAlert({ type: "error", message: `خطأ في إنشاء الدور: ${error instanceof Error ? error.message : 'خطأ غير معروف'}` })
+      const errorMessage = error instanceof Error ? error.message : 'خطأ غير معروف';
+      setAlert({ type: "error", message: `خطأ في إنشاء الدور: ${errorMessage}` });
+      showErrorToast("خطأ في إنشاء الدور الوظيفي", errorMessage);
     }
   }
 
@@ -1332,11 +1374,14 @@ function SettingsPageContent() {
       realtimeUpdates.broadcastUpdate('taskType', { action: 'create', taskType: savedTaskType })
       
       setAlert({ type: "success", message: "تم إنشاء نوع المهمة بنجاح" })
+      showSuccessToast("تم إنشاء نوع المهمة بنجاح", "تم حفظ البيانات في قاعدة البيانات")
       setIsTaskTypeDialogOpen(false)
       resetTaskTypeForm()
     } catch (error) {
       console.error('Error creating task type:', error);
-      setAlert({ type: "error", message: `خطأ في إنشاء نوع المهمة: ${error instanceof Error ? error.message : 'خطأ غير معروف'}` })
+      const errorMessage = error instanceof Error ? error.message : 'خطأ غير معروف';
+      setAlert({ type: "error", message: `خطأ في إنشاء نوع المهمة: ${errorMessage}` });
+      showErrorToast("خطأ في إنشاء نوع المهمة", errorMessage);
     }
   }
 

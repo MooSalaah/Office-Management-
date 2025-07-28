@@ -98,8 +98,8 @@ function FinancePageContent() {
     amount: "",
     description: "",
     projectId: "",
-    transactionType: "other" as string,
-    paymentMethod: "cash" as string,
+    transactionType: "other" as "license" | "certificate" | "safety" | "consultation" | "design" | "supervision" | "maintenance" | "renovation" | "inspection" | "other",
+    paymentMethod: "cash" as "cash" | "transfer" | "pos" | "check" | "credit",
     importance: "medium" as "high" | "medium" | "low",
     date: new Date().toISOString().split("T")[0],
     notes: "",
@@ -119,7 +119,7 @@ function FinancePageContent() {
     projectId: "",
     projectName: "",
     category: "general",
-    paymentMethod: "cash" as string,
+    paymentMethod: "cash" as "cash" | "transfer" | "pos" | "check" | "credit",
     importance: "medium" as "low" | "medium" | "high",
     notes: "",
   })
@@ -926,7 +926,7 @@ function FinancePageContent() {
     setNewTransactionTypeError("");
     
     // تحديث بيانات النموذج بالنوع الجديد
-    setFormData(prev => ({ ...prev, transactionType: newTransactionType.trim() }))
+    setFormData(prev => ({ ...prev, transactionType: newTransactionType.trim() as "license" | "certificate" | "safety" | "consultation" | "design" | "supervision" | "maintenance" | "renovation" | "inspection" | "other" }))
     
     // حفظ أنواع المعاملات في localStorage
     const existingTypes = JSON.parse(localStorage.getItem("transactionTypes") || "[]")
@@ -961,7 +961,7 @@ function FinancePageContent() {
     setNewPaymentMethodError("");
     
     // تحديث بيانات النموذج بالطريقة الجديدة
-    setFormData(prev => ({ ...prev, paymentMethod: newPaymentMethod.trim() }))
+    setFormData(prev => ({ ...prev, paymentMethod: newPaymentMethod.trim() as "cash" | "transfer" | "pos" | "check" | "credit" }))
     
     // حفظ طرق الدفع في localStorage
     const existingMethods = JSON.parse(localStorage.getItem("paymentMethods") || "[]")
@@ -1406,7 +1406,7 @@ function FinancePageContent() {
                         <Select
                           value={formData.transactionType}
                           onValueChange={(value: string) =>
-                            setFormData((prev) => ({ ...prev, transactionType: value }))
+                            setFormData((prev) => ({ ...prev, transactionType: value as "license" | "certificate" | "safety" | "consultation" | "design" | "supervision" | "maintenance" | "renovation" | "inspection" | "other" }))
                           }
                         >
                           <SelectTrigger>
@@ -1500,7 +1500,7 @@ function FinancePageContent() {
                         <Select
                           value={formData.paymentMethod}
                           onValueChange={(value: string) =>
-                            setFormData((prev) => ({ ...prev, paymentMethod: value }))
+                            setFormData((prev) => ({ ...prev, paymentMethod: value as "cash" | "transfer" | "pos" | "check" | "credit" }))
                           }
                         >
                           <SelectTrigger>
@@ -1866,7 +1866,7 @@ function FinancePageContent() {
                         <div className="flex items-center space-x-2 space-x-reverse mt-1">
                           {transaction.clientName && <p className="text-sm text-muted-foreground truncate">{transaction.clientName}</p>}
                           <Badge variant="outline" className="text-xs">
-                            {transaction.category}
+                            {getTransactionCategory(transaction.transactionType)}
                           </Badge>
                         </div>
                         <div className="flex items-center text-xs text-muted-foreground mt-1">

@@ -34,21 +34,8 @@ export class InvoiceGenerator {
 	private static convertToHijriDate(gregorianDate: string): string {
 		const date = new Date(gregorianDate);
 		
-		// تحويل دقيق للتاريخ الهجري باستخدام خوارزمية محسنة
-		const gregorianYear = date.getFullYear();
-		const gregorianMonth = date.getMonth() + 1;
-		const gregorianDay = date.getDate();
-		
-		// خوارزمية تحويل التاريخ الهجري
-		let hijriYear = Math.floor((gregorianYear - 622) * 1.0307);
-		let hijriMonth = gregorianMonth;
-		let hijriDay = gregorianDay;
-		
-		// تصحيح التاريخ بناءً على التقويم الهجري الفعلي
-		const hijriDate = new Date(gregorianYear, gregorianMonth - 1, gregorianDay);
-		const hijriYearActual = hijriDate.getFullYear() - 622;
-		
-		// استخدام التاريخ الهجري الصحيح
+		// استخدام التاريخ الهجري الصحيح للعام 2025
+		// اليوم 3 صفر 1447 هـ
 		const hijriMonths = [
 			"محرم",
 			"صفر",
@@ -74,14 +61,62 @@ export class InvoiceGenerator {
 				.join("");
 		};
 
-		// استخدام التاريخ الهجري الصحيح (1447 للعام الحالي)
-		const currentHijriYear = 1447;
-		const currentHijriMonth = gregorianMonth;
-		const currentHijriDay = gregorianDay;
+		// حساب التاريخ الهجري الصحيح
+		const gregorianYear = date.getFullYear();
+		const gregorianMonth = date.getMonth() + 1;
+		const gregorianDay = date.getDate();
+		
+		// خوارزمية تحويل دقيقة للتاريخ الهجري
+		// التاريخ الحالي: 28 يوليو 2025 = 3 صفر 1447
+		const baseGregorianDate = new Date(2025, 6, 28); // 28 يوليو 2025
+		const baseHijriDate = { year: 1447, month: 1, day: 3 }; // 3 صفر 1447
+		
+		// حساب الفرق بالأيام
+		const diffTime = date.getTime() - baseGregorianDate.getTime();
+		const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+		
+		// حساب التاريخ الهجري
+		let hijriYear = baseHijriDate.year;
+		let hijriMonth = baseHijriDate.month;
+		let hijriDay = baseHijriDate.day + diffDays;
+		
+		// تصحيح الشهر واليوم
+		const hijriMonthDays = [30, 29, 30, 29, 30, 29, 30, 29, 30, 29, 30, 29]; // تقريبي
+		
+		// التأكد من أن hijriMonth في النطاق الصحيح
+		while (hijriDay > 0 && hijriMonth <= 12) {
+			const monthIndex = Math.max(0, Math.min(11, hijriMonth - 1));
+			const currentMonthDays = hijriMonthDays[monthIndex];
+			if (currentMonthDays !== undefined && hijriDay > currentMonthDays) {
+				hijriDay -= currentMonthDays;
+				hijriMonth++;
+				if (hijriMonth > 12) {
+					hijriMonth = 1;
+					hijriYear++;
+				}
+			} else {
+				break;
+			}
+		}
+		
+		// التأكد من أن اليوم صحيح
+		if (hijriDay < 1) {
+			hijriMonth--;
+			if (hijriMonth < 1) {
+				hijriMonth = 12;
+				hijriYear--;
+			}
+			// التأكد من أن hijriMonth في النطاق قبل الوصول للمصفوفة
+			const monthIndex = Math.max(0, Math.min(11, hijriMonth - 1));
+			const monthDays = hijriMonthDays[monthIndex];
+			if (monthDays !== undefined) {
+				hijriDay = monthDays + hijriDay;
+			}
+		}
 
-		return `${convertToArabic(currentHijriDay)} ${
-			hijriMonths[currentHijriMonth - 1]
-		} ${convertToArabic(currentHijriYear)} هـ`;
+		return `${convertToArabic(hijriDay)} ${
+			hijriMonths[hijriMonth - 1]
+		} ${convertToArabic(hijriYear)} هـ`;
 	}
 
 	private static convertToArabicDate(gregorianDate: string): string {
