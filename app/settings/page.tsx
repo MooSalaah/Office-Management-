@@ -52,12 +52,73 @@ import { transliterateArabicToEnglish } from "@/lib/utils"
 // تم إزالة اختبار الاتصال من صفحة الإعدادات
 import { logger } from "@/lib/logger"
 import { Checkbox } from "@/components/ui/checkbox"
+import React from "react"
+
+// Error Boundary Component
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class SettingsErrorBoundary extends React.Component<{ children: React.ReactNode }, ErrorBoundaryState> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: any, errorInfo: any) {
+    console.error('Settings page error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
+          <Card className="w-full max-w-md">
+            <CardHeader className="text-center">
+              <AlertCircle className="h-12 w-12 text-red-600 mx-auto mb-4" />
+              <CardTitle className="text-xl font-bold text-gray-900 dark:text-white">
+                حدث خطأ في صفحة الإعدادات
+              </CardTitle>
+              <CardDescription className="text-gray-600 dark:text-gray-400">
+                يرجى تحديث الصفحة أو العودة للصفحة الرئيسية
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Button 
+                onClick={() => window.location.reload()} 
+                className="w-full"
+              >
+                تحديث الصفحة
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => window.location.href = '/dashboard'} 
+                className="w-full"
+              >
+                العودة للصفحة الرئيسية
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 export default function SettingsPage() {
   return (
-    <PermissionGuard requiredPermission="view_settings" requiredAction="view" requiredModule="settings" moduleName="صفحة الإعدادات">
-      <SettingsPageContent />
-    </PermissionGuard>
+    <SettingsErrorBoundary>
+      <PermissionGuard requiredPermission="view_settings" requiredAction="view" requiredModule="settings" moduleName="صفحة الإعدادات">
+        <SettingsPageContent />
+      </PermissionGuard>
+    </SettingsErrorBoundary>
   )
 }
 
