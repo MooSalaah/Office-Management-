@@ -1419,7 +1419,7 @@ function DashboardPageContent() {
                   </Badge>
                 </div>
                 <div className="text-right">
-                  <p className="text-2xl font-bold text-green-600">₪ {selectedProject.price.toLocaleString()}<img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 block dark:hidden" loading="lazy" />
+                  <p className="text-2xl font-bold text-green-600">{selectedProject.price.toLocaleString()}<img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 block dark:hidden" loading="lazy" />
 <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 hidden dark:block" loading="lazy" /></p>
                   <p className="text-sm text-gray-600">السعر الإجمالي</p>
                 </div>
@@ -1469,17 +1469,17 @@ function DashboardPageContent() {
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span className="text-gray-600">السعر الإجمالي:</span>
-                        <span className="font-medium">₪ {selectedProject.price.toLocaleString()}<img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 block dark:hidden" loading="lazy" />
+                        <span className="font-medium">{selectedProject.price.toLocaleString()}<img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 block dark:hidden" loading="lazy" />
 <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 hidden dark:block" loading="lazy" /></span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">الدفعة المقدمة:</span>
-                        <span className="text-green-600">₪ {selectedProject.downPayment.toLocaleString()}<img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 block dark:hidden" loading="lazy" />
+                                                  <span className="text-green-600">{selectedProject.downPayment.toLocaleString()}<img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 block dark:hidden" loading="lazy" />
 <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 hidden dark:block" loading="lazy" /></span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">المبلغ المتبقي:</span>
-                        <span className="text-red-600">₪ {selectedProject.remainingBalance.toLocaleString()}<img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 block dark:hidden" loading="lazy" />
+                                                  <span className="text-red-600">{selectedProject.remainingBalance.toLocaleString()}<img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 block dark:hidden" loading="lazy" />
 <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 hidden dark:block" loading="lazy" /></span>
                       </div>
                     </div>

@@ -566,14 +566,14 @@ function SettingsPageContent() {
 
   const handleProfileUpdate = async () => {
     if (profileData.newPassword && profileData.newPassword !== profileData.confirmPassword) {
-      setAlert({ type: "error", message: "كلمات المرور الجديدة غير متطابقة" })
+      showErrorToast("خطأ في كلمة المرور", "كلمات المرور الجديدة غير متطابقة");
       return
     }
 
     // تحقق من كلمة المرور الحالية إذا كان المستخدم يريد تغيير كلمة المرور
     if (profileData.newPassword) {
       if (currentUser?.password && profileData.currentPassword !== currentUser.password) {
-        setAlert({ type: "error", message: "كلمة المرور الحالية غير صحيحة" })
+        showErrorToast("خطأ في كلمة المرور", "كلمة المرور الحالية غير صحيحة");
         return
       }
     }
@@ -688,7 +688,6 @@ function SettingsPageContent() {
       } catch (error) {
         console.error('Error updating profile:', error);
         const errorMessage = error instanceof Error ? error.message : 'خطأ غير معروف';
-        setAlert({ type: "error", message: `حدث خطأ أثناء تحديث الملف الشخصي: ${errorMessage}` });
         showErrorToast("خطأ في تحديث الملف الشخصي", errorMessage);
       }
     }
@@ -827,7 +826,6 @@ function SettingsPageContent() {
     } catch (error) {
       console.error('Error saving company settings:', error);
       const errorMessage = error instanceof Error ? error.message : 'خطأ غير معروف';
-      setAlert({ type: "error", message: `حدث خطأ أثناء حفظ إعدادات المكتب في قاعدة البيانات: ${errorMessage}` });
       showErrorToast("خطأ في حفظ بيانات المكتب", errorMessage);
     }
   };

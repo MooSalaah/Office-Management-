@@ -40,7 +40,7 @@ import { mockUsers } from "@/lib/data"
 import type { User as UserType, AttendanceRecord } from "@/lib/types"
 import { ArabicNumber } from "@/components/ui/ArabicNumber"
 import { useApp, useAppActions } from "@/lib/context/AppContext"
-import { SwipeToDelete } from "@/components/ui/swipe-to-delete"
+
 import { PermissionGuard } from "@/components/ui/permission-guard"
 import { realtimeUpdates } from "@/lib/realtime-updates"
 
@@ -1540,148 +1540,99 @@ function AttendancePageContent() {
           <CardContent>
             <div className="space-y-4">
               {filteredRecords.map((record) => (
-                canManageAttendance ? (
-                  <SwipeToDelete
-                    key={record.id}
-                    onDelete={() => {
-                      setAttendanceRecords(prev => prev.filter(r => r.id !== record.id))
-                      setAlert({ type: "success", message: "تم حذف السجل بنجاح" })
-                    }}
-                  >
-                    <Card className="hover:bg-muted/50 transition-colors">
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-4 space-x-reverse">
-                            <Avatar className="w-10 h-10">
-                              <AvatarFallback>
-                                {record.userName.split(" ").map((n) => n[0]).join("").substring(0, 2)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <h4 className="font-medium">{record.userName}</h4>
-                              <div className="flex items-center space-x-2 space-x-reverse text-sm text-muted-foreground">
-                                <Badge variant="outline" className="text-xs">
-                                  {record.session === "morning" ? "صباحية" : "مسائية"}
-                                </Badge>
-                                <span>{record.date}</span>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex items-center space-x-4 space-x-reverse">
-                            <div className="text-right">
-                              <div className="flex items-center space-x-2 space-x-reverse text-sm">
-                                <span className="text-muted-foreground">الحضور:</span>
-                                <span className="font-medium">
-                                  {record.checkIn ? new Date(record.checkIn).toLocaleTimeString("ar-SA") : "--"}
-                                </span>
-                              </div>
-                              {record.checkOut && (
-                                <div className="flex items-center space-x-2 space-x-reverse text-sm">
-                                  <span className="text-muted-foreground">الانصراف:</span>
-                                  <span className="font-medium">
-                                    {new Date(record.checkOut).toLocaleTimeString("ar-SA")}
-                                  </span>
-                                </div>
-                              )}
-                              {record.totalHours > 0 && (
-                                <div className="flex items-center space-x-2 space-x-reverse text-sm">
-                                  <span className="text-muted-foreground">الساعات:</span>
-                                  <span className="font-medium">{record.totalHours} ساعة</span>
-                                </div>
-                              )}
-                              {record.overtimeHours > 0 && (
-                                <div className="flex items-center space-x-2 space-x-reverse text-sm">
-                                  <span className="text-muted-foreground">إضافية:</span>
-                                  <span className="font-medium text-orange-600">{record.overtimeHours} ساعة</span>
-                                </div>
-                              )}
-                            </div>
-                            <div className="flex flex-col items-end space-y-1">
-                              <Badge className={`${getStatusColor(record.status)}`}>
-                                {getStatusIcon(record.status)}
-                                {getStatusText(record.status)}
-                              </Badge>
-                              {canManageAttendance && (
-                                <div className="flex items-center space-x-1 space-x-reverse">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => {
-                                      // Handle edit
-                                    }}
-                                    className="h-6 w-6 p-0"
-                                    title="تعديل"
-                                  >
-                                    <Edit className="w-3 h-3" />
-                                  </Button>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </SwipeToDelete>
-                ) : (
-                  <Card key={record.id} className="hover:bg-muted/50 transition-colors">
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-4 space-x-reverse">
-                          <Avatar className="w-10 h-10">
-                            <AvatarFallback>
-                              {record.userName.split(" ").map((n) => n[0]).join("").substring(0, 2)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <h4 className="font-medium">{record.userName}</h4>
-                            <div className="flex items-center space-x-2 space-x-reverse text-sm text-muted-foreground">
-                              <Badge variant="outline" className="text-xs">
-                                {record.session === "morning" ? "صباحية" : "مسائية"}
-                              </Badge>
-                              <span>{record.date}</span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-4 space-x-reverse">
-                          <div className="text-right">
-                            <div className="flex items-center space-x-2 space-x-reverse text-sm">
-                              <span className="text-muted-foreground">الحضور:</span>
-                              <span className="font-medium">
-                                {record.checkIn ? new Date(record.checkIn).toLocaleTimeString("ar-SA") : "--"}
-                              </span>
-                            </div>
-                            {record.checkOut && (
-                              <div className="flex items-center space-x-2 space-x-reverse text-sm">
-                                <span className="text-muted-foreground">الانصراف:</span>
-                                <span className="font-medium">
-                                  {new Date(record.checkOut).toLocaleTimeString("ar-SA")}
-                                </span>
-                              </div>
-                            )}
-                            {record.totalHours > 0 && (
-                              <div className="flex items-center space-x-2 space-x-reverse text-sm">
-                                <span className="text-muted-foreground">الساعات:</span>
-                                <span className="font-medium">{record.totalHours} ساعة</span>
-                              </div>
-                            )}
-                            {record.overtimeHours > 0 && (
-                              <div className="flex items-center space-x-2 space-x-reverse text-sm">
-                                <span className="text-muted-foreground">إضافية:</span>
-                                <span className="font-medium text-orange-600">{record.overtimeHours} ساعة</span>
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex flex-col items-end space-y-1">
-                            <Badge className={`${getStatusColor(record.status)}`}>
-                              {getStatusIcon(record.status)}
-                              {getStatusText(record.status)}
+                <Card key={record.id} className="hover:bg-muted/50 transition-colors">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-4 space-x-reverse">
+                        <Avatar className="w-10 h-10">
+                          <AvatarFallback>
+                            {record.userName.split(" ").map((n) => n[0]).join("").substring(0, 2)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <h4 className="font-medium">{record.userName}</h4>
+                          <div className="flex items-center space-x-2 space-x-reverse text-sm text-muted-foreground">
+                            <Badge variant="outline" className="text-xs">
+                              {record.session === "morning" ? "صباحية" : "مسائية"}
                             </Badge>
+                            <span>{record.date}</span>
                           </div>
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                )
+                      <div className="flex items-center space-x-4 space-x-reverse">
+                        <div className="text-right">
+                          <div className="flex items-center space-x-2 space-x-reverse text-sm">
+                            <span className="text-muted-foreground">الحضور:</span>
+                            <span className="font-medium">
+                              {record.checkIn ? new Date(record.checkIn).toLocaleTimeString("ar-SA") : "--"}
+                            </span>
+                          </div>
+                          {record.checkOut && (
+                            <div className="flex items-center space-x-2 space-x-reverse text-sm">
+                              <span className="text-muted-foreground">الانصراف:</span>
+                              <span className="font-medium">
+                                {new Date(record.checkOut).toLocaleTimeString("ar-SA")}
+                              </span>
+                            </div>
+                          )}
+                          {record.totalHours > 0 && (
+                            <div className="flex items-center space-x-2 space-x-reverse text-sm">
+                              <span className="text-muted-foreground">الساعات:</span>
+                              <span className="font-medium">{record.totalHours} ساعة</span>
+                            </div>
+                          )}
+                          {record.overtimeHours > 0 && (
+                            <div className="flex items-center space-x-2 space-x-reverse text-sm">
+                              <span className="text-muted-foreground">إضافية:</span>
+                              <span className="font-medium text-orange-600">{record.overtimeHours} ساعة</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex flex-col items-end space-y-1">
+                          <Badge className={`${getStatusColor(record.status)}`}>
+                            {getStatusIcon(record.status)}
+                            {getStatusText(record.status)}
+                          </Badge>
+                          {canManageAttendance && (
+                            <div className="flex items-center space-x-1 space-x-reverse">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  // Handle edit - تفعيل التعديل
+                                  setManualFormData({
+                                    employeeId: record.userId,
+                                    action: record.checkOut ? "checkout" : "checkin",
+                                    time: record.checkIn ? new Date(record.checkIn).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16),
+                                    notes: record.notes || "",
+                                  });
+                                  setIsManualDialogOpen(true);
+                                }}
+                                className="h-6 w-6 p-0"
+                                title="تعديل"
+                              >
+                                <Edit className="w-3 h-3" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  if (confirm("هل أنت متأكد من حذف هذا السجل؟")) {
+                                    handleDeleteAttendance(record.id);
+                                  }
+                                }}
+                                className="h-6 w-6 p-0 text-red-600 hover:text-red-700"
+                                title="حذف"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               ))}
               {filteredRecords.length === 0 && (
                 <div className="text-center py-8">
