@@ -20,7 +20,7 @@ export async function PUT(request: NextRequest) {
 	try {
 		const body = await request.json();
 		const response = await fetch(`${BACKEND_URL}/api/companySettings`, {
-			method: "PUT",
+			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
 			},
@@ -32,6 +32,27 @@ export async function PUT(request: NextRequest) {
 		console.error("Error updating company settings:", error);
 		return NextResponse.json(
 			{ success: false, error: "Failed to update company settings" },
+			{ status: 500 }
+		);
+	}
+}
+
+export async function POST(request: NextRequest) {
+	try {
+		const body = await request.json();
+		const response = await fetch(`${BACKEND_URL}/api/companySettings`, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify(body),
+		});
+		const data = await response.json();
+		return NextResponse.json(data);
+	} catch (error) {
+		console.error("Error creating company settings:", error);
+		return NextResponse.json(
+			{ success: false, error: "Failed to create company settings" },
 			{ status: 500 }
 		);
 	}

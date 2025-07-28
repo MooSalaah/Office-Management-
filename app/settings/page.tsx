@@ -683,11 +683,10 @@ function SettingsPageContent() {
   const handleOfficeUpdate = async () => {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
-      const response = await fetch(`${apiUrl}/api/companySettings`, {
+      const response = await fetch(`/api/companySettings`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
         },
         body: JSON.stringify(officeData),
       });
@@ -723,7 +722,9 @@ function SettingsPageContent() {
         });
       }
     } catch (error) {
-      setAlert({ type: "error", message: "حدث خطأ أثناء حفظ إعدادات المكتب في قاعدة البيانات" });
+      console.error('Error saving company settings:', error);
+      const errorMessage = error instanceof Error ? error.message : 'خطأ غير معروف';
+      setAlert({ type: "error", message: `حدث خطأ أثناء حفظ إعدادات المكتب في قاعدة البيانات: ${errorMessage}` });
     }
   };
 
