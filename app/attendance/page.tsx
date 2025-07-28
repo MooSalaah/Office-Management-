@@ -943,10 +943,37 @@ function AttendancePageContent() {
         record.userId === currentUser?.id
     )
 
+  // حساب الإحصائيات بناءً على الأشخاص الفعليين وليس السجلات
+  const today = new Date().toISOString().split("T")[0];
+  
+  // الحصول على الأشخاص الذين حضروا اليوم (فريدة)
+  const presentUserIds = new Set(
+    filteredRecords
+      .filter((r) => r.status === "present" && r.date === today)
+      .map((r) => r.userId)
+  );
+  
+  // الحصول على الأشخاص الذين تأخروا اليوم (فريدة)
+  const lateUserIds = new Set(
+    filteredRecords
+      .filter((r) => r.status === "late" && r.date === today)
+      .map((r) => r.userId)
+  );
+  
+  // الحصول على جميع الأشخاص الذين حضروا اليوم (فريدة)
+  const allPresentUserIds = new Set(
+    filteredRecords
+      .filter((r) => r.date === today)
+      .map((r) => r.userId)
+  );
+  
+  // الأشخاص الغائبون = إجمالي المستخدمين - الحاضرون
+  const absentCount = users.length - allPresentUserIds.size;
+  
   const todayStats = {
-    present: filteredRecords.filter((r) => r.status === "present").length,
-    late: filteredRecords.filter((r) => r.status === "late").length,
-    absent: users.length - filteredRecords.length,
+    present: presentUserIds.size,
+    late: lateUserIds.size,
+    absent: absentCount,
     totalHours: filteredRecords.reduce((sum, r) => sum + (r.totalHours || 0), 0),
     overtimeHours: filteredRecords.reduce((sum, r) => sum + (r.overtimeHours || 0), 0),
   }
