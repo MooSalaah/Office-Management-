@@ -997,8 +997,11 @@ function FinancePageContent() {
   const confirmDelete = async () => {
     if (!transactionToDelete) return;
     try {
-      const res = await fetch(`${API_BASE_URL}/api/transactions/${transactionToDelete}`, {
+      const res = await fetch(`${API_BASE_URL}/api/transactions/transaction/${transactionToDelete}`, {
         method: "DELETE",
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+        }
       });
       const data = await res.json();
       if (data.success) {

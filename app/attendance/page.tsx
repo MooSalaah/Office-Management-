@@ -54,7 +54,7 @@ export default function AttendancePage() {
 
 function AttendancePageContent() {
   const { state, dispatch } = useApp()
-  const { addNotification } = useAppActions()
+  const { addNotification, showSuccessToast } = useAppActions()
   const [currentUser, setCurrentUser] = useState<UserType | null>(null)
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([])
   const [isCheckedIn, setIsCheckedIn] = useState(false)
@@ -163,7 +163,7 @@ function AttendancePageContent() {
       const data = await res.json();
       if (data.success) {
         setAttendanceRecords((prev) => prev.filter((r) => r.id !== id));
-        setAlert({ type: "success", message: "تم حذف سجل الحضور من قاعدة البيانات" });
+        setAlert({ type: "success", message: "تم حذف السجل بنجاح" });
       } else {
         setAlert({ type: "error", message: data.error || "فشل حذف سجل الحضور من قاعدة البيانات" });
       }
@@ -525,6 +525,7 @@ function AttendancePageContent() {
     
     // رسالة نجاح
     setAlert({ type: "success", message: `تم تسجيل الحضور بنجاح للفترة ${session === 'morning' ? 'الصباحية' : 'المسائية'}` });
+    showSuccessToast("تم تسجيل الحضور بنجاح", `تم تسجيل الحضور للفترة ${session === 'morning' ? 'الصباحية' : 'المسائية'}`);
   };
 
   const handleCheckOut = (session: "morning" | "evening") => {
@@ -589,6 +590,7 @@ function AttendancePageContent() {
     
     // رسالة نجاح
     setAlert({ type: "success", message: `تم تسجيل الانصراف بنجاح للفترة ${session === 'morning' ? 'الصباحية' : 'المسائية'}` });
+    showSuccessToast("تم تسجيل الانصراف بنجاح", `تم تسجيل الانصراف للفترة ${session === 'morning' ? 'الصباحية' : 'المسائية'}`);
   };
 
   const handleManualCheckInOut = async () => {
@@ -866,7 +868,7 @@ function AttendancePageContent() {
         const record = monthlyRecords.find(r => r.date === dateStr);
         tableRows += `<tr${day === Math.ceil(totalDays / 2) + 1 ? ' class=\"page-break\"' : ''}>
           <td>${day}</td>
-          <td>${date.toLocaleDateString("ar-SA")}</td>
+          <td>${date.toLocaleDateString("ar-SA", { year: 'numeric', month: '2-digit', day: '2-digit' })}</td>
           <td>${record ? (record.checkIn ? new Date(record.checkIn).toLocaleTimeString("ar-SA") : "-") : "-"}</td>
           <td>${record ? (record.checkOut ? new Date(record.checkOut).toLocaleTimeString("ar-SA") : "-") : "-"}</td>
           <td>${record ? (record.totalHours || 0) : "-"}</td>
