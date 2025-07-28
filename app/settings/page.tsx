@@ -389,7 +389,7 @@ function SettingsPageContent() {
       const reader = new FileReader()
       reader.onload = (e) => {
         const result = e.target?.result as string
-        setUserFormData(prev => ({ ...prev, avatar: result }))
+        setProfileData(prev => ({ ...prev, avatar: result }))
       }
       reader.readAsDataURL(file)
     }
@@ -424,13 +424,13 @@ function SettingsPageContent() {
         // Save to backend database
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
         
-        // تحضير البيانات للإرسال
+        // تحضير البيانات للإرسال - تأكد من إرسال جميع البيانات
         const userDataToSend = {
           id: currentUser.id,
           name: profileData.name,
           email: profileData.email,
-          phone: profileData.phone,
-          avatar: profileData.avatar,
+          phone: profileData.phone || "", // تأكد من إرسال رقم الهاتف
+          avatar: profileData.avatar || "", // تأكد من إرسال الصورة
           password: profileData.newPassword || currentUser.password || "",
           role: currentUser.role,
           isActive: currentUser.isActive,
@@ -439,6 +439,8 @@ function SettingsPageContent() {
           createdAt: currentUser.createdAt,
           workingHours: currentUser.workingHours
         };
+
+        console.log('Sending profile data to backend:', userDataToSend);
 
         const response = await fetch(`${apiUrl}/api/users/${currentUser.id}`, {
           method: 'PUT',
@@ -459,7 +461,7 @@ function SettingsPageContent() {
         console.log('Profile update result:', result);
         logger.info('Profile updated in database', { result }, 'SETTINGS');
 
-        // Save to localStorage
+        // تحديث البيانات المحلية
         const existingUsers = JSON.parse(localStorage.getItem("users") || "[]")
         const updatedUsers = existingUsers.map((u: any) => u.id === currentUser.id ? updatedUser : u)
         localStorage.setItem("users", JSON.stringify(updatedUsers))
@@ -473,6 +475,7 @@ function SettingsPageContent() {
         // إرسال تحديث فوري لجميع المستخدمين
         realtimeUpdates.broadcastUpdate('user', updatedUser)
         
+        // إظهار رسالة نجاح
         setAlert(null)
         showSuccessToast("تم تحديث الملف الشخصي بنجاح", "تم حفظ البيانات في قاعدة البيانات")
         
