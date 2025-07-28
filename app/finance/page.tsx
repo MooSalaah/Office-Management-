@@ -52,10 +52,6 @@ import { useSearchParams } from "next/navigation"
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
 export default function FinancePage() {
-  const { state, dispatch } = useApp()
-  const { addNotification } = useAppActions()
-  const { currentUser, transactions, projects, clients, users } = state
-
   return (
     <PermissionGuard requiredPermission="view_finance" requiredAction="view" requiredModule="finance" moduleName="صفحة المالية">
       <FinancePageContent />
