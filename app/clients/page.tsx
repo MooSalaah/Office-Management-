@@ -189,27 +189,27 @@ function ClientsPageContent() {
 
   const handleCreateClient = async () => {
     if (!hasPermission(currentUser?.role || "", "create", "clients")) {
-      showErrorToast("خطأ في إنشاء العميل", "ليس لديك صلاحية لإنشاء عملاء جدد")
-      return
-    }
-    const missingFields = {
-      name: !formData.name.trim(),
-      phone: !formData.phone.trim(),
-    }
-    setRequiredFieldsClient({ name: missingFields.name, email: false, phone: missingFields.phone });
-    if (missingFields.name || missingFields.phone) {
-      // لا تعرض alert عام، فقط أظهر الأخطاء تحت الحقول
-      return
-    }
-
-    // تحقق من صحة رقم الهاتف
-    const phoneRegex = /^05\d{8}$/;
-    if (!phoneRegex.test(formData.phone)) {
-      setPhoneError("رقم الهاتف يجب أن يكون على الصيغة 05XXXXXXXX");
+      setAlert({ type: "error", message: "ليس لديك صلاحية لإنشاء العملاء" });
       return;
-    } else {
-      setPhoneError("");
     }
+    
+    // منع الحفظ المتكرر
+    if (state.loadingStates.clients) {
+      return;
+    }
+    
+    const missing: string[] = [];
+    if (!formData.name.trim()) missing.push("اسم العميل");
+    if (!formData.phone.trim()) missing.push("رقم الهاتف");
+    if (!formData.email.trim()) missing.push("البريد الإلكتروني");
+    if (!formData.address.trim()) missing.push("العنوان");
+    
+    if (missing.length > 0) {
+      setShowValidationErrors(true);
+      setMissingFields(missing);
+      return;
+    }
+    setMissingFields([]);
 
     const newClient: Client = {
       id: Date.now().toString(),
@@ -221,37 +221,43 @@ function ClientsPageContent() {
       projectsCount: 0,
       totalValue: 0,
       lastContact: new Date().toISOString(),
-      status: formData.status,
+      status: "active",
       createdAt: new Date().toISOString(),
-      avatar: formData.avatar,
     }
 
     try {
-      // استخدام وظيفة AppContext
-      await createClient(newClient)
+      // تعيين حالة التحميل لمنع الحفظ المتكرر
+      dispatch({ type: "SET_LOADING_STATE", payload: { key: 'clients', value: true } });
       
-      setIsDialogOpen(false)
-      resetForm()
-
-      // Add notification to admin when client is created
-      if (currentUser?.role !== "admin") {
-        // إرسال إشعار لجميع المديرين
-        const adminUsers = users.filter((user: any) => user.role === "admin");
-        adminUsers.forEach((admin: any) => {
-          addNotification({
-            userId: admin.id,
-            title: "عميل جديد تم إضافته",
-            message: `تم إضافة عميل جديد "${formData.name}" بواسطة ${currentUser?.name}`,
-            type: "client",
-            actionUrl: `/clients/${newClient.id}`,
-            triggeredBy: currentUser?.id || "",
-            isRead: false,
-          });
-        });
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
+      const response = await fetch(`${apiUrl}/api/clients`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+        },
+        body: JSON.stringify(newClient),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          dispatch({ type: "ADD_CLIENT", payload: data.data || newClient });
+          setAlert({ type: "success", message: "تم إنشاء العميل بنجاح" });
+          resetForm();
+          setIsDialogOpen(false);
+        } else {
+          setAlert({ type: "error", message: data.error || "فشل في إنشاء العميل" });
+        }
+      } else {
+        setAlert({ type: "error", message: "فشل في إنشاء العميل" });
       }
     } catch (error) {
-      logger.error('Error creating client:', { error }, 'CLIENTS');
-      showErrorToast("خطأ في إنشاء العميل", "حدث خطأ أثناء حفظ العميل في قاعدة البيانات");
+      console.error('خطأ في إنشاء العميل:', error);
+      setAlert({ type: "error", message: "حدث خطأ في إنشاء العميل" });
+    } finally {
+      // إزالة حالة التحميل
+      dispatch({ type: "SET_LOADING_STATE", payload: { key: 'clients', value: false } });
     }
   }
 

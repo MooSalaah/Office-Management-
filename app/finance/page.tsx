@@ -183,22 +183,6 @@ function FinancePageContent() {
   const [transactionToDelete, setTransactionToDelete] = useState<string | null>(null)
   const [deleteError, setDeleteError] = useState("")
 
-  // البيانات يتم تحميلها من AppContext، لا نحتاج لجلبها مرة أخرى
-  // useEffect(() => {
-  //   async function fetchTransactions() {
-  //     try {
-  //       const res = await fetch(`${API_BASE_URL}/api/transactions`);
-  //       const data = await res.json();
-  //       if (data.success) {
-  //         dispatch({ type: "LOAD_TRANSACTIONS", payload: data.data });
-  //       }
-  //     } catch (err) {
-  //       // يمكن عرض رسالة خطأ هنا
-  //     }
-  //   }
-  //   fetchTransactions();
-  // }, [dispatch]);
-
   // جلب المدفوعات القادمة من backend
   useEffect(() => {
     async function fetchUpcomingPayments() {
@@ -215,6 +199,11 @@ function FinancePageContent() {
 
   // استبدل إضافة معاملة مالية
   const handleCreateTransaction = async () => {
+    // منع الحفظ المتكرر
+    if (state.loadingStates.transactions) {
+      return;
+    }
+    
     const missingFields = {
       description: !formData.description,
       amount: !formData.amount,
@@ -258,22 +247,37 @@ function FinancePageContent() {
     }
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/transactions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      // تعيين حالة التحميل لمنع الحفظ المتكرر
+      dispatch({ type: "SET_LOADING_STATE", payload: { key: 'transactions', value: true } });
+      
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
+      const response = await fetch(`${apiUrl}/api/transactions`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+        },
         body: JSON.stringify(newTransaction),
       });
-      const data = await res.json();
-      if (data.success) {
-        dispatch({ type: "ADD_TRANSACTION", payload: data.data });
-        setIsDialogOpen(false);
-        resetForm();
-        showSuccessToast("تم إنشاء المعاملة بنجاح", `تم إنشاء معاملة بقيمة ${newTransaction.amount} ريال بنجاح`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          dispatch({ type: "ADD_TRANSACTION", payload: data.data || newTransaction });
+          setAlert({ type: "success", message: "تم إضافة المعاملة المالية بنجاح" });
+          resetForm();
+        } else {
+          setAlert({ type: "error", message: data.error || "فشل في إضافة المعاملة المالية" });
+        }
       } else {
-        setAlert({ type: "error", message: "فشل حفظ المعاملة في قاعدة البيانات" });
+        setAlert({ type: "error", message: "فشل في إضافة المعاملة المالية" });
       }
-    } catch (err) {
-      setAlert({ type: "error", message: "حدث خطأ أثناء حفظ المعاملة في قاعدة البيانات" });
+    } catch (error) {
+      console.error('خطأ في إضافة المعاملة المالية:', error);
+      setAlert({ type: "error", message: "حدث خطأ في إضافة المعاملة المالية" });
+    } finally {
+      // إزالة حالة التحميل
+      dispatch({ type: "SET_LOADING_STATE", payload: { key: 'transactions', value: false } });
     }
   }
 
@@ -498,24 +502,50 @@ function FinancePageContent() {
           payerName: payment.payerName,
         }
         
-        dispatch({ type: "ADD_TRANSACTION", payload: newTransaction })
+        // حفظ المعاملة المالية في قاعدة البيانات
+        const saveTransactionToDatabase = async () => {
+          try {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
+            const response = await fetch(`${apiUrl}/api/transactions`, {
+              method: 'POST',
+              headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+              },
+              body: JSON.stringify(newTransaction),
+            });
+            
+            if (response.ok) {
+              const data = await response.json();
+              if (data.success) {
+                dispatch({ type: "ADD_TRANSACTION", payload: data.data || newTransaction });
+                
+                // Remove payment from upcoming payments
+                dispatch({ type: "DELETE_UPCOMING_PAYMENT", payload: payment.id })
+                
+                // Remove from localStorage
+                const existingPaymentsForComplete = JSON.parse(localStorage.getItem("upcomingPayments") || "[]")
+                const filteredPaymentsForComplete = existingPaymentsForComplete.filter((p: any) => p.id !== payment.id)
+                localStorage.setItem("upcomingPayments", JSON.stringify(filteredPaymentsForComplete))
+                
+                setSuccessMessage("تم إكمال الدفعة وإضافتها للمعاملات بنجاح")
+                setIsSuccessDialogOpen(true)
+              } else {
+                setAlert({ type: "error", message: "فشل في حفظ المعاملة المالية في قاعدة البيانات" });
+              }
+            } else {
+              setAlert({ type: "error", message: "فشل في حفظ المعاملة المالية في قاعدة البيانات" });
+            }
+          } catch (error) {
+            console.error('خطأ في حفظ المعاملة المالية:', error);
+            setAlert({ type: "error", message: "حدث خطأ في حفظ المعاملة المالية" });
+          }
+        };
         
-        // Save transaction to localStorage
-        const existingTransactions = JSON.parse(localStorage.getItem("transactions") || "[]")
-        existingTransactions.push(newTransaction)
-        localStorage.setItem("transactions", JSON.stringify(existingTransactions))
-        
-        // Remove payment from upcoming payments
-        dispatch({ type: "DELETE_UPCOMING_PAYMENT", payload: payment.id })
-        
-        // Remove from localStorage
-        const existingPaymentsForComplete = JSON.parse(localStorage.getItem("upcomingPayments") || "[]")
-        const filteredPaymentsForComplete = existingPaymentsForComplete.filter((p: any) => p.id !== payment.id)
-        localStorage.setItem("upcomingPayments", JSON.stringify(filteredPaymentsForComplete))
-        
-        setSuccessMessage("تم إكمال الدفعة وإضافتها للمعاملات بنجاح")
-        setIsSuccessDialogOpen(true)
+        // تنفيذ حفظ المعاملة
+        saveTransactionToDatabase();
         break
+        
       case 'delete':
         dispatch({ type: "DELETE_UPCOMING_PAYMENT", payload: payment.id })
         
@@ -1023,53 +1053,6 @@ function FinancePageContent() {
       setDeleteError("حدث خطأ أثناء حذف المعاملة من قاعدة البيانات");
     }
   }
-
-  // إزالة التحديث التلقائي لتجنب تكرار البيانات
-  // البيانات يتم تحميلها من AppContext عند بدء التطبيق
-  // useEffect(() => {
-  //   const interval = setInterval(async () => {
-  //     try {
-  //       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
-  //       const response = await fetch(`${apiUrl}/api/transactions`, {
-  //         headers: {
-  //           'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
-  //         }
-  //       });
-  //       if (response.ok) {
-  //         const result = await response.json();
-  //         if (result && result.success && Array.isArray(result.data)) {
-  //           // تحديث البيانات المالية فقط إذا كان هناك تغيير
-  //           const currentTransactions = state.transactions;
-  //           const newTransactions = result.data;
-  //           
-  //           // مقارنة عدد المعاملات
-  //           if (currentTransactions.length !== newTransactions.length) {
-  //             dispatch({ type: "LOAD_TRANSACTIONS", payload: newTransactions });
-  //             console.log('Finance: Transactions updated from Backend API', { 
-  //               oldCount: currentTransactions.length,
-  //               newCount: newTransactions.length
-  //             });
-  //           } else {
-  //             // مقارنة آخر معاملة
-  //             const lastCurrentTransaction = currentTransactions[0];
-  //             const lastNewTransaction = newTransactions[0];
-  //             
-  //             if (lastCurrentTransaction?.id !== lastNewTransaction?.id) {
-  //               dispatch({ type: "LOAD_TRANSACTIONS", payload: newTransactions });
-  //               console.log('Finance: New transactions detected, updated from Backend API', { 
-  //                 count: newTransactions.length
-  //               });
-  //             }
-  //           }
-  //         }
-  //       }
-  //     } catch (error) {
-  //       console.error('Finance: Error updating transactions from Backend API', { error });
-  //     }
-  //   }, 30000); // 30 ثانية
-
-  //   return () => clearInterval(interval);
-  // }, [state.transactions.length, dispatch]);
 
   return (
     <div className="max-w-screen-xl mx-auto space-y-6">

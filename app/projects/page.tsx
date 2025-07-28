@@ -36,7 +36,7 @@ import {
 import { useApp, useAppActions } from "@/lib/context/AppContext"
 import { realtimeUpdates, useRealtimeUpdatesByType } from "@/lib/realtime-updates"
 import { hasPermission } from "@/lib/auth"
-import type { Project, TaskType } from "@/lib/types"
+import type { Project, TaskType, Transaction } from "@/lib/types"
 import { useRouter, useSearchParams } from "next/navigation"
 import { formatCurrency } from "@/lib/utils"
 import { ArabicNumber } from "@/components/ui/ArabicNumber"
@@ -258,6 +258,12 @@ function ProjectsPageContent() {
       setAlert({ type: "error", message: "ليس لديك صلاحية لإنشاء المشاريع" });
       return;
     }
+    
+    // منع الحفظ المتكرر
+    if (state.loadingStates.projects) {
+      return;
+    }
+    
     const missing: string[] = [];
     if (!formData.name.trim()) missing.push("اسم المشروع");
     if (!formData.clientId) missing.push("العميل");
@@ -321,6 +327,9 @@ function ProjectsPageContent() {
     });
 
     try {
+      // تعيين حالة التحميل لمنع الحفظ المتكرر
+      dispatch({ type: "SET_LOADING_STATE", payload: { key: 'projects', value: true } });
+      
       console.log('بيانات المشروع المرسلة للسيرفر:', { project: newProject, tasks, createdByName: currentUser?.name || '' });
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
       const response = await fetch(`${apiUrl}/api/projects`, {
@@ -338,7 +347,58 @@ function ProjectsPageContent() {
       const data = await response.json();
       if (data.success && data.data) {
         dispatch({ type: "ADD_PROJECT", payload: data.data });
-        showSuccessToast("تم إنشاء المشروع بنجاح", `تم إنشاء المشروع "${data.data.name}" بنجاح`);
+        
+        // إنشاء معاملة مالية للدفعة المقدمة إذا كانت موجودة
+        if (downPayment > 0) {
+          const downPaymentTransaction: Transaction = {
+            id: Date.now().toString() + "_dp",
+            type: "income",
+            amount: downPayment,
+            description: `دفعة مقدمة - مشروع ${newProject.name}`,
+            clientId: newProject.clientId,
+            clientName: newProject.client,
+            projectId: newProject.id,
+            projectName: newProject.name,
+            category: "دفعة مقدمة",
+            transactionType: "design",
+            importance: newProject.importance,
+            paymentMethod: "transfer",
+            date: newProject.startDate,
+            status: "completed",
+            createdBy: currentUser?.id || "",
+            createdAt: new Date().toISOString(),
+          }
+          
+          // حفظ المعاملة المالية في قاعدة البيانات
+          try {
+            const transactionResponse = await fetch(`${apiUrl}/api/transactions`, {
+              method: 'POST',
+              headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+              },
+              body: JSON.stringify(downPaymentTransaction),
+            });
+            
+            if (transactionResponse.ok) {
+              const transactionData = await transactionResponse.json();
+              if (transactionData.success) {
+                dispatch({ type: "ADD_TRANSACTION", payload: transactionData.data || downPaymentTransaction });
+                showSuccessToast("تم إنشاء المشروع والمعاملة المالية بنجاح", `تم إنشاء مشروع "${data.data.name}" مع دفعة مقدمة ${downPayment} ريال`);
+              } else {
+                showSuccessToast("تم إنشاء المشروع بنجاح", `تم إنشاء المشروع "${data.data.name}" بنجاح`);
+              }
+            } else {
+              showSuccessToast("تم إنشاء المشروع بنجاح", `تم إنشاء المشروع "${data.data.name}" بنجاح`);
+            }
+          } catch (transactionError) {
+            console.error('خطأ في إنشاء المعاملة المالية:', transactionError);
+            showSuccessToast("تم إنشاء المشروع بنجاح", `تم إنشاء المشروع "${data.data.name}" بنجاح`);
+          }
+        } else {
+          showSuccessToast("تم إنشاء المشروع بنجاح", `تم إنشاء المشروع "${data.data.name}" بنجاح`);
+        }
+        
         setIsDialogOpen(false);
         resetForm();
         setSelectedTasks([]);
@@ -349,6 +409,9 @@ function ProjectsPageContent() {
     } catch (error) {
       console.error('خطأ أثناء حفظ المشروع:', error);
       setAlert({ type: "error", message: "حدث خطأ أثناء حفظ المشروع في قاعدة البيانات: " + (error?.message || error) });
+    } finally {
+      // إزالة حالة التحميل
+      dispatch({ type: "SET_LOADING_STATE", payload: { key: 'projects', value: false } });
     }
   }
 
@@ -520,6 +583,14 @@ function ProjectsPageContent() {
         return
       }
 
+      // منع الحفظ المتكرر
+      if (state.loadingStates.projects) {
+        return;
+      }
+
+      // تعيين حالة التحميل
+      dispatch({ type: "SET_LOADING_STATE", payload: { key: 'projects', value: true } });
+
       // Delete from backend database via Backend API
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
       const response = await fetch(`${apiUrl}/api/projects/${projectToDelete}`, {
@@ -540,6 +611,73 @@ function ProjectsPageContent() {
 
       const result = await response.json();
       logger.info('Project deleted from database via Backend API', { result }, 'PROJECTS');
+
+      // حذف المهام المرتبطة بالمشروع
+      const projectTasks = state.tasks.filter(task => task.projectId === projectToDelete);
+      
+      if (projectTasks.length > 0) {
+        console.log(`حذف ${projectTasks.length} مهمة مرتبطة بالمشروع "${project.name}"`);
+        
+        // حذف المهام من قاعدة البيانات
+        for (const task of projectTasks) {
+          try {
+            const taskResponse = await fetch(`${apiUrl}/api/tasks/${task.id}`, {
+              method: 'DELETE',
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token') || ''}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                deletedBy: currentUser?.id,
+                deletedByName: currentUser?.name,
+                reason: `حذف تلقائي بسبب حذف المشروع "${project.name}"`
+              })
+            });
+
+            if (taskResponse.ok) {
+              console.log(`تم حذف المهمة "${task.title}" من قاعدة البيانات`);
+            } else {
+              console.error(`فشل في حذف المهمة "${task.title}" من قاعدة البيانات`);
+            }
+          } catch (taskError) {
+            console.error(`خطأ في حذف المهمة "${task.title}":`, taskError);
+          }
+        }
+
+        // حذف المهام من الواجهة الأمامية
+        projectTasks.forEach(task => {
+          dispatch({ type: "DELETE_TASK", payload: task.id });
+        });
+
+        // إرسال تحديث فوري لحذف المهام
+        if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
+          projectTasks.forEach(task => {
+            (window as any).realtimeUpdates.sendTaskUpdate({ 
+              action: 'delete', 
+              task: task, 
+              userId: currentUser?.id, 
+              userName: currentUser?.name 
+            });
+          });
+        }
+
+        // إشعار المسؤولين عن المهام المحذوفة
+        projectTasks.forEach(task => {
+          if (task.assigneeId && task.assigneeId !== currentUser?.id) {
+            const assignee = users.find(u => u.id === task.assigneeId);
+            if (assignee) {
+              addNotification({
+                userId: assignee.id,
+                title: "تم حذف مهمة كنت مسؤول عنها",
+                message: `تم حذف مهمة "${task.title}" تلقائياً بسبب حذف المشروع "${project.name}"`,
+                type: "task",
+                triggeredBy: currentUser?.id || "",
+                isRead: false,
+              });
+            }
+          }
+        });
+      }
 
       // Update local state
       dispatch({ type: "DELETE_PROJECT", payload: projectToDelete })
@@ -571,12 +709,29 @@ function ProjectsPageContent() {
           }
         });
       }
+
+      // إظهار رسالة نجاح مع عدد المهام المحذوفة
+      if (projectTasks.length > 0) {
+        showSuccessToast(
+          "تم حذف المشروع والمهام المرتبطة به بنجاح", 
+          `تم حذف مشروع "${project.name}" مع ${projectTasks.length} مهمة مرتبطة به`
+        );
+      } else {
+        showSuccessToast(
+          "تم حذف المشروع بنجاح", 
+          `تم حذف مشروع "${project.name}" بنجاح`
+        );
+      }
+
       setDeleteDialogOpen(false)
       setProjectToDelete(null)
       setDeleteError("")
     } catch (error) {
       console.error('Error deleting project:', error);
       setDeleteError("حدث خطأ أثناء حذف المشروع من قاعدة البيانات")
+    } finally {
+      // إزالة حالة التحميل
+      dispatch({ type: "SET_LOADING_STATE", payload: { key: 'projects', value: false } });
     }
   }
 

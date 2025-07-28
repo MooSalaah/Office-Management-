@@ -353,21 +353,30 @@ function TasksPageContent() {
 
   const handleCreateTask = async () => {
     if (!hasPermission(currentUser?.role || "", "create", "tasks")) {
-      setAlert({ type: "error", message: "ليس لديك صلاحية لإنشاء مهام جديدة" })
-      return
+      setAlert({ type: "error", message: "ليس لديك صلاحية لإنشاء المهام" });
+      return;
     }
-    // التحقق من الحقول المطلوبة
-    const missingFields = {
-      title: !formData.title.trim(),
-      assigneeId: !formData.assigneeId,
-      dueDate: !formData.dueDate,
+    
+    // منع الحفظ المتكرر
+    if (state.loadingStates.tasks) {
+      return;
     }
-    setRequiredFields(missingFields)
-    if (missingFields.title || missingFields.assigneeId || missingFields.dueDate) {
-      return
+    
+    const missing: string[] = [];
+    if (!formData.title.trim()) missing.push("عنوان المهمة");
+    if (!formData.assigneeId) missing.push("المسؤول");
+    if (!formData.dueDate) missing.push("تاريخ الاستحقاق");
+    
+    if (missing.length > 0) {
+      setShowValidationErrors(true);
+      setMissingFields(missing);
+      return;
     }
-    const assignee = users.find((u) => u.id === formData.assigneeId)
-    const project = projects.find((p) => p.id === formData.projectId)
+    setMissingFields([]);
+
+    const assignee = users.find(u => u.id === formData.assigneeId);
+    const project = projects.find(p => p.id === formData.projectId);
+
     const newTask: Task = {
       id: Date.now().toString(),
       title: formData.title,
@@ -375,7 +384,7 @@ function TasksPageContent() {
       assigneeId: formData.assigneeId,
       assigneeName: assignee?.name || "",
       projectId: formData.projectId,
-      projectName: project?.name || "",
+      projectName: project?.name,
       priority: formData.priority,
       status: "todo",
       dueDate: formData.dueDate,
@@ -384,107 +393,42 @@ function TasksPageContent() {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
+
     try {
-      // Save to backend database
-      const response = await fetch('/api/tasks', {
+      // تعيين حالة التحميل لمنع الحفظ المتكرر
+      dispatch({ type: "SET_LOADING_STATE", payload: { key: 'tasks', value: true } });
+      
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
+      const response = await fetch(`${apiUrl}/api/tasks`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+        },
         body: JSON.stringify(newTask),
       });
-      const data = await response.json();
-      if (data.success && data.data) {
-        dispatch({ type: "ADD_TASK", payload: data.data });
-        
-        // ربط المهمة بالمشروع تلقائياً إذا كانت مرتبطة بمشروع
-        if (data.data.projectId) {
-          const project = projects.find(p => p.id === data.data.projectId);
-          if (project) {
-            // تحديث المشروع لإضافة المهمة الجديدة
-            const updatedProject = {
-              ...project,
-              tasks: [...(project.tasks || []), data.data.id],
-              updatedAt: new Date().toISOString()
-            };
-            dispatch({ type: "UPDATE_PROJECT", payload: updatedProject });
-            
-            // حفظ تحديث المشروع في قاعدة البيانات
-            try {
-              await fetch(`/api/projects/${project.id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(updatedProject),
-              });
-            } catch (error) {
-              console.error('Error updating project with new task:', error);
-            }
-          }
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          dispatch({ type: "ADD_TASK", payload: data.data || newTask });
+          setAlert({ type: "success", message: "تم إنشاء المهمة بنجاح" });
+          resetForm();
+          setIsDialogOpen(false);
+        } else {
+          setAlert({ type: "error", message: data.error || "فشل في إنشاء المهمة" });
         }
-        
-        // إرسال إشعار للمسؤول عن المهمة
-        if (data.data.assigneeId && data.data.assigneeId !== currentUser?.id) {
-          // البحث عن المستخدم المسؤول في قائمة المستخدمين
-          const assignee = users.find(u => 
-            u._id === data.data.assigneeId || 
-            u.id === data.data.assigneeId ||
-            u.email === data.data.assigneeName
-          );
-          
-          if (assignee) {
-            addNotification({
-              userId: assignee._id || assignee.id,
-              title: "مهمة جديدة مُعيّنة لك",
-              message: `تم تعيين مهمة "${data.data.title}" لك بواسطة ${currentUser?.name}`,
-              type: "task",
-              actionUrl: `/tasks?highlight=${data.data.id}`,
-              triggeredBy: currentUser?.id || "",
-              isRead: false,
-            });
-            
-            // إرسال تحديث فوري للمسؤول الجديد
-            try {
-              if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
-                (window as any).realtimeUpdates.broadcastUpdate('notification', {
-                  userId: assignee._id || assignee.id,
-                  title: "مهمة جديدة مُعيّنة لك",
-                  message: `تم تعيين مهمة "${data.data.title}" لك بواسطة ${currentUser?.name}`,
-                  type: "task",
-                  actionUrl: `/tasks?highlight=${data.data.id}`,
-                  triggeredBy: currentUser?.id || "",
-                  isRead: false,
-                });
-              }
-            } catch (error) {
-              console.error('Error broadcasting notification:', error);
-            }
-          }
-        }
-        
-        // إرسال إشعار للمديرين عند إنشاء مهمة جديدة
-        if (currentUser?.role !== "admin") {
-          const adminUsers = users.filter(user => user.role === "admin");
-          adminUsers.forEach(admin => {
-            addNotification({
-              userId: admin._id || admin.id,
-              title: "مهمة جديدة تم إنشاؤها",
-              message: `تم إنشاء مهمة "${data.data.title}" بواسطة ${currentUser?.name}`,
-              type: "task",
-              actionUrl: `/tasks?highlight=${data.data.id}`,
-              triggeredBy: currentUser?.id || "",
-              isRead: false,
-            });
-          });
-        }
-        
-        showSuccessToast("تم إنشاء المهمة بنجاح", `تم إنشاء المهمة "${data.data.title}" بنجاح`);
-        setIsDialogOpen(false);
-        resetForm();
       } else {
-        setAlert({ type: "error", message: data.error || "فشل حفظ المهمة في قاعدة البيانات" });
+        setAlert({ type: "error", message: "فشل في إنشاء المهمة" });
       }
     } catch (error) {
-      setAlert({ type: "error", message: "حدث خطأ أثناء حفظ المهمة في قاعدة البيانات" });
+      console.error('خطأ في إنشاء المهمة:', error);
+      setAlert({ type: "error", message: "حدث خطأ في إنشاء المهمة" });
+    } finally {
+      // إزالة حالة التحميل
+      dispatch({ type: "SET_LOADING_STATE", payload: { key: 'tasks', value: false } });
     }
-  };
+  }
 
   const handleUpdateTask = async () => {
     if (!editingTask) return
