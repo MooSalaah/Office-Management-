@@ -165,10 +165,10 @@ function AttendancePageContent() {
             const realtimeUpdates = (window as any).realtimeUpdates;
             if (typeof realtimeUpdates.sendAttendanceUpdate === 'function') {
               realtimeUpdates.sendAttendanceUpdate({ 
-                attendance: data.data, 
+            attendance: data.data, 
                 userId: data.data.userId || "", 
                 userName: data.data.userName || "" 
-              });
+          });
               console.log('✅ Realtime update sent successfully');
             } else {
               console.warn('⚠️ sendAttendanceUpdate function not found');
@@ -220,10 +220,10 @@ function AttendancePageContent() {
             const realtimeUpdates = (window as any).realtimeUpdates;
             if (typeof realtimeUpdates.sendAttendanceUpdate === 'function') {
               realtimeUpdates.sendAttendanceUpdate({ 
-                attendance: data.data, 
+            attendance: data.data, 
                 userId: data.data.userId || "", 
                 userName: data.data.userName || "" 
-              });
+          });
             }
           }
         } catch (realtimeError) {
@@ -260,10 +260,10 @@ function AttendancePageContent() {
             const realtimeUpdates = (window as any).realtimeUpdates;
             if (typeof realtimeUpdates.sendAttendanceUpdate === 'function') {
               realtimeUpdates.sendAttendanceUpdate({ 
-                attendance: data.data, 
+            attendance: data.data, 
                 userId: data.data.userId || "", 
                 userName: data.data.userName || "" 
-              });
+          });
             }
           }
         } catch (realtimeError) {

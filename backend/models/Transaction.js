@@ -12,7 +12,7 @@ const TransactionSchema = new mongoose.Schema({
   category: { type: String },
   transactionType: { type: String },
   importance: { type: String, enum: ['low', 'medium', 'high'], default: 'medium' },
-  paymentMethod: { type: String, enum: ['cash', 'transfer', 'pos'] },
+  paymentMethod: { type: String, enum: ['cash', 'transfer', 'pos', 'check', 'credit'] },
   date: { type: String },
   status: { type: String, enum: ['completed', 'pending', 'draft', 'canceled'], default: 'pending' },
   createdBy: { type: String },

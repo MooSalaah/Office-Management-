@@ -224,13 +224,13 @@ export class InvoiceGenerator {
 					</div>
 					<div class="invoice-footer">
 						<div class="footer-main">
-							<div class="signature-section">
+						<div class="signature-section">
 								${data.companySignature ? `<img src="${data.companySignature}" alt="توقيع المكتب" class="company-signature">` : `<div class="signature-line"></div>`}
-								<div class="signature-text">التوقيع</div>
-							</div>
-							<div class="stamp-section">
+							<div class="signature-text">التوقيع</div>
+						</div>
+						<div class="stamp-section">
 								${data.companyStamp ? `<img src="${data.companyStamp}" alt="ختم الشركة" class="company-stamp">` : ""}
-								<div class="stamp-text">ختم الشركة</div>
+							<div class="stamp-text">ختم الشركة</div>
 							</div>
 						</div>
 						<div class="footer-info">

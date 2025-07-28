@@ -507,6 +507,17 @@ function FinancePageContent() {
                 // تحديث الدفعة القادمة
                 dispatch({ type: "UPDATE_UPCOMING_PAYMENT", payload: data.data.payment });
                 
+                // حفظ في localStorage
+                const existingTransactions = JSON.parse(localStorage.getItem("transactions") || "[]");
+                const updatedTransactions = [...existingTransactions, data.data.transaction];
+                localStorage.setItem("transactions", JSON.stringify(updatedTransactions));
+                
+                const existingPayments = JSON.parse(localStorage.getItem("upcomingPayments") || "[]");
+                const updatedPayments = existingPayments.map((p: any) => 
+                  p.id === data.data.payment.id ? data.data.payment : p
+                );
+                localStorage.setItem("upcomingPayments", JSON.stringify(updatedPayments));
+                
                 setSuccessMessage("تم إكمال الدفعة وإنشاء المعاملة المالية بنجاح");
                 setIsSuccessDialogOpen(true);
               } else {
@@ -659,14 +670,28 @@ function FinancePageContent() {
     try {
       const res = await fetch(`${API_BASE_URL}/api/upcomingPayments/${id}`, {
         method: "DELETE",
+        headers: { 
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+        }
       });
       const data = await res.json();
       if (data.success) {
         dispatch({ type: "DELETE_UPCOMING_PAYMENT", payload: id });
+        
+        // حذف من localStorage
+        const existingPayments = JSON.parse(localStorage.getItem("upcomingPayments") || "[]");
+        const filteredPayments = existingPayments.filter((p: any) => p.id !== id);
+        localStorage.setItem("upcomingPayments", JSON.stringify(filteredPayments));
+        
         setSuccessMessage("تم حذف الدفعة بنجاح");
         setIsSuccessDialogOpen(true);
+      } else {
+        setAlert({ type: "error", message: data.error || "فشل في حذف الدفعة" });
       }
-    } catch (err) {}
+    } catch (err) {
+      console.error('خطأ في حذف الدفعة:', err);
+      setAlert({ type: "error", message: "حدث خطأ في حذف الدفعة" });
+    }
   };
 
   const exportPDF = (type: "income" | "expense" | "all") => {
