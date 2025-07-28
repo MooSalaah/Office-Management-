@@ -157,6 +157,11 @@ export class RealtimeUpdates {
 		this.broadcastUpdate("attendance", attendance);
 	}
 
+	// إرسال تحديث بيانات المكتب
+	sendCompanySettingsUpdate(settings: any) {
+		this.broadcastUpdate("companySettings", settings);
+	}
+
 	// تنظيف التحديثات القديمة
 	cleanup() {
 		if (typeof window === "undefined") return;

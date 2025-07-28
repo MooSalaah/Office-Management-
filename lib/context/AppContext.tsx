@@ -1158,6 +1158,36 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     window.realtimeUpdates = undefined;
   }
 
+  // تحميل بيانات المكتب تلقائياً عند بدء التطبيق أو تغيير المستخدم
+  useEffect(() => {
+    const fetchCompanySettings = async () => {
+      try {
+        const response = await fetch('/api/companySettings');
+        const data = await response.json();
+        if (data.success && data.data) {
+          dispatch({ type: 'UPDATE_COMPANY_SETTINGS', payload: data.data });
+          localStorage.setItem('companySettings', JSON.stringify(data.data));
+        }
+      } catch (error) {
+        // fallback: لا تفعل شيئاً إذا فشل التحميل
+      }
+    };
+    fetchCompanySettings();
+  }, [state.currentUser?.id]);
+
+  // الاستماع لتحديثات بيانات المكتب الفورية
+  useEffect(() => {
+    if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
+      const realtimeUpdates = (window as any).realtimeUpdates;
+      if (realtimeUpdates && typeof realtimeUpdates.on === 'function') {
+        realtimeUpdates.on('companySettings', (settings: any) => {
+          dispatch({ type: 'UPDATE_COMPANY_SETTINGS', payload: settings });
+          localStorage.setItem('companySettings', JSON.stringify(settings));
+        });
+      }
+    }
+  }, []);
+
   return <AppContext.Provider value={{ state, dispatch, isAuthLoading }}>{children}</AppContext.Provider>
 }
 

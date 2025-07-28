@@ -1079,19 +1079,43 @@ function FinancePageContent() {
   const canEditTransaction = hasPermission(currentUser?.role || "", "edit", "finance")
   const canDeleteTransaction = hasPermission(currentUser?.role || "", "delete", "finance")
 
-  const handleCreateInvoice = (transaction: Transaction) => {
+  const handleCreateInvoice = async (transaction: Transaction) => {
     const project = projects.find(p => p.id === transaction.projectId)
     const client = clients.find(c => c.id === transaction.clientId || c.id === project?.clientId)
     
     if (project && client) {
-      const htmlContent = InvoiceGenerator.generateInvoiceFromTransaction(
-        transaction,
-        project,
-        client,
-        state.companySettings
-      )
-      
-      InvoiceGenerator.openInvoiceInNewTab(htmlContent)
+      try {
+        // تحميل أحدث بيانات المكتب من قاعدة البيانات
+        const response = await fetch('/api/companySettings');
+        const data = await response.json();
+        
+        let companySettings = state.companySettings;
+        if (data.success && data.data) {
+          companySettings = data.data;
+          // تحديث localStorage
+          localStorage.setItem("companySettings", JSON.stringify(companySettings));
+        }
+        
+        const htmlContent = InvoiceGenerator.generateInvoiceFromTransaction(
+          transaction,
+          project,
+          client,
+          companySettings
+        )
+        
+        InvoiceGenerator.openInvoiceInNewTab(htmlContent)
+      } catch (error) {
+        console.error('Error loading company settings:', error);
+        // استخدام البيانات المحلية إذا فشل التحميل
+        const htmlContent = InvoiceGenerator.generateInvoiceFromTransaction(
+          transaction,
+          project,
+          client,
+          state.companySettings
+        )
+        
+        InvoiceGenerator.openInvoiceInNewTab(htmlContent)
+      }
     } else {
       setAlert({ type: "error", message: "لا يمكن إنشاء الفاتورة: المشروع أو العميل غير موجود" })
     }

@@ -701,8 +701,10 @@ function SettingsPageContent() {
       // حفظ في localStorage
       localStorage.setItem("companySettings", JSON.stringify(officeData));
       
-      // إرسال تحديث فوري
-      realtimeUpdates.broadcastUpdate('companySettings', officeData);
+      // إرسال تحديث فوري لجميع المستخدمين
+      if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
+        (window as any).realtimeUpdates.sendCompanySettingsUpdate(officeData);
+      }
       
       setAlert(null);
       showSuccessToast("تم تحديث بيانات المكتب بنجاح", "تم حفظ البيانات في قاعدة البيانات");
