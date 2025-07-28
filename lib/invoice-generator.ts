@@ -234,11 +234,9 @@ export class InvoiceGenerator {
 							</div>
 						</div>
 						<div class="footer-info">
-							<span>اسم المكتب: ${data.companyName}</span>
-							${data.address ? `<span>العنوان: ${data.address}</span>` : ""}
-							${data.phone ? `<span>رقم الهاتف: ${data.phone}</span>` : ""}
-							${data.email ? `<span>البريد الإلكتروني: ${data.email}</span>` : ""}
-							${data.website ? `<span>الموقع الإلكتروني: ${data.website}</span>` : ""}
+							<span>${data.companyName}</span>
+							${data.address ? `<span>${data.address}</span>` : ""}
+							${data.phone || data.email || data.website ? `<span>${data.website ? data.website : ""}${data.email ? (data.website ? " | " : "") + data.email : ""}${data.phone ? (data.website || data.email ? " | " : "") + data.phone : ""}</span>` : ""}
 						</div>
 					</div>
 				</div>

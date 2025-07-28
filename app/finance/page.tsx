@@ -567,6 +567,19 @@ function FinancePageContent() {
       return;
     }
 
+    // تحديد اسم الدافع والمستلم بناءً على نوع الدفعة
+    let payerName = paymentFormData.payerName || "";
+    let recipientName = currentUser?.name || "";
+    
+    // إذا كانت دفعة مقدمة لمشروع، اسم الدافع هو العميل واسم المستلم هو منشئ المشروع
+    if (paymentFormData.projectId) {
+      const project = projects.find(p => p.id === paymentFormData.projectId);
+      if (project) {
+        payerName = project.client; // اسم الدافع = العميل
+        recipientName = currentUser?.name || ""; // اسم المستلم = منشئ المشروع
+      }
+    }
+
     const newPayment = {
       id: `upcoming_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       client: paymentFormData.client,
@@ -575,7 +588,8 @@ function FinancePageContent() {
       type: paymentFormData.type,
       dueDate: paymentFormData.dueDate,
       status: "pending",
-      payerName: paymentFormData.payerName || currentUser?.name || "",
+      payerName: payerName,
+      recipientName: recipientName,
       description: paymentFormData.description || `دفعة ${paymentFormData.client}`,
       projectId: paymentFormData.projectId,
       projectName: paymentFormData.projectName,
@@ -1409,8 +1423,8 @@ function FinancePageContent() {
                       <span className="text-red-500 mr-1">*</span>
                     </Label>
                     <Select
-                      value={formData.payerName}
-                      onValueChange={(value) => setFormData((prev) => ({ ...prev, payerName: value }))}
+                      value={formData.recipientName}
+                      onValueChange={(value) => setFormData((prev) => ({ ...prev, recipientName: value }))}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="اختر المستلم" />
@@ -1430,7 +1444,6 @@ function FinancePageContent() {
                   <div className="space-y-2">
                     <Label htmlFor="payerName" className="flex items-center">
                       اسم الدافع
-                      <span className="text-red-500 mr-1">*</span>
                     </Label>
                     <Input
                       id="payerName"
@@ -1442,7 +1455,7 @@ function FinancePageContent() {
                             return project.client;
                           }
                         }
-                        return "اسم الدافع";
+                        return "اسم الدافع (اختياري)";
                       })()}
                       value={formData.payerName}
                       onChange={(e) => setFormData((prev) => ({ ...prev, payerName: e.target.value }))}
@@ -1990,7 +2003,16 @@ function FinancePageContent() {
                 <CardHeader>
                   <CardTitle className="text-lg">الشهر الحالي</CardTitle>
                   <CardDescription className="text-muted-foreground">
-                    {new Date().toLocaleDateString('ar-SA', { month: 'long', year: 'numeric' })}
+                    {(() => {
+                      const currentDate = new Date();
+                      const currentMonth = currentDate.getMonth();
+                      const currentYear = currentDate.getFullYear();
+                      const arabicMonths = [
+                        "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+                        "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"
+                      ];
+                      return `${arabicMonths[currentMonth]} ${currentYear}`;
+                    })()}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
