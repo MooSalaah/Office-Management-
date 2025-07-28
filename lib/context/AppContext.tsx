@@ -582,24 +582,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     fetchTasks();
   }, []);
 
-  // جلب البيانات المالية من الباكند عند بدء التطبيق
+  // جلب البيانات المالية من الباكند عند بدء التطبيق - منع التكرار
   useEffect(() => {
+    let isMounted = true; // منع التحديث إذا تم إلغاء التحميل
+    
     const fetchTransactions = async () => {
       try {
         dispatch({ type: "SET_LOADING_STATE", payload: { key: 'transactions', value: true } });
         const response = await api.transactions.getAll();
-        if (response && response.success && Array.isArray(response.data)) {
+        if (isMounted && response && response.success && Array.isArray(response.data)) {
           dispatch({ type: "LOAD_TRANSACTIONS", payload: response.data });
           logger.info('Transactions loaded from Backend API', { 
             count: response.data.length 
           }, 'TRANSACTIONS');
-        } else {
+        } else if (isMounted) {
           logger.warn('Invalid transactions response format from Backend API', { response }, 'TRANSACTIONS');
         }
       } catch (error) {
-        logger.error('Error fetching transactions from Backend API', { error }, 'TRANSACTIONS');
+        if (isMounted) {
+          logger.error('Error fetching transactions from Backend API', { error }, 'TRANSACTIONS');
+        }
       } finally {
-        dispatch({ type: "SET_LOADING_STATE", payload: { key: 'transactions', value: false } });
+        if (isMounted) {
+          dispatch({ type: "SET_LOADING_STATE", payload: { key: 'transactions', value: false } });
+        }
       }
     };
     
@@ -611,24 +617,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
           }
         });
-        if (response.ok) {
+        if (isMounted && response.ok) {
           const result = await response.json();
           if (result && result.success && Array.isArray(result.data)) {
             dispatch({ type: "LOAD_UPCOMING_PAYMENTS", payload: result.data });
             logger.info('Upcoming payments loaded from Backend API', { 
               count: result.data.length 
             }, 'UPCOMING_PAYMENTS');
-          } else {
+          } else if (isMounted) {
             logger.warn('Invalid upcoming payments response format from Backend API', { result }, 'UPCOMING_PAYMENTS');
           }
         }
       } catch (error) {
-        logger.error('Error fetching upcoming payments from Backend API', { error }, 'UPCOMING_PAYMENTS');
+        if (isMounted) {
+          logger.error('Error fetching upcoming payments from Backend API', { error }, 'UPCOMING_PAYMENTS');
+        }
       }
     };
     
     fetchTransactions();
     fetchUpcomingPayments();
+    
+    return () => {
+      isMounted = false; // إلغاء التحديث عند إلغاء التحميل
+    };
   }, []);
 
   // إزالة التحديث التلقائي للبيانات المالية لتجنب التكرار

@@ -280,7 +280,7 @@ function AttendancePageContent() {
     }, 5000)
   }
 
-  // إضافة دالة لحساب إحصائيات الموظف الشهرية
+  // إضافة دالة لحساب إحصائيات الموظف الشهرية - التاريخ الميلادي
   const getEmployeeMonthlyStats = () => {
     const now = new Date();
     const currentMonth = now.getMonth();
@@ -289,7 +289,7 @@ function AttendancePageContent() {
     const monthEnd = new Date(currentYear, currentMonth + 1, 0);
     const totalDays = monthEnd.getDate();
     
-    // سجلات الحضور للموظف الحالي في الشهر الحالي
+    // سجلات الحضور للموظف الحالي في الشهر الحالي (التاريخ الميلادي)
     const employeeMonthlyRecords = attendanceRecords.filter(r => {
       const recordDate = new Date(r.date);
       return r.userId === currentUser?.id && 
@@ -297,16 +297,16 @@ function AttendancePageContent() {
              recordDate.getFullYear() === currentYear;
     });
 
-    // أيام الحضور
+    // أيام الحضور (بناءً على التاريخ الميلادي)
     const presentDays = employeeMonthlyRecords.reduce((acc, r) => acc.add(r.date), new Set()).size;
     
-    // أيام الغياب
+    // أيام الغياب (بناءً على التاريخ الميلادي)
     const absentDays = totalDays - presentDays;
     
-    // إجمالي الساعات الشهرية
+    // إجمالي الساعات الشهرية (من بداية الشهر الميلادي حتى اليوم الحالي)
     const totalMonthlyHours = Math.ceil(employeeMonthlyRecords.reduce((sum, r) => sum + (r.totalHours || 0), 0));
     
-    // ساعات إضافية
+    // ساعات إضافية (بناءً على التاريخ الميلادي)
     const overtimeHours = Math.round(employeeMonthlyRecords.reduce((sum, r) => sum + Math.max(0, (r.totalHours || 0) - 9), 0));
 
     return {
