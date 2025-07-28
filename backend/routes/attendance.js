@@ -81,14 +81,27 @@ router.post('/', async (req, res) => {
 // Update attendance record
 router.put('/:id', async (req, res) => {
   try {
-    const updatedRecord = await Attendance.findByIdAndUpdate(
-      req.params.id,
+    // البحث بالـ id المخصص بدلاً من _id
+    const updatedRecord = await Attendance.findOneAndUpdate(
+      { id: req.params.id },
       { ...req.body, updatedAt: new Date().toISOString() },
       { new: true }
     );
-    if (!updatedRecord) return res.status(404).json({ success: false, error: 'Attendance record not found' });
+    if (!updatedRecord) {
+      // إذا لم يجد بالـ id المخصص، جرب البحث بالـ _id
+      const updatedByMongoId = await Attendance.findByIdAndUpdate(
+        req.params.id,
+        { ...req.body, updatedAt: new Date().toISOString() },
+        { new: true }
+      );
+      if (!updatedByMongoId) {
+        return res.status(404).json({ success: false, error: 'Attendance record not found' });
+      }
+      return res.json({ success: true, data: updatedByMongoId });
+    }
     res.json({ success: true, data: updatedRecord });
   } catch (err) {
+    console.error('Error updating attendance record:', err);
     res.status(400).json({ success: false, error: err.message });
   }
 });
@@ -96,10 +109,19 @@ router.put('/:id', async (req, res) => {
 // Delete attendance record
 router.delete('/:id', async (req, res) => {
   try {
-    const deletedRecord = await Attendance.findByIdAndDelete(req.params.id);
-    if (!deletedRecord) return res.status(404).json({ success: false, error: 'Attendance record not found' });
+    // البحث بالـ id المخصص بدلاً من _id
+    const deletedRecord = await Attendance.findOneAndDelete({ id: req.params.id });
+    if (!deletedRecord) {
+      // إذا لم يجد بالـ id المخصص، جرب البحث بالـ _id
+      const deletedByMongoId = await Attendance.findByIdAndDelete(req.params.id);
+      if (!deletedByMongoId) {
+        return res.status(404).json({ success: false, error: 'Attendance record not found' });
+      }
+      return res.json({ success: true, message: 'Attendance record deleted', data: deletedByMongoId });
+    }
     res.json({ success: true, message: 'Attendance record deleted', data: deletedRecord });
   } catch (err) {
+    console.error('Error deleting attendance record:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -112,13 +134,15 @@ router.delete('/bulk', async (req, res) => {
       return res.status(400).json({ success: false, error: 'IDs array is required' });
     }
     
-    const result = await Attendance.deleteMany({ _id: { $in: ids } });
+    // البحث بالـ id المخصص بدلاً من _id
+    const result = await Attendance.deleteMany({ id: { $in: ids } });
     res.json({ 
       success: true, 
       message: `${result.deletedCount} attendance records deleted`,
       deletedCount: result.deletedCount
     });
   } catch (err) {
+    console.error('Error bulk deleting attendance records:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
