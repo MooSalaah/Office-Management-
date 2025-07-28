@@ -443,7 +443,7 @@ function AttendancePageContent() {
           actionUrl: `/attendance`,
           triggeredBy: currentUser?.id || "",
           isRead: false,
-        });
+        } as any);
       }
       
       console.log(`تم إرسال إشعار ${actionText} للمديرين:`, adminUsers.map(u => u.name));
@@ -682,14 +682,26 @@ function AttendancePageContent() {
     // حساب الساعات الإضافية (أكثر من 9 ساعات)
     const overtimeHours = Math.max(0, totalHours - 9);
 
-    const updatedRecord: AttendanceRecord = {
-      ...existingRecord,
+    // إنشاء سجل انصراف جديد بدلاً من تحديث السجل الموجود
+    const checkoutRecord: AttendanceRecord = {
+      id: `attendance_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      userId: currentUser.id,
+      userName: currentUser.name || "",
+      date: today,
+      session: session,
+      checkIn: existingRecord.checkIn || "",
       checkOut: currentTime,
       totalHours: totalHours,
       overtimeHours: overtimeHours,
+      status: existingRecord.status,
+      notes: "",
+      location: "",
+      createdAt: existingRecord.createdAt || currentTime,
+      updatedAt: currentTime,
     };
 
-    handleUpdateAttendance(existingRecord.id, updatedRecord);
+    // استخدام handleCreateAttendance بدلاً من handleUpdateAttendance
+    handleCreateAttendance(checkoutRecord);
     
     // إرسال إشعار للمدير
     notifyManager('checkout', session);
@@ -744,7 +756,7 @@ function AttendancePageContent() {
       setAttendanceRecords((prev) => [...prev, newRecord])
       
       // بث تحديث فوري لجميع المستخدمين
-      realtimeUpdates.sendAttendanceUpdate({ action: 'create', attendance: newRecord, userId: employee.id, userName: employee.name || "" })
+      realtimeUpdates.sendAttendanceUpdate({ attendance: newRecord, userId: employee.id, userName: employee.name || "" })
     } else {
       // Find existing record for checkout
       const existingRecord = attendanceRecords.find(r => r.userId === employee.id && r.date === today)
@@ -772,7 +784,7 @@ function AttendancePageContent() {
       setAttendanceRecords((prev) => prev.map((record) => (record.id === existingRecord.id ? updatedRecord : record)))
       
       // بث تحديث فوري لجميع المستخدمين
-      realtimeUpdates.sendAttendanceUpdate({ action: 'update', attendance: updatedRecord, userId: employee.id, userName: employee.name || "" })
+      realtimeUpdates.sendAttendanceUpdate({ attendance: updatedRecord, userId: employee.id, userName: employee.name || "" })
     }
 
     // إرسال إشعار للمدير إذا كان المستخدم الحالي هو الموارد البشرية
@@ -787,7 +799,7 @@ function AttendancePageContent() {
           actionUrl: `/attendance`,
           triggeredBy: currentUser?.id || "",
           isRead: false,
-        });
+        } as any);
       }
     }
 
@@ -815,7 +827,7 @@ function AttendancePageContent() {
       actionUrl: `/attendance`,
       triggeredBy: currentUser?.id || "",
       isRead: false,
-    })
+    } as any)
 
     setAlert({ type: "success", message: "تم تصدير التقرير بنجاح" })
   }
