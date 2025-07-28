@@ -617,61 +617,79 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     fetchTasks();
   }, []);
 
-  // جلب البيانات المالية من الباكند عند بدء التطبيق - منع التكرار
+  // جلب جميع البيانات من قاعدة البيانات عند بدء التطبيق
   useEffect(() => {
     let isMounted = true; // منع التحديث إذا تم إلغاء التحميل
     
-    const fetchTransactions = async () => {
+    const fetchAllData = async () => {
       try {
-        dispatch({ type: "SET_LOADING_STATE", payload: { key: 'transactions', value: true } });
-        const response = await api.transactions.getAll();
-        if (isMounted && response && response.success && Array.isArray(response.data)) {
-          dispatch({ type: "LOAD_TRANSACTIONS", payload: response.data });
-          logger.info('Transactions loaded from Backend API', { 
-            count: response.data.length 
-          }, 'TRANSACTIONS');
-        } else if (isMounted) {
-          logger.warn('Invalid transactions response format from Backend API', { response }, 'TRANSACTIONS');
+        // جلب المستخدمين
+        const usersResponse = await api.users.getAll();
+        if (isMounted && usersResponse && usersResponse.success && Array.isArray(usersResponse.data)) {
+          dispatch({ type: "LOAD_USERS", payload: usersResponse.data });
         }
-      } catch (error) {
-        if (isMounted) {
-          logger.error('Error fetching transactions from Backend API', { error }, 'TRANSACTIONS');
+
+        // جلب المشاريع
+        const projectsResponse = await api.projects.getAll();
+        if (isMounted && projectsResponse && projectsResponse.success && Array.isArray(projectsResponse.data)) {
+          dispatch({ type: "LOAD_PROJECTS", payload: projectsResponse.data });
         }
-      } finally {
-        if (isMounted) {
-          dispatch({ type: "SET_LOADING_STATE", payload: { key: 'transactions', value: false } });
+
+        // جلب العملاء
+        const clientsResponse = await api.clients.getAll();
+        if (isMounted && clientsResponse && clientsResponse.success && Array.isArray(clientsResponse.data)) {
+          dispatch({ type: "LOAD_CLIENTS", payload: clientsResponse.data });
         }
-      }
-    };
-    
-    const fetchUpcomingPayments = async () => {
-      try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
-        const response = await fetch(`${apiUrl}/api/upcomingPayments`, {
+
+        // جلب المهام
+        const tasksResponse = await api.tasks.getAll();
+        if (isMounted && tasksResponse && tasksResponse.success && Array.isArray(tasksResponse.data)) {
+          dispatch({ type: "LOAD_TASKS", payload: tasksResponse.data });
+        }
+
+        // جلب المعاملات المالية
+        const transactionsResponse = await api.transactions.getAll();
+        if (isMounted && transactionsResponse && transactionsResponse.success && Array.isArray(transactionsResponse.data)) {
+          dispatch({ type: "LOAD_TRANSACTIONS", payload: transactionsResponse.data });
+        }
+
+        // جلب الإشعارات
+        const notificationsResponse = await api.notifications.getAll();
+        if (isMounted && notificationsResponse && notificationsResponse.success && Array.isArray(notificationsResponse.data)) {
+          dispatch({ type: "LOAD_NOTIFICATIONS", payload: notificationsResponse.data });
+        }
+
+        // جلب المدفوعات القادمة
+        const upcomingPaymentsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com'}/api/upcomingPayments`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
           }
         });
-        if (isMounted && response.ok) {
-          const result = await response.json();
+        if (isMounted && upcomingPaymentsResponse.ok) {
+          const result = await upcomingPaymentsResponse.json();
           if (result && result.success && Array.isArray(result.data)) {
             dispatch({ type: "LOAD_UPCOMING_PAYMENTS", payload: result.data });
-            logger.info('Upcoming payments loaded from Backend API', { 
-              count: result.data.length 
-            }, 'UPCOMING_PAYMENTS');
-          } else if (isMounted) {
-            logger.warn('Invalid upcoming payments response format from Backend API', { result }, 'UPCOMING_PAYMENTS');
           }
         }
+
+        logger.info('All data loaded from Database successfully', { 
+          users: usersResponse?.data?.length || 0,
+          projects: projectsResponse?.data?.length || 0,
+          clients: clientsResponse?.data?.length || 0,
+          tasks: tasksResponse?.data?.length || 0,
+          transactions: transactionsResponse?.data?.length || 0,
+          notifications: notificationsResponse?.data?.length || 0,
+          upcomingPayments: result?.data?.length || 0
+        }, 'DATABASE');
+
       } catch (error) {
         if (isMounted) {
-          logger.error('Error fetching upcoming payments from Backend API', { error }, 'UPCOMING_PAYMENTS');
+          logger.error('Error loading data from Database', { error }, 'DATABASE');
         }
       }
     };
     
-    fetchTransactions();
-    fetchUpcomingPayments();
+    fetchAllData();
     
     return () => {
       isMounted = false; // إلغاء التحديث عند إلغاء التحميل
@@ -891,13 +909,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const transactionsData = localStorage.getItem("transactions")
         if (transactionsData && state.transactions.length === mockTransactions.length) {
           const transactions = JSON.parse(transactionsData)
-          transactions.forEach((transaction: Transaction) => {
-            // Check if transaction already exists
-            const existingTransaction = state.transactions.find(t => t.id === transaction.id)
-            if (!existingTransaction) {
-              dispatch({ type: "ADD_TRANSACTION", payload: transaction })
-            }
-          })
+          // استبدال جميع المعاملات بدلاً من إضافة واحدة تلو الأخرى لتجنب التكرار
+          dispatch({ type: "LOAD_TRANSACTIONS", payload: transactions })
         }
 
         // Load notifications from localStorage
@@ -1047,7 +1060,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           if (parsedData.projects) dispatch({ type: "LOAD_PROJECTS", payload: parsedData.projects })
           if (parsedData.clients) dispatch({ type: "LOAD_CLIENTS", payload: parsedData.clients })
           if (parsedData.tasks) dispatch({ type: "LOAD_TASKS", payload: parsedData.tasks })
-          if (parsedData.transactions) dispatch({ type: "LOAD_TRANSACTIONS", payload: parsedData.transactions })
+          // تحميل المعاملات المالية فقط إذا لم تكن محملة بالفعل
+          if (parsedData.transactions && state.transactions.length === mockTransactions.length) {
+            dispatch({ type: "LOAD_TRANSACTIONS", payload: parsedData.transactions })
+          }
           if (parsedData.notifications) dispatch({ type: "LOAD_NOTIFICATIONS", payload: parsedData.notifications })
           if (parsedData.attendanceRecords) dispatch({ type: "LOAD_ATTENDANCE", payload: parsedData.attendanceRecords })
           if (parsedData.upcomingPayments) dispatch({ type: "LOAD_UPCOMING_PAYMENTS", payload: parsedData.upcomingPayments })
@@ -1073,7 +1089,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (projects) dispatch({ type: "LOAD_PROJECTS", payload: JSON.parse(projects) })
       if (clients) dispatch({ type: "LOAD_CLIENTS", payload: JSON.parse(clients) })
       if (tasks) dispatch({ type: "LOAD_TASKS", payload: JSON.parse(tasks) })
-      if (transactions) dispatch({ type: "LOAD_TRANSACTIONS", payload: JSON.parse(transactions) })
+      // تحميل المعاملات المالية فقط إذا لم تكن محملة بالفعل
+      if (transactions && state.transactions.length === mockTransactions.length) {
+        dispatch({ type: "LOAD_TRANSACTIONS", payload: JSON.parse(transactions) })
+      }
       if (notifications) dispatch({ type: "LOAD_NOTIFICATIONS", payload: JSON.parse(notifications) })
       if (attendanceRecords) dispatch({ type: "LOAD_ATTENDANCE", payload: JSON.parse(attendanceRecords) })
       if (upcomingPayments) dispatch({ type: "LOAD_UPCOMING_PAYMENTS", payload: JSON.parse(upcomingPayments) })
