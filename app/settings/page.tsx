@@ -505,8 +505,6 @@ function SettingsPageContent() {
       
       try {
         // Save to backend database
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
-        
         // تحضير البيانات للإرسال - تأكد من إرسال جميع البيانات
         const userDataToSend = {
           id: currentUser.id,
@@ -525,11 +523,10 @@ function SettingsPageContent() {
 
         console.log('Sending profile data to backend:', userDataToSend);
 
-        const response = await fetch(`${apiUrl}/api/users/${currentUser.id}`, {
+        const response = await fetch(`/api/users/${currentUser.id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
           },
           body: JSON.stringify(userDataToSend),
         });

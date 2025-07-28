@@ -41,10 +41,18 @@ router.put('/:id', async (req, res) => {
 // Delete transaction
 router.delete('/:id', async (req, res) => {
   try {
-    const deletedTransaction = await Transaction.findByIdAndDelete(req.params.id);
-    if (!deletedTransaction) return res.status(404).json({ success: false, error: 'Transaction not found' });
+    // البحث بالـ id المخصص بدلاً من _id
+    const deletedTransaction = await Transaction.findOneAndDelete({ id: req.params.id });
+    if (!deletedTransaction) {
+      // إذا لم يجد بالـ id المخصص، جرب البحث بالـ _id
+      const deletedByMongoId = await Transaction.findByIdAndDelete(req.params.id);
+      if (!deletedByMongoId) {
+        return res.status(404).json({ success: false, error: 'Transaction not found' });
+      }
+    }
     res.json({ success: true, message: 'Transaction deleted' });
   } catch (err) {
+    console.error('Error deleting transaction:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });

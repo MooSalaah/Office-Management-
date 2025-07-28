@@ -731,11 +731,8 @@ function FinancePageContent() {
   // حذف دفعة قادمة
   const handleDeletePayment = async (id: string) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/upcomingPayments/${id}`, {
+      const res = await fetch(`/api/upcomingPayments/${id}`, {
         method: "DELETE",
-        headers: { 
-          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
-        }
       });
       const data = await res.json();
       if (data.success) {
@@ -1230,11 +1227,8 @@ function FinancePageContent() {
         return;
       }
 
-      const res = await fetch(`${API_BASE_URL}/api/transactions/${transaction.id}`, {
+      const res = await fetch(`/api/transactions/${transaction.id}`, {
         method: "DELETE",
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
-        }
       });
       const data = await res.json();
       if (data.success) {
@@ -1246,6 +1240,7 @@ function FinancePageContent() {
       setDeleteDialogOpen(false);
       setTransactionToDelete(null);
     } catch (err) {
+      console.error('Error deleting transaction:', err);
       setDeleteError("حدث خطأ أثناء حذف المعاملة من قاعدة البيانات");
     }
   }
