@@ -531,11 +531,10 @@ function FinancePageContent() {
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
             
             // استدعاء API لإكمال الدفعة وإنشاء المعاملة
-            const response = await fetch(`${apiUrl}/api/upcomingPayments/${payment.id}/complete`, {
+            const response = await fetch(`/api/upcomingPayments/${payment.id}/complete`, {
               method: 'POST',
               headers: { 
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
               },
               body: JSON.stringify({
                 completedBy: currentUser?.id || ""

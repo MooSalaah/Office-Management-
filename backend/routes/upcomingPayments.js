@@ -80,12 +80,8 @@ router.post('/:id/complete', async (req, res) => {
     const transaction = new Transaction(transactionData);
     const savedTransaction = await transaction.save();
 
-    // تحديث حالة الدفعة القادمة إلى مكتملة
-    payment.status = 'completed';
-    payment.completedAt = new Date().toISOString();
-    payment.completedBy = req.body.completedBy || payment.createdBy;
-    payment.updatedAt = new Date().toISOString();
-    await payment.save();
+    // حذف الدفعة القادمة من قاعدة البيانات
+    await UpcomingPayment.findOneAndDelete({ id: req.params.id });
 
     res.json({ 
       success: true, 
