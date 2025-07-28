@@ -590,10 +590,26 @@ function AttendancePageContent() {
       return;
     }
 
-    // تحديد حالة الحضور بناءً على الوقت
-    let status = "present";
+    // التحقق من الوقت المسموح لتسجيل الحضور
     const hour = now.getHours();
     const minute = now.getMinutes();
+    
+    if (session === "morning") {
+      // الفترة الصباحية: يمكن تسجيل الحضور حتى الساعة 12:00 ظهراً
+      if (hour >= 12) {
+        setAlert({ type: "error", message: "لا يمكن تسجيل الحضور للفترة الصباحية بعد الساعة 12:00 ظهراً" });
+        return;
+      }
+    } else {
+      // الفترة المسائية: يمكن تسجيل الحضور حتى الساعة 9:00 مساءً
+      if (hour >= 21) {
+        setAlert({ type: "error", message: "لا يمكن تسجيل الحضور للفترة المسائية بعد الساعة 9:00 مساءً" });
+        return;
+      }
+    }
+
+    // تحديد حالة الحضور بناءً على الوقت
+    let status = "present";
     
     if (session === "morning") {
       // الفترة الصباحية: 8:00 - 12:00
@@ -631,7 +647,7 @@ function AttendancePageContent() {
     
     // رسالة نجاح
     setAlert({ type: "success", message: `تم تسجيل الحضور بنجاح للفترة ${session === 'morning' ? 'الصباحية' : 'المسائية'}` });
-    showSuccessToast("تم تسجيل الحضور بنجاح", `تم تسجيل الحضور للفترة ${session === 'morning' ? 'الصباحية' : 'المسائية'}`);
+    showSuccessToast("تم تسجيل الحضور بنجاح", `تم تسجيل الحضور للفترة ${session === 'morning' ? 'الصباحية' : 'المسائية'} بنجاح`);
   };
 
   const handleCheckOut = (session: "morning" | "evening") => {
@@ -708,7 +724,7 @@ function AttendancePageContent() {
     
     // رسالة نجاح
     setAlert({ type: "success", message: `تم تسجيل الانصراف بنجاح للفترة ${session === 'morning' ? 'الصباحية' : 'المسائية'}` });
-    showSuccessToast("تم تسجيل الانصراف بنجاح", `تم تسجيل الانصراف للفترة ${session === 'morning' ? 'الصباحية' : 'المسائية'}`);
+    showSuccessToast("تم تسجيل الانصراف بنجاح", `تم تسجيل الانصراف للفترة ${session === 'morning' ? 'الصباحية' : 'المسائية'} بنجاح`);
   };
 
   const handleManualCheckInOut = async () => {
@@ -804,6 +820,7 @@ function AttendancePageContent() {
     }
 
     setAlert({ type: "success", message: `تم تسجيل ${manualFormData.action === "checkin" ? "الحضور" : "الانصراف"} بنجاح` })
+    showSuccessToast(`تم تسجيل ${manualFormData.action === "checkin" ? "الحضور" : "الانصراف"} بنجاح`, `تم تسجيل ${manualFormData.action === "checkin" ? "الحضور" : "الانصراف"} يدوياً بنجاح`)
     setIsManualDialogOpen(false)
     setManualFormData({
       employeeId: "",
@@ -830,6 +847,7 @@ function AttendancePageContent() {
     } as any)
 
     setAlert({ type: "success", message: "تم تصدير التقرير بنجاح" })
+    showSuccessToast("تم تصدير التقرير بنجاح", "تم تصدير تقرير الحضور بنجاح")
   }
 
   const getStatusColor = (status: string) => {

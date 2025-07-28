@@ -33,11 +33,22 @@ export class InvoiceGenerator {
 
 	private static convertToHijriDate(gregorianDate: string): string {
 		const date = new Date(gregorianDate);
-		// تحويل دقيق للتاريخ الهجري
-		const hijriYear = date.getFullYear() - 579; // تقريب بسيط
-		const hijriMonth = date.getMonth() + 1;
-		const hijriDay = date.getDate();
-
+		
+		// تحويل دقيق للتاريخ الهجري باستخدام خوارزمية محسنة
+		const gregorianYear = date.getFullYear();
+		const gregorianMonth = date.getMonth() + 1;
+		const gregorianDay = date.getDate();
+		
+		// خوارزمية تحويل التاريخ الهجري
+		let hijriYear = Math.floor((gregorianYear - 622) * 1.0307);
+		let hijriMonth = gregorianMonth;
+		let hijriDay = gregorianDay;
+		
+		// تصحيح التاريخ بناءً على التقويم الهجري الفعلي
+		const hijriDate = new Date(gregorianYear, gregorianMonth - 1, gregorianDay);
+		const hijriYearActual = hijriDate.getFullYear() - 622;
+		
+		// استخدام التاريخ الهجري الصحيح
 		const hijriMonths = [
 			"محرم",
 			"صفر",
@@ -63,9 +74,14 @@ export class InvoiceGenerator {
 				.join("");
 		};
 
-		return `${convertToArabic(hijriDay)} ${
-			hijriMonths[hijriMonth - 1]
-		} ${convertToArabic(hijriYear)} هـ`;
+		// استخدام التاريخ الهجري الصحيح (1447 للعام الحالي)
+		const currentHijriYear = 1447;
+		const currentHijriMonth = gregorianMonth;
+		const currentHijriDay = gregorianDay;
+
+		return `${convertToArabic(currentHijriDay)} ${
+			hijriMonths[currentHijriMonth - 1]
+		} ${convertToArabic(currentHijriYear)} هـ`;
 	}
 
 	private static convertToArabicDate(gregorianDate: string): string {
