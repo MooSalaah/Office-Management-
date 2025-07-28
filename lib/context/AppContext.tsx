@@ -631,43 +631,43 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     fetchUpcomingPayments();
   }, []);
 
-  // تحديث البيانات المالية تلقائياً كل 30 ثانية
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      try {
-        const response = await api.transactions.getAll();
-        if (response && response.success && Array.isArray(response.data)) {
-          // تحديث البيانات المالية فقط إذا كان هناك تغيير
-          const currentTransactions = state.transactions;
-          const newTransactions = response.data;
-          
-          // مقارنة عدد المعاملات
-          if (currentTransactions.length !== newTransactions.length) {
-            dispatch({ type: "LOAD_TRANSACTIONS", payload: newTransactions });
-            logger.info('Transactions updated from Backend API', { 
-              oldCount: currentTransactions.length,
-              newCount: newTransactions.length
-            }, 'TRANSACTIONS');
-          } else {
-            // مقارنة آخر معاملة
-            const lastCurrentTransaction = currentTransactions[0];
-            const lastNewTransaction = newTransactions[0];
-            
-            if (lastCurrentTransaction?.id !== lastNewTransaction?.id) {
-              dispatch({ type: "LOAD_TRANSACTIONS", payload: newTransactions });
-              logger.info('New transactions detected, updated from Backend API', { 
-                count: newTransactions.length
-              }, 'TRANSACTIONS');
-            }
-          }
-        }
-      } catch (error) {
-        logger.error('Error updating transactions from Backend API', { error }, 'TRANSACTIONS');
-      }
-    }, 30000); // 30 ثانية
+  // إزالة التحديث التلقائي للبيانات المالية لتجنب التكرار
+  // useEffect(() => {
+  //   const interval = setInterval(async () => {
+  //     try {
+  //       const response = await api.transactions.getAll();
+  //       if (response && response.success && Array.isArray(response.data)) {
+  //         // تحديث البيانات المالية فقط إذا كان هناك تغيير
+  //         const currentTransactions = state.transactions;
+  //         const newTransactions = response.data;
+  //         
+  //         // مقارنة عدد المعاملات
+  //         if (currentTransactions.length !== newTransactions.length) {
+  //           dispatch({ type: "LOAD_TRANSACTIONS", payload: newTransactions });
+  //           logger.info('Transactions updated from Backend API', { 
+  //             oldCount: currentTransactions.length,
+  //             newCount: newTransactions.length
+  //           }, 'TRANSACTIONS');
+  //         } else {
+  //           // مقارنة آخر معاملة
+  //           const lastCurrentTransaction = currentTransactions[0];
+  //           const lastNewTransaction = newTransactions[0];
+  //           
+  //           if (lastCurrentTransaction?.id !== lastNewTransaction?.id) {
+  //             dispatch({ type: "LOAD_TRANSACTIONS", payload: newTransactions });
+  //             logger.info('New transactions detected, updated from Backend API', { 
+  //               count: newTransactions.length
+  //             }, 'TRANSACTIONS');
+  //           }
+  //         }
+  //       }
+  //     } catch (error) {
+  //       logger.error('Error updating transactions from Backend API', { error }, 'TRANSACTIONS');
+  //     }
+  //   }, 30000); // 30 ثانية
 
-    return () => clearInterval(interval);
-  }, [state.transactions.length]);
+  //   return () => clearInterval(interval);
+  // }, [state.transactions.length]);
 
   // تحديث الإشعارات تلقائياً كل 30 ثانية
   useEffect(() => {

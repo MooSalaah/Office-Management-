@@ -21,16 +21,16 @@ export class RealtimeUpdates {
 	// إرسال تحديث لجميع المستخدمين عبر SSE
 	async broadcastUpdate(type: string, data: RealtimeDataType) {
 		try {
-			// إرسال التحديث للمستمعين المحليين فقط لتجنب الأخطاء
+			// إرسال التحديث للمستمعين المحليين فقط
 			this.notifyListeners(type, data);
 			
-			// محاولة إرسال عبر SSE إذا كان متاحاً
-			if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
-				const realtimeUpdates = (window as any).realtimeUpdates;
-				if (realtimeUpdates.sendUpdate) {
-					realtimeUpdates.sendUpdate(type, data.action || "update", data);
-				}
-			}
+			// تجنب إرسال عبر SSE لتجنب الأخطاء
+			// if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
+			//   const realtimeUpdates = (window as any).realtimeUpdates;
+			//   if (realtimeUpdates.sendUpdate) {
+			//     realtimeUpdates.sendUpdate(type, data.action || "update", data);
+			//   }
+			// }
 		} catch (error) {
 			console.error("ERROR [NOTIFICATIONS] Error broadcasting notification update | Data:", { error });
 			// Fallback: إرسال للمستمعين المحليين فقط
