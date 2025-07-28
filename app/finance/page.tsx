@@ -481,69 +481,49 @@ function FinancePageContent() {
 
     switch (action) {
       case 'complete':
-        // Add payment as transaction
-        const newTransaction: Transaction = {
-          id: Date.now().toString(),
-          type: payment.type,
-          amount: payment.amount,
-          description: payment.description || `دفعة ${payment.client}`,
-          projectId: undefined,
-          projectName: undefined,
-          clientId: undefined,
-          clientName: payment.client,
-          category: payment.type === "income" ? "دفعات" : "فواتير",
-          transactionType: "other",
-          paymentMethod: "transfer",
-          importance: "medium",
-          date: new Date().toISOString().split("T")[0],
-          status: "completed",
-          createdBy: currentUser?.id || "",
-          createdAt: new Date().toISOString(),
-          payerName: payment.payerName,
-        }
-        
-        // حفظ المعاملة المالية في قاعدة البيانات
-        const saveTransactionToDatabase = async () => {
+        // إكمال الدفعة وإنشاء معاملة مالية
+        const completePayment = async () => {
           try {
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
-            const response = await fetch(`${apiUrl}/api/transactions`, {
+            
+            // استدعاء API لإكمال الدفعة وإنشاء المعاملة
+            const response = await fetch(`${apiUrl}/api/upcomingPayments/${payment.id}/complete`, {
               method: 'POST',
               headers: { 
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
               },
-              body: JSON.stringify(newTransaction),
+              body: JSON.stringify({
+                completedBy: currentUser?.id || ""
+              }),
             });
             
             if (response.ok) {
               const data = await response.json();
               if (data.success) {
-                dispatch({ type: "ADD_TRANSACTION", payload: data.data || newTransaction });
+                // إضافة المعاملة المالية
+                dispatch({ type: "ADD_TRANSACTION", payload: data.data.transaction });
                 
-                // Remove payment from upcoming payments
-                dispatch({ type: "DELETE_UPCOMING_PAYMENT", payload: payment.id })
+                // تحديث الدفعة القادمة
+                dispatch({ type: "UPDATE_UPCOMING_PAYMENT", payload: data.data.payment });
                 
-                // Remove from localStorage
-                const existingPaymentsForComplete = JSON.parse(localStorage.getItem("upcomingPayments") || "[]")
-                const filteredPaymentsForComplete = existingPaymentsForComplete.filter((p: any) => p.id !== payment.id)
-                localStorage.setItem("upcomingPayments", JSON.stringify(filteredPaymentsForComplete))
-                
-                setSuccessMessage("تم إكمال الدفعة وإضافتها للمعاملات بنجاح")
-                setIsSuccessDialogOpen(true)
+                setSuccessMessage("تم إكمال الدفعة وإنشاء المعاملة المالية بنجاح");
+                setIsSuccessDialogOpen(true);
               } else {
-                setAlert({ type: "error", message: "فشل في حفظ المعاملة المالية في قاعدة البيانات" });
+                setAlert({ type: "error", message: data.error || "فشل في إكمال الدفعة" });
               }
             } else {
-              setAlert({ type: "error", message: "فشل في حفظ المعاملة المالية في قاعدة البيانات" });
+              const errorData = await response.json();
+              setAlert({ type: "error", message: errorData.error || "فشل في إكمال الدفعة" });
             }
           } catch (error) {
-            console.error('خطأ في حفظ المعاملة المالية:', error);
-            setAlert({ type: "error", message: "حدث خطأ في حفظ المعاملة المالية" });
+            console.error('خطأ في إكمال الدفعة:', error);
+            setAlert({ type: "error", message: "حدث خطأ في إكمال الدفعة" });
           }
         };
         
-        // تنفيذ حفظ المعاملة
-        saveTransactionToDatabase();
+        // تنفيذ إكمال الدفعة
+        completePayment();
         break
         
       case 'delete':
@@ -569,43 +549,72 @@ function FinancePageContent() {
       setAlert({ type: "error", message: "ليس لديك صلاحية لإنشاء دفعات قادمة" })
       return
     }
-    // استخدم paymentFormData بدلاً من formData
+
+    // التحقق من البيانات المطلوبة
+    if (!paymentFormData.client || !paymentFormData.amount || !paymentFormData.dueDate) {
+      setAlert({ type: "error", message: "يرجى ملء جميع الحقول المطلوبة" });
+      return;
+    }
+
     const newPayment = {
-      id: Date.now().toString(),
+      id: `upcoming_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       client: paymentFormData.client,
+      clientId: paymentFormData.clientId,
       amount: Number(paymentFormData.amount),
       type: paymentFormData.type,
       dueDate: paymentFormData.dueDate,
       status: "pending",
-      payerName: paymentFormData.payerName || "",
-      description: paymentFormData.description || "",
+      payerName: paymentFormData.payerName || currentUser?.name || "",
+      description: paymentFormData.description || `دفعة ${paymentFormData.client}`,
+      projectId: paymentFormData.projectId,
+      projectName: paymentFormData.projectName,
+      category: paymentFormData.category || "general",
+      paymentMethod: paymentFormData.paymentMethod || "cash",
+      importance: paymentFormData.importance || "medium",
+      createdBy: currentUser?.id || "",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      notes: paymentFormData.notes || ""
     };
+
     try {
       const res = await fetch(`${API_BASE_URL}/api/upcomingPayments`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+        },
         body: JSON.stringify(newPayment),
-        credentials: "include",
       });
+      
       const data = await res.json();
       if (res.ok && data.success) {
         dispatch({ type: "ADD_UPCOMING_PAYMENT", payload: data.data });
         setIsAddPaymentDialogOpen(false);
-        setSuccessMessage("تمت إضافة الدفعة بنجاح!");
+        setSuccessMessage("تمت إضافة الدفعة القادمة بنجاح!");
         setIsSuccessDialogOpen(true);
+        
         // إعادة تعيين النموذج
         setPaymentFormData({
           client: "",
+          clientId: "",
           amount: "",
           type: "income",
           dueDate: "",
           description: "",
           payerName: currentUser?.name || "",
+          projectId: "",
+          projectName: "",
+          category: "general",
+          paymentMethod: "cash",
+          importance: "medium",
+          notes: ""
         });
       } else {
-        setAlert({ type: "error", message: data.message || "حدث خطأ أثناء إضافة الدفعة" });
+        setAlert({ type: "error", message: data.error || "حدث خطأ أثناء إضافة الدفعة" });
       }
     } catch (error) {
+      console.error('خطأ في إضافة الدفعة القادمة:', error);
       setAlert({ type: "error", message: "حدث خطأ أثناء إضافة الدفعة" });
     }
   };

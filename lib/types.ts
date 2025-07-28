@@ -132,6 +132,17 @@ export interface AttendanceRecord {
 	status: "present" | "absent" | "late" | "overtime";
 	notes?: string;
 	overtimePay?: number;
+	location?: string;
+	device?: string;
+	ipAddress?: string;
+	createdBy?: string;
+	createdAt?: string;
+	updatedAt?: string;
+	isManualEntry?: boolean;
+	manualEntryBy?: string;
+	approvedBy?: string;
+	approvedAt?: string;
+	rejectionReason?: string;
 }
 
 export interface CompanySettings {
@@ -147,11 +158,24 @@ export interface CompanySettings {
 export interface UpcomingPayment {
 	id: string;
 	client: string;
+	clientId?: string;
 	amount: number;
 	type: "income" | "expense";
 	dueDate: string;
-	status: "pending" | "overdue";
+	status: "pending" | "overdue" | "completed";
 	payerName?: string;
+	description?: string;
+	projectId?: string;
+	projectName?: string;
+	category?: string;
+	paymentMethod?: "cash" | "transfer" | "pos" | "check" | "credit";
+	importance?: "low" | "medium" | "high";
+	createdBy?: string;
+	createdAt?: string;
+	updatedAt?: string;
+	completedAt?: string;
+	completedBy?: string;
+	notes?: string;
 }
 
 export interface UserSettings {

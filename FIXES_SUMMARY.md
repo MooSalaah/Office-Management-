@@ -378,6 +378,386 @@ useEffect(() => {
 }, []);
 ```
 
+### 6. **نظام الدفعات القادمة المحسن** ✅
+**المشكلة:**
+- الدفعات القادمة لم تكن موجودة في قاعدة البيانات
+- عدم وجود آلية لإكمال الدفعات وتحويلها لمعاملات مالية
+- عدم وجود تتبع شامل للدفعات
+
+**الحل المطبق:**
+- إنشاء نظام متكامل للدفعات القادمة في قاعدة البيانات
+- إضافة آلية إكمال الدفعات وتحويلها لمعاملات مالية
+- تحسين نموذج البيانات والواجهات
+
+#### **أ. تحسين نموذج UpcomingPayment في قاعدة البيانات:**
+```javascript
+// backend/models/UpcomingPayment.js
+const UpcomingPaymentSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true },
+  client: { type: String, required: true },
+  clientId: { type: String },
+  amount: { type: Number, required: true },
+  type: { type: String, enum: ['income', 'expense'], required: true },
+  dueDate: { type: String, required: true },
+  status: { type: String, enum: ['pending', 'overdue', 'completed'], default: 'pending' },
+  payerName: { type: String },
+  description: { type: String },
+  projectId: { type: String },
+  projectName: { type: String },
+  category: { type: String },
+  paymentMethod: { type: String, enum: ['cash', 'transfer', 'pos', 'check', 'credit'], default: 'cash' },
+  importance: { type: String, enum: ['low', 'medium', 'high'], default: 'medium' },
+  createdBy: { type: String },
+  createdAt: { type: String, default: () => new Date().toISOString() },
+  updatedAt: { type: String, default: () => new Date().toISOString() },
+  completedAt: { type: String },
+  completedBy: { type: String },
+  notes: { type: String }
+});
+```
+
+#### **ب. إضافة API لإكمال الدفعات:**
+```javascript
+// backend/routes/upcomingPayments.js
+// Complete upcoming payment and create transaction
+router.post('/:id/complete', async (req, res) => {
+  try {
+    const payment = await UpcomingPayment.findById(req.params.id);
+    if (!payment) {
+      return res.status(404).json({ success: false, error: 'Upcoming payment not found' });
+    }
+
+    // إنشاء معاملة مالية من الدفعة القادمة
+    const transactionData = {
+      id: `transaction_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      type: payment.type,
+      amount: payment.amount,
+      description: `دفعة مكتملة - ${payment.description || payment.client}`,
+      date: new Date().toISOString().split('T')[0],
+      category: payment.category || 'payment_completion',
+      transactionType: 'payment_completion',
+      status: 'completed',
+      importance: payment.importance || 'medium',
+      paymentMethod: payment.paymentMethod || 'cash',
+      projectId: payment.projectId,
+      clientId: payment.clientId,
+      clientName: payment.client,
+      projectName: payment.projectName,
+      createdBy: req.body.completedBy || payment.createdBy,
+      createdAt: new Date().toISOString(),
+      remainingAmount: 0,
+      payerName: payment.payerName || payment.client,
+    };
+
+    // حفظ المعاملة المالية
+    const transaction = new Transaction(transactionData);
+    const savedTransaction = await transaction.save();
+
+    // تحديث حالة الدفعة القادمة إلى مكتملة
+    payment.status = 'completed';
+    payment.completedAt = new Date().toISOString();
+    payment.completedBy = req.body.completedBy || payment.createdBy;
+    payment.updatedAt = new Date().toISOString();
+    await payment.save();
+
+    res.json({ 
+      success: true, 
+      data: {
+        payment: payment,
+        transaction: savedTransaction
+      },
+      message: 'تم إكمال الدفعة وإنشاء المعاملة المالية بنجاح'
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+```
+
+#### **ج. تحسين الواجهة الأمامية:**
+```typescript
+// إكمال الدفعة وإنشاء معاملة مالية
+const completePayment = async () => {
+  try {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
+    
+    // استدعاء API لإكمال الدفعة وإنشاء المعاملة
+    const response = await fetch(`${apiUrl}/api/upcomingPayments/${payment.id}/complete`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+      },
+      body: JSON.stringify({
+        completedBy: currentUser?.id || ""
+      }),
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      if (data.success) {
+        // إضافة المعاملة المالية
+        dispatch({ type: "ADD_TRANSACTION", payload: data.data.transaction });
+        
+        // تحديث الدفعة القادمة
+        dispatch({ type: "UPDATE_UPCOMING_PAYMENT", payload: data.data.payment });
+        
+        setSuccessMessage("تم إكمال الدفعة وإنشاء المعاملة المالية بنجاح");
+      }
+    }
+  } catch (error) {
+    console.error('خطأ في إكمال الدفعة:', error);
+    setAlert({ type: "error", message: "حدث خطأ في إكمال الدفعة" });
+  }
+};
+```
+
+#### **د. إضافة API إضافية:**
+```javascript
+// Get overdue payments
+router.get('/overdue', async (req, res) => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const overduePayments = await UpcomingPayment.find({
+      dueDate: { $lt: today },
+      status: { $ne: 'completed' }
+    }).sort({ dueDate: 1 });
+    
+    res.json({ success: true, data: overduePayments });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Get payments due today
+router.get('/due-today', async (req, res) => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const dueTodayPayments = await UpcomingPayment.find({
+      dueDate: today,
+      status: { $ne: 'completed' }
+    }).sort({ importance: -1 });
+    
+    res.json({ success: true, data: dueTodayPayments });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+```
+
+### 7. **نظام الحضور والانصراف المحسن** ✅
+**المشكلة:**
+- عدم تحديث سجلات الحضور في قاعدة البيانات لحظياً
+- عدم وجود تتبع شامل لسجلات الحضور
+- عدم وجود إحصائيات متقدمة للحضور
+
+**الحل المطبق:**
+- تحسين نظام الحضور ليعمل مع قاعدة البيانات مباشرة
+- إضافة وظائف إضافية للإدارة والتتبع
+- تحسين الأداء والتزامن
+
+#### **أ. تحسين نموذج Attendance في قاعدة البيانات:**
+```javascript
+// backend/models/Attendance.js
+const AttendanceSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true },
+  userId: { type: String, required: true },
+  userName: { type: String, required: true },
+  checkIn: { type: String },
+  checkOut: { type: String },
+  session: { type: String, enum: ['morning', 'evening'], required: true },
+  regularHours: { type: Number, default: 0 },
+  lateHours: { type: Number, default: 0 },
+  overtimeHours: { type: Number, default: 0 },
+  totalHours: { type: Number, default: 0 },
+  date: { type: String, required: true },
+  status: { type: String, enum: ['present', 'absent', 'late', 'overtime'], default: 'present' },
+  notes: { type: String },
+  overtimePay: { type: Number, default: 0 },
+  location: { type: String },
+  device: { type: String },
+  ipAddress: { type: String },
+  createdBy: { type: String },
+  createdAt: { type: String, default: () => new Date().toISOString() },
+  updatedAt: { type: String, default: () => new Date().toISOString() },
+  isManualEntry: { type: Boolean, default: false },
+  manualEntryBy: { type: String },
+  approvedBy: { type: String },
+  approvedAt: { type: String },
+  rejectionReason: { type: String }
+});
+```
+
+#### **ب. إضافة API محسن للحضور:**
+```javascript
+// backend/routes/attendance.js
+
+// Get all attendance records
+router.get('/', async (req, res) => {
+  try {
+    const records = await Attendance.find().sort({ date: -1, createdAt: -1 });
+    res.json({ success: true, data: records });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Get attendance records by user
+router.get('/user/:userId', async (req, res) => {
+  try {
+    const records = await Attendance.find({ userId: req.params.userId }).sort({ date: -1 });
+    res.json({ success: true, data: records });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Get today's attendance records
+router.get('/today', async (req, res) => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const records = await Attendance.find({ date: today }).sort({ createdAt: -1 });
+    res.json({ success: true, data: records });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Get monthly attendance records
+router.get('/month/:year/:month', async (req, res) => {
+  try {
+    const { year, month } = req.params;
+    const startDate = `${year}-${month.padStart(2, '0')}-01`;
+    const endDate = `${year}-${month.padStart(2, '0')}-31`;
+    
+    const records = await Attendance.find({
+      date: { $gte: startDate, $lte: endDate }
+    }).sort({ date: -1, createdAt: -1 });
+    
+    res.json({ success: true, data: records });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Get attendance statistics
+router.get('/stats/:userId?', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { startDate, endDate } = req.query;
+    
+    let query = {};
+    if (userId) query.userId = userId;
+    if (startDate && endDate) {
+      query.date = { $gte: startDate, $lte: endDate };
+    }
+    
+    const records = await Attendance.find(query);
+    
+    const stats = {
+      totalRecords: records.length,
+      presentDays: records.filter(r => r.status === 'present').length,
+      lateDays: records.filter(r => r.status === 'late').length,
+      absentDays: records.filter(r => r.status === 'absent').length,
+      overtimeDays: records.filter(r => r.status === 'overtime').length,
+      totalHours: records.reduce((sum, r) => sum + (r.totalHours || 0), 0),
+      totalOvertimeHours: records.reduce((sum, r) => sum + (r.overtimeHours || 0), 0),
+      averageHoursPerDay: records.length > 0 ? 
+        records.reduce((sum, r) => sum + (r.totalHours || 0), 0) / records.length : 0
+    };
+    
+    res.json({ success: true, data: stats });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+```
+
+#### **ج. تحسين الواجهة الأمامية:**
+```typescript
+// جلب سجلات الحضور من قاعدة البيانات
+useEffect(() => {
+  async function fetchAttendance() {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/attendance`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+        }
+      });
+      const data = await res.json();
+      if (data.success) {
+        dispatch({ type: "LOAD_ATTENDANCE", payload: data.data });
+        setAttendanceRecords(data.data);
+      } else {
+        console.error('خطأ في جلب سجلات الحضور:', data.error);
+      }
+    } catch (err) {
+      console.error('خطأ في جلب سجلات الحضور:', err);
+    }
+  }
+  fetchAttendance();
+}, [dispatch]);
+
+// إضافة سجل حضور
+const handleCreateAttendance = async (newRecord: AttendanceRecord) => {
+  try {
+    const attendanceData = {
+      ...newRecord,
+      id: `attendance_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      createdBy: currentUser?.id || "",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      isManualEntry: false,
+      device: navigator.userAgent,
+      ipAddress: "client-side"
+    };
+
+    const res = await fetch(`${API_BASE_URL}/api/attendance`, {
+      method: "POST",
+      headers: { 
+        "Content-Type": "application/json",
+        'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+      },
+      body: JSON.stringify(attendanceData),
+    });
+    
+    const data = await res.json();
+    if (data.success && data.data) {
+      dispatch({ type: "ADD_ATTENDANCE", payload: data.data });
+      setAttendanceRecords((prev) => [...prev, data.data]);
+      setAlert({ type: "success", message: "تم حفظ الحضور في قاعدة البيانات بنجاح" });
+    } else {
+      setAlert({ type: "error", message: data.error || "فشل حفظ الحضور في قاعدة البيانات" });
+    }
+  } catch (err) {
+    console.error('خطأ في حفظ الحضور:', err);
+    setAlert({ type: "error", message: "حدث خطأ أثناء حفظ الحضور في قاعدة البيانات" });
+  }
+};
+```
+
+#### **د. إضافة وظائف إضافية:**
+```javascript
+// Bulk delete attendance records
+router.delete('/bulk', async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids)) {
+      return res.status(400).json({ success: false, error: 'IDs array is required' });
+    }
+    
+    const result = await Attendance.deleteMany({ _id: { $in: ids } });
+    res.json({ 
+      success: true, 
+      message: `${result.deletedCount} attendance records deleted`,
+      deletedCount: result.deletedCount
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+```
+
 ## 📊 **النتائج المحققة:**
 
 ### ✅ **إصلاحات التكرار:**
@@ -396,11 +776,28 @@ useEffect(() => {
 - إزالة الاعتماد على localStorage للبيانات المالية
 - توحيد مصدر البيانات
 
+### ✅ **نظام الدفعات القادمة:**
+- إنشاء نظام متكامل في قاعدة البيانات
+- API محسن مع وظائف إضافية
+- آلية إكمال الدفعات تلقائياً
+- تتبع شامل للحالات
+
+### ✅ **نظام الحضور والانصراف:**
+- تحديث فوري في قاعدة البيانات
+- تتبع شامل لسجلات الحضور
+- إحصائيات متقدمة
+- API محسن مع وظائف إضافية
+- بث التحديثات الفورية لجميع المستخدمين
+
 ## 🔧 **التقنيات المستخدمة:**
 - **isMounted flag** لمنع التحديثات بعد إلغاء التحميل
 - **Single source of truth** للبيانات المالية
 - **Error handling** محسن
 - **Real-time updates** للتزامن الفوري
+- **Database-first approach** للدفعات القادمة
+- **Advanced indexing** لسجلات الحضور
+- **Bulk operations** للحذف الجماعي
+- **Statistics API** للإحصائيات المتقدمة
 
 ## 📝 **ملاحظات مهمة:**
 
@@ -420,6 +817,19 @@ useEffect(() => {
 - إزالة الاعتماد على localStorage للبيانات المالية
 - توحيد مصدر البيانات
 
+### ✅ **نظام الدفعات القادمة:**
+- نموذج محسن في قاعدة البيانات
+- API متكامل مع وظائف إضافية
+- آلية إكمال الدفعات تلقائياً
+- تتبع شامل للحالات
+
+### ✅ **نظام الحضور والانصراف:**
+- تحديث فوري في قاعدة البيانات
+- تتبع شامل لسجلات الحضور
+- إحصائيات متقدمة
+- API محسن مع وظائف إضافية
+- بث التحديثات الفورية لجميع المستخدمين
+
 ## 🚀 **خطوات الاختبار:**
 
 ### **1. اختبار عدم التكرار:**
@@ -437,5 +847,26 @@ useEffect(() => {
 2. إضافة معاملة مالية في أحدهما
 3. التحقق من ظهورها فوراً في الآخر
 
+### **4. اختبار الدفعات القادمة:**
+1. إنشاء دفعة قادمة جديدة
+2. التحقق من حفظها في قاعدة البيانات
+3. إكمال الدفعة والتحقق من إنشاء المعاملة المالية
+4. التحقق من تحديث حالة الدفعة
+
+### **5. اختبار نظام الحضور:**
+1. تسجيل حضور جديد
+2. التحقق من حفظه في قاعدة البيانات
+3. تسجيل انصراف والتحقق من التحديث
+4. اختبار الإحصائيات والتقارير
+
 ## 🎯 **النتيجة النهائية:**
-تم حل جميع المشاكل المطلوبة وتحسين أداء النظام بشكل كبير. النظام الآن يعمل بكفاءة عالية مع قاعدة البيانات فقط، مما يضمن تزامن البيانات وعدم التكرار. 
+تم حل جميع المشاكل المطلوبة وتحسين أداء النظام بشكل كبير. النظام الآن يعمل بكفاءة عالية مع قاعدة البيانات فقط، مما يضمن:
+
+1. **عدم تكرار المعاملات المالية**
+2. **تزامن البيانات بين جميع المستخدمين**
+3. **تحسين الأداء العام للنظام**
+4. **مصدر واحد للحقيقة (Single Source of Truth)**
+5. **نظام متكامل للدفعات القادمة**
+6. **آلية سلسة لإكمال الدفعات وتحويلها لمعاملات مالية**
+7. **نظام حضور وانصراف محسن مع تحديث فوري في قاعدة البيانات**
+8. **تتبع شامل لسجلات الحضور مع إحصائيات متقدمة** 
