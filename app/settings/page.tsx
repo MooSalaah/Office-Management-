@@ -395,6 +395,42 @@ function SettingsPageContent() {
     }
   }
 
+  // دالة لتنسيق رقم الهاتف
+  const formatPhoneNumber = (phone: string): string => {
+    // إزالة جميع الأحرف غير الرقمية
+    const cleaned = phone.replace(/\D/g, '');
+    
+    // إذا كان الرقم يبدأ بـ 966 أو 00966، تحويله إلى 05
+    if (cleaned.startsWith('966')) {
+      return '05' + cleaned.substring(3);
+    } else if (cleaned.startsWith('00966')) {
+      return '05' + cleaned.substring(5);
+    }
+    
+    // إذا كان الرقم يبدأ بـ 5، إضافة 0
+    if (cleaned.startsWith('5') && cleaned.length === 9) {
+      return '0' + cleaned;
+    }
+    
+    // إذا كان الرقم 10 أرقام ويبدأ بـ 0، تركه كما هو
+    if (cleaned.length === 10 && cleaned.startsWith('0')) {
+      return cleaned;
+    }
+    
+    // إذا كان الرقم 9 أرقام، إضافة 0
+    if (cleaned.length === 9) {
+      return '0' + cleaned;
+    }
+    
+    // إذا كان الرقم 10 أرقام، تركه كما هو
+    if (cleaned.length === 10) {
+      return cleaned;
+    }
+    
+    // في الحالات الأخرى، إرجاع الرقم كما هو
+    return phone;
+  };
+
   const handleProfileUpdate = async () => {
     if (profileData.newPassword && profileData.newPassword !== profileData.confirmPassword) {
       setAlert({ type: "error", message: "كلمات المرور الجديدة غير متطابقة" })
@@ -409,13 +445,16 @@ function SettingsPageContent() {
       }
     }
 
+    // تنسيق رقم الهاتف
+    const formattedPhone = formatPhoneNumber(profileData.phone);
+
     // Update global user info
     if (currentUser) {
       const updatedUser = {
         ...currentUser,
         name: profileData.name,
         email: profileData.email,
-        phone: profileData.phone,
+        phone: formattedPhone,
         avatar: profileData.avatar,
         password: profileData.newPassword || currentUser.password || "",
       }
@@ -429,7 +468,7 @@ function SettingsPageContent() {
           id: currentUser.id,
           name: profileData.name,
           email: profileData.email,
-          phone: profileData.phone || "", // تأكد من إرسال رقم الهاتف
+          phone: formattedPhone || "", // تأكد من إرسال رقم الهاتف المنسق
           avatar: profileData.avatar || "", // تأكد من إرسال الصورة
           password: profileData.newPassword || currentUser.password || "",
           role: currentUser.role,
@@ -682,12 +721,15 @@ function SettingsPageContent() {
     setUserFormErrors(errors)
     if (hasError) return
 
+    // تنسيق رقم الهاتف
+    const formattedPhone = formatPhoneNumber(userFormData.phone);
+    
     const newUser: UserType = {
       id: Date.now().toString(),
       name: userFormData.name,
       email: email,
       password: password,
-      phone: userFormData.phone,
+      phone: formattedPhone,
       role: userFormData.role,
       isActive: userFormData.isActive,
       permissions: userFormData.permissions,
@@ -746,12 +788,15 @@ function SettingsPageContent() {
         return
       }
     }
+    // تنسيق رقم الهاتف
+    const formattedPhone = formatPhoneNumber(userFormData.phone);
+    
     const updatedUser: UserType = {
       ...editingUser,
       name: userFormData.name,
       email: userFormData.email,
       password: userFormData.password || editingUser.password || "",
-      phone: userFormData.phone,
+      phone: formattedPhone,
       role: userFormData.role,
       isActive: userFormData.isActive,
       permissions: userFormData.permissions,
@@ -768,7 +813,7 @@ function SettingsPageContent() {
         name: userFormData.name,
         email: userFormData.email,
         password: userFormData.password || editingUser.password || "",
-        phone: userFormData.phone,
+        phone: formattedPhone,
         role: userFormData.role,
         isActive: userFormData.isActive,
         permissions: userFormData.permissions,
