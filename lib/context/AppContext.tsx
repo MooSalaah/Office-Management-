@@ -446,6 +446,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // جلب المستخدمين من الباكند عند بدء التطبيق
   useEffect(() => {
     const fetchUsers = async () => {
+      // إضافة تأخير قصير لضمان تحميل البيانات بشكل صحيح
+      await new Promise(resolve => setTimeout(resolve, 100));
       try {
         dispatch({ type: "SET_LOADING_STATE", payload: { key: 'users', value: true } });
         const response = await api.users.getAll();
@@ -458,21 +460,54 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           const currentUserData = localStorage.getItem("currentUser");
           if (currentUserData) {
             const currentUser = JSON.parse(currentUserData);
-            const currentUserFromDB = response.data.find((u: User) => 
+            const currentUserFromDB = response.data.find((u: any) => 
               u.email === currentUser.email || 
               u.name === currentUser.name ||
-              u.id === currentUser.id
+              u.id === currentUser.id ||
+              u._id === currentUser.id // إضافة فحص _id أيضاً
             );
             if (currentUserFromDB) {
               const updatedCurrentUser = updateUserPermissionsByRole(currentUserFromDB);
               dispatch({ type: "SET_CURRENT_USER", payload: updatedCurrentUser });
               localStorage.setItem("currentUser", JSON.stringify(updatedCurrentUser));
               logger.info("تم تحديث المستخدم الحالي ببيانات قاعدة البيانات", { user: updatedCurrentUser }, 'USERS');
+              
+              // إرسال إشعار للمستخدم أن بياناته تم تحديثها
+              if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
+                const realtimeUpdates = (window as any).realtimeUpdates;
+                if (realtimeUpdates && realtimeUpdates.broadcastUpdate) {
+                  realtimeUpdates.broadcastUpdate('user', {
+                    action: 'update',
+                    data: updatedCurrentUser,
+                    userId: updatedCurrentUser.id,
+                    userName: updatedCurrentUser.name
+                  });
+                }
+              }
+              
+              // إرسال Storage Event لتحديث الأجهزة الأخرى
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(new StorageEvent('storage', {
+                  key: 'currentUser',
+                  newValue: JSON.stringify(updatedCurrentUser),
+                  oldValue: JSON.stringify(currentUser)
+                }));
+              }
             }
           }
           
           // حفظ في localStorage للاستخدام offline
           localStorage.setItem("users", JSON.stringify(response.data));
+          
+          // إرسال Storage Event لتحديث قائمة المستخدمين
+          if (typeof window !== 'undefined') {
+            const existingUsers = localStorage.getItem("users");
+            window.dispatchEvent(new StorageEvent('storage', {
+              key: 'users',
+              newValue: JSON.stringify(response.data),
+              oldValue: existingUsers
+            }));
+          }
         } else {
           logger.warn("فشل جلب المستخدمين من الباكند، استخدام localStorage", { response }, 'USERS');
           // استخدام localStorage كبديل

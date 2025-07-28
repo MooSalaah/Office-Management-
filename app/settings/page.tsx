@@ -244,7 +244,38 @@ function SettingsPageContent() {
       const parsedSettings = JSON.parse(savedCompanySettings)
       setOfficeData(prev => ({ ...prev, ...parsedSettings }))
     }
-  }, [currentUser])
+    
+    // إضافة listener للتحديثات من الأجهزة الأخرى
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'currentUser' && e.newValue) {
+        try {
+          const updatedUser = JSON.parse(e.newValue);
+          if (currentUser && updatedUser.id === currentUser.id) {
+            // تحديث البيانات المحلية
+            dispatch({ type: "SET_CURRENT_USER", payload: updatedUser });
+            setProfileData({
+              name: updatedUser.name,
+              email: updatedUser.email,
+              phone: updatedUser.phone || "",
+              currentPassword: "",
+              newPassword: "",
+              confirmPassword: "",
+              avatar: updatedUser.avatar || "",
+            });
+            logger.info("تم تحديث بيانات الملف الشخصي من جهاز آخر", { user: updatedUser }, 'SETTINGS');
+          }
+        } catch (error) {
+          logger.error("خطأ في تحديث بيانات الملف الشخصي", { error }, 'SETTINGS');
+        }
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [currentUser, dispatch])
 
   // استماع للتحديثات الفورية للمستخدمين
   useEffect(() => {
@@ -272,6 +303,19 @@ function SettingsPageContent() {
         if (currentUser && data.user.id === currentUser.id) {
           dispatch({ type: "SET_CURRENT_USER", payload: data.user })
           localStorage.setItem("currentUser", JSON.stringify(data.user))
+          
+          // تحديث بيانات الملف الشخصي في النموذج
+          setProfileData({
+            name: data.user.name,
+            email: data.user.email,
+            phone: data.user.phone || "",
+            currentPassword: "",
+            newPassword: "",
+            confirmPassword: "",
+            avatar: data.user.avatar || "",
+          });
+          
+          logger.info("تم تحديث بيانات الملف الشخصي من realtime update", { user: data.user }, 'SETTINGS');
         }
       } else if (data.action === 'delete') {
         // حذف المستخدم من state
@@ -511,8 +555,29 @@ function SettingsPageContent() {
         dispatch({ type: "UPDATE_USER", payload: updatedUser })
         dispatch({ type: "SET_CURRENT_USER", payload: updatedUser })
         
+        // إرسال إشعار لجميع الأجهزة المفتوحة
+        if (typeof window !== 'undefined') {
+          // إرسال حدث storage لتحديث الأجهزة الأخرى
+          window.dispatchEvent(new StorageEvent('storage', {
+            key: 'users',
+            newValue: JSON.stringify(updatedUsers),
+            oldValue: JSON.stringify(existingUsers)
+          }));
+          
+          window.dispatchEvent(new StorageEvent('storage', {
+            key: 'currentUser',
+            newValue: JSON.stringify(updatedUser),
+            oldValue: JSON.stringify(currentUser)
+          }));
+        }
+        
         // إرسال تحديث فوري لجميع المستخدمين
-        realtimeUpdates.broadcastUpdate('user', updatedUser)
+        realtimeUpdates.broadcastUpdate('user', { 
+          action: 'update', 
+          data: updatedUser,
+          userId: currentUser.id,
+          userName: currentUser.name 
+        })
         
         // إظهار رسالة نجاح
         setAlert(null)
