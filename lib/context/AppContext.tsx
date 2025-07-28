@@ -430,17 +430,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // Initialize realtime updates
   useEffect(() => {
-    // Realtime functionality temporarily disabled for SSR compatibility
     // استمع لتحديثات الإشعارات الفورية (عند تفعيلها)
     if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
-              (window as any).realtimeUpdates.on('notification', (notification: Notification) => {
-        // تحقق إذا كان الإشعار موجود مسبقاً
-        if (!state.notifications.some(n => n.id === notification.id)) {
-          dispatch({ type: 'ADD_NOTIFICATION', payload: notification })
-        }
-      })
+      const realtimeUpdates = (window as any).realtimeUpdates;
+      if (realtimeUpdates && typeof realtimeUpdates.on === 'function') {
+        realtimeUpdates.on('notification', (notification: Notification) => {
+          // تحقق إذا كان الإشعار موجود مسبقاً
+          if (!state.notifications.some(n => n.id === notification.id)) {
+            dispatch({ type: 'ADD_NOTIFICATION', payload: notification })
+          }
+        });
+      }
     }
-    logger.info('Realtime updates disabled for SSR compatibility', undefined, 'REALTIME');
+    logger.info('Realtime updates initialized', undefined, 'REALTIME');
   }, [state.currentUser?.id, state.notifications])
 
   // جلب المستخدمين من الباكند عند بدء التطبيق
@@ -1118,8 +1120,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // عند أي تغيير في البيانات، إذا online أرسل broadcast، إذا offline أضف لقائمة الانتظار:
   const broadcastOrQueue = (type: string, data: unknown, isOnline: boolean, setPendingUpdates: React.Dispatch<React.SetStateAction<unknown[]>>) => {
     if (isOnline) {
-      if (typeof window !== 'undefined' && window.realtimeUpdates && typeof window.realtimeUpdates === 'object' && typeof (window.realtimeUpdates as any).broadcastUpdate === 'function') {
-        (window.realtimeUpdates as any).broadcastUpdate(type, data)
+      if (typeof window !== 'undefined' && window.realtimeUpdates && typeof window.realtimeUpdates === 'object' && typeof (window.realtimeUpdates as any).sendUpdate === 'function') {
+        (window.realtimeUpdates as any).sendUpdate(type, data.action || 'update', data)
       }
     } else {
               setPendingUpdates((prev: unknown[]) => [...prev, { type, data }])
@@ -1130,8 +1132,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isOnline && pendingUpdates.length > 0) {
       pendingUpdates.forEach(update => {
-        if (typeof window !== 'undefined' && window.realtimeUpdates && typeof window.realtimeUpdates === 'object' && typeof (window.realtimeUpdates as any).broadcastUpdate === 'function') {
-          (window.realtimeUpdates as any).broadcastUpdate(update.type, update.data)
+        if (typeof window !== 'undefined' && window.realtimeUpdates && typeof window.realtimeUpdates === 'object' && typeof (window.realtimeUpdates as any).sendUpdate === 'function') {
+          (window.realtimeUpdates as any).sendUpdate(update.type, 'update', update.data)
         }
       })
       setPendingUpdates([])
@@ -1937,14 +1939,14 @@ export function useAppActions() {
 
   // Realtime broadcast functions
   const broadcastProjectUpdate = async (action: 'create' | 'update' | 'delete', data: Project) => {
-    if (typeof window !== 'undefined' && window.realtimeUpdates && typeof window.realtimeUpdates === 'object' && typeof (window.realtimeUpdates as any).broadcastUpdate === 'function') {
-      (window.realtimeUpdates as any).broadcastUpdate('project', { action, data });
+    if (typeof window !== 'undefined' && window.realtimeUpdates && typeof window.realtimeUpdates === 'object' && typeof (window.realtimeUpdates as any).sendUpdate === 'function') {
+      (window.realtimeUpdates as any).sendUpdate('project', action, data);
     }
   }
 
   const broadcastTaskUpdate = async (action: 'create' | 'update' | 'delete', data: Task) => {
-    if (typeof window !== 'undefined' && window.realtimeUpdates && typeof window.realtimeUpdates === 'object' && typeof (window.realtimeUpdates as any).broadcastUpdate === 'function') {
-      (window.realtimeUpdates as any).broadcastUpdate('task', { action, data });
+    if (typeof window !== 'undefined' && window.realtimeUpdates && typeof window.realtimeUpdates === 'object' && typeof (window.realtimeUpdates as any).sendUpdate === 'function') {
+      (window.realtimeUpdates as any).sendUpdate('task', action, data);
     }
   }
 

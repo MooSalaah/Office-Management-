@@ -137,7 +137,15 @@ export class RealtimeUpdates {
 
 // Create global instance
 if (typeof window !== 'undefined') {
-  (window as any).realtimeUpdates = new RealtimeUpdates();
+  const realtimeUpdates = new RealtimeUpdates();
+  (window as any).realtimeUpdates = realtimeUpdates;
+  
+  // Expose methods on window for compatibility
+  (window as any).realtimeUpdates.on = realtimeUpdates.on.bind(realtimeUpdates);
+  (window as any).realtimeUpdates.off = realtimeUpdates.off.bind(realtimeUpdates);
+  (window as any).realtimeUpdates.sendUpdate = realtimeUpdates.sendUpdate.bind(realtimeUpdates);
+  (window as any).realtimeUpdates.cleanup = realtimeUpdates.cleanup.bind(realtimeUpdates);
+  (window as any).realtimeUpdates.getConnectionStatus = realtimeUpdates.getConnectionStatus.bind(realtimeUpdates);
 }
 
 // Export broadcastUpdate function
