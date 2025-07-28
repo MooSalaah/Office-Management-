@@ -120,16 +120,12 @@ export class InvoiceGenerator {
 		return paymentMethods[method.toLowerCase()] || method;
 	}
 
-	static generateInvoiceHTML(data: InvoiceData): string {
+	static generateInvoiceHTML(data: InvoiceData & { address?: string; phone?: string; email?: string; website?: string }): string {
 		const formattedDate = this.convertToArabicDate(data.transactionDate);
 		const hijriDate = this.convertToHijriDate(data.transactionDate);
-		const translatedPaymentMethod = this.translatePaymentMethod(
-			data.paymentMethod
-		);
+		const translatedPaymentMethod = this.translatePaymentMethod(data.paymentMethod);
 		const formattedAmount = data.amount.toLocaleString("ar-SA");
-		const formattedRemainingAmount = data.remainingAmount
-			? data.remainingAmount.toLocaleString("ar-SA")
-			: "0";
+		const formattedRemainingAmount = data.remainingAmount ? data.remainingAmount.toLocaleString("ar-SA") : "0";
 		// اسم المستلم من المستخدم الحالي فقط
 		let recipientDisplay = data.recipientName;
 		if (typeof window !== "undefined") {
@@ -140,9 +136,7 @@ export class InvoiceGenerator {
 		let payerDisplay = data.payerName || "غير محدد";
 		let projectPhrase = data.isAdvancePayment
 			? `دفعة مقدمة من مشروع <strong>${data.projectDetails}</strong>`
-			: `وذلك مقابل <strong>${
-					data.description || data.projectDetails
-			  }</strong>`;
+			: `وذلك مقابل <strong>${data.description || data.projectDetails}</strong>`;
 		return `
 			<!DOCTYPE html>
 			<html dir="rtl" lang="ar">
@@ -174,11 +168,14 @@ export class InvoiceGenerator {
 					.detail-value { font-weight: 700; color: #2c3e50; font-size: 15px; }
 					.amount-value, .remaining-amount { display: flex; align-items: center; direction: rtl; justify-content: flex-end; font-size: 18px; font-weight: bold; }
 					.currency-text { font-family: 'Amiri', serif; margin-left: 4px; font-weight: bold; color: #27ae60; font-size: 16px; }
-					.invoice-footer { display: flex; justify-content: space-between; align-items: flex-start; padding: 18px 18px 18px 18px; border-top: 2px solid #e9ecef; background: #f8f9fa; border-radius: 0 0 10px 10px; margin-top: 0; }
+					.invoice-footer { display: flex; flex-direction: column; align-items: stretch; padding: 0; border-top: 2px solid #e9ecef; background: #f8f9fa; border-radius: 0 0 10px 10px; margin-top: 0; }
+					.footer-main { display: flex; justify-content: space-between; align-items: flex-start; padding: 18px 18px 0 18px; }
 					.signature-section, .stamp-section { text-align: center; flex: 1; padding: 0; background: white; border-radius: 8px; margin: 0 18px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; }
 					.company-signature, .company-stamp { width: 150px; height: 150px; object-fit: contain; margin-bottom: 12px; background: #fff; border-radius: 8px; padding: 0; border: none; }
 					.signature-line { width: 120px; height: 2px; background: #333; margin: 12px auto; }
 					.signature-text, .stamp-text { font-size: 18px; color: #6c757d; font-weight: 700; }
+					.footer-info { background: #e9ecef; color: #333; border-radius: 0 0 10px 10px; padding: 12px 18px; text-align: center; font-size: 15px; font-weight: 700; letter-spacing: 0.5px; display: flex; flex-direction: column; gap: 4px; margin-top: 12px; }
+					.footer-info span { display: block; }
 					.notes-section { margin-top: 12px; background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 8px 12px; font-size: 13px; color: #888; min-height: 24px; }
 					@media print { .print-button { display: none; } body { background: white; } .invoice-container { box-shadow: none; margin: 0; } }
 				</style>
@@ -188,11 +185,7 @@ export class InvoiceGenerator {
 				<div class="invoice-container">
 					<div class="invoice-header">
 						<div class="company-info">
-							${
-								data.companyLogo
-									? `<img src="${data.companyLogo}" alt="شعار الشركة" class="company-logo">`
-									: ""
-							}
+							${data.companyLogo ? `<img src="${data.companyLogo}" alt="شعار الشركة" class="company-logo">` : ""}
 							<div class="company-name">${data.companyName}</div>
 						</div>
 						<div class="invoice-header-flex">
@@ -201,16 +194,12 @@ export class InvoiceGenerator {
 								<div>التاريخ الهجري: ${hijriDate}</div>
 							</div>
 							<div class="invoice-title">فاتورة إيصال</div>
-							<div class="invoice-header-box invoice-header-box-small" style="min-width:60px; font-size:12px;">رقم الفاتورة<br>${
-								data.invoiceNumber
-							}</div>
+							<div class="invoice-header-box invoice-header-box-small" style="min-width:60px; font-size:12px;">رقم الفاتورة<br>${data.invoiceNumber}</div>
 						</div>
 					</div>
 					<div class="invoice-content">
 						<div class="invoice-text">
-							استلمنا نحن <strong>${
-								data.companyName
-							}</strong> من المكرم <strong>${payerDisplay}</strong> مبلغ وقدره <strong>(<span class="currency-text">${formattedAmount} ريال سعودي</span>)</strong> عن طريق <strong>${translatedPaymentMethod}</strong> ${projectPhrase}
+							استلمنا نحن <strong>${data.companyName}</strong> من المكرم <strong>${payerDisplay}</strong> مبلغ وقدره <strong>(<span class="currency-text">${formattedAmount} ريال سعودي</span>)</strong> عن طريق <strong>${translatedPaymentMethod}</strong> ${projectPhrase}
 						</div>
 						<div class="receipt-text">وهذا إيصال منا بذلك</div>
 						<div class="invoice-details">
@@ -225,11 +214,7 @@ export class InvoiceGenerator {
 									<span class="currency-text"> ريال سعودي</span>
 								</span>
 							</div>
-							${
-								data.remainingAmount && data.remainingAmount > 0
-									? `<div class="detail-row"><span class="detail-label">المبلغ المتبقي:</span><span class="detail-value remaining-amount">${formattedRemainingAmount}<span class="currency-text"> ريال سعودي</span></span></div>`
-									: ""
-							}
+							${data.remainingAmount && data.remainingAmount > 0 ? `<div class="detail-row"><span class="detail-label">المبلغ المتبقي:</span><span class="detail-value remaining-amount">${formattedRemainingAmount}<span class="currency-text"> ريال سعودي</span></span></div>` : ""}
 							<div class="detail-row">
 								<span class="detail-label">طريقة الدفع:</span>
 								<span class="detail-value">${translatedPaymentMethod}</span>
@@ -238,21 +223,22 @@ export class InvoiceGenerator {
 						<div class="notes-section">ملاحظات:</div>
 					</div>
 					<div class="invoice-footer">
-						<div class="signature-section">
-							${
-								data.companySignature
-									? `<img src="${data.companySignature}" alt="توقيع المكتب" class="company-signature">`
-									: `<div class="signature-line"></div>`
-							}
-							<div class="signature-text">التوقيع</div>
+						<div class="footer-main">
+							<div class="signature-section">
+								${data.companySignature ? `<img src="${data.companySignature}" alt="توقيع المكتب" class="company-signature">` : `<div class="signature-line"></div>`}
+								<div class="signature-text">التوقيع</div>
+							</div>
+							<div class="stamp-section">
+								${data.companyStamp ? `<img src="${data.companyStamp}" alt="ختم الشركة" class="company-stamp">` : ""}
+								<div class="stamp-text">ختم الشركة</div>
+							</div>
 						</div>
-						<div class="stamp-section">
-							${
-								data.companyStamp
-									? `<img src="${data.companyStamp}" alt="ختم الشركة" class="company-stamp">`
-									: ""
-							}
-							<div class="stamp-text">ختم الشركة</div>
+						<div class="footer-info">
+							<span>اسم المكتب: ${data.companyName}</span>
+							${data.address ? `<span>العنوان: ${data.address}</span>` : ""}
+							${data.phone ? `<span>رقم الهاتف: ${data.phone}</span>` : ""}
+							${data.email ? `<span>البريد الإلكتروني: ${data.email}</span>` : ""}
+							${data.website ? `<span>الموقع الإلكتروني: ${data.website}</span>` : ""}
 						</div>
 					</div>
 				</div>
@@ -267,13 +253,12 @@ export class InvoiceGenerator {
 		client: Client,
 		companySettings: CompanySettings
 	): string {
-		const invoiceData: InvoiceData = {
+		const invoiceData: InvoiceData & { address?: string; phone?: string; email?: string; website?: string } = {
 			companyName: companySettings.name || "الركن الجديد للاستشارات الهندسية",
 			clientName: client?.name || transaction.clientName || "غير محدد",
 			amount: transaction.amount,
 			paymentMethod: transaction.paymentMethod || "نقداً",
-			projectDetails:
-				project?.name || transaction.projectName || "خدمات هندسية",
+			projectDetails: project?.name || transaction.projectName || "خدمات هندسية",
 			description: transaction.description,
 			transactionDate: transaction.date,
 			invoiceNumber: this.generateInvoiceNumber(),
@@ -281,13 +266,13 @@ export class InvoiceGenerator {
 			companyStamp: companySettings.stamp,
 			companySignature: companySettings.signature,
 			remainingAmount: transaction.remainingAmount || 0,
-			payerName:
-				transaction.payerName ||
-				client?.name ||
-				transaction.clientName ||
-				"غير محدد",
-			recipientName: "", // اسم المستلم يؤخذ من المستخدم الحالي فقط
+			payerName: transaction.payerName || client?.name || transaction.clientName || "غير محدد",
+			recipientName: "",
 			isAdvancePayment: transaction.isAdvancePayment || false,
+			address: companySettings.address,
+			phone: companySettings.phone,
+			email: companySettings.email,
+			website: companySettings.website,
 		};
 
 		return this.generateInvoiceHTML(invoiceData);

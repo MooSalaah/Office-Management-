@@ -225,3 +225,8 @@ export function useRealtimeUpdatesByType(type: string) {
 
 	return updates;
 }
+
+// تعريف window.realtimeUpdates للوصول من الواجهة الأمامية
+if (typeof window !== 'undefined') {
+	(window as any).realtimeUpdates = realtimeUpdates;
+}

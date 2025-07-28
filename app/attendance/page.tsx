@@ -101,7 +101,7 @@ function AttendancePageContent() {
   useEffect(() => {
     async function fetchAttendance() {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/attendance`, {
+        const res = await fetch('/api/attendance', {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
           }
@@ -121,7 +121,7 @@ function AttendancePageContent() {
   }, [dispatch]);
 
   // إضافة سجل حضور
-  const handleCreateAttendance = async (newRecord: AttendanceRecord) => {
+  async function handleCreateAttendance(newRecord: AttendanceRecord) {
     try {
       const attendanceData = {
         ...newRecord,
@@ -134,7 +134,9 @@ function AttendancePageContent() {
         ipAddress: "client-side"
       };
 
-      const res = await fetch(`${API_BASE_URL}/api/attendance`, {
+      console.log('🔄 Sending attendance data to backend:', attendanceData);
+
+      const res = await fetch('/api/attendance', {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
@@ -143,32 +145,52 @@ function AttendancePageContent() {
         body: JSON.stringify(attendanceData),
       });
       
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        console.error('❌ Backend error:', errorData);
+        throw new Error(errorData.error || `HTTP ${res.status}: ${res.statusText}`);
+      }
+      
       const data = await res.json();
+      console.log('✅ Backend response:', data);
+      
       if (data.success && data.data) {
         dispatch({ type: "ADD_ATTENDANCE", payload: data.data });
         setAttendanceRecords((prev) => [...prev, data.data]);
         setAlert({ type: "success", message: "تم حفظ الحضور في قاعدة البيانات بنجاح" });
         
-        // بث تحديث فوري لجميع المستخدمين
-        if (window.realtimeUpdates) {
-          window.realtimeUpdates.sendAttendanceUpdate({ 
-            action: 'create', 
-            attendance: data.data, 
-            userId: data.data.userId, 
-            userName: data.data.userName 
-          });
+        // بث تحديث فوري لجميع المستخدمين - مع فحص الأمان
+        try {
+          if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
+            const realtimeUpdates = (window as any).realtimeUpdates;
+            if (typeof realtimeUpdates.sendAttendanceUpdate === 'function') {
+              realtimeUpdates.sendAttendanceUpdate({ 
+                attendance: data.data, 
+                userId: data.data.userId || "", 
+                userName: data.data.userName || "" 
+              });
+              console.log('✅ Realtime update sent successfully');
+            } else {
+              console.warn('⚠️ sendAttendanceUpdate function not found');
+            }
+          } else {
+            console.warn('⚠️ realtimeUpdates not available');
+          }
+        } catch (realtimeError) {
+          console.error('❌ Realtime update error:', realtimeError);
+          // لا نريد أن يفشل الحفظ بسبب مشكلة التحديث الفوري
         }
       } else {
         setAlert({ type: "error", message: data.error || "فشل حفظ الحضور في قاعدة البيانات" });
       }
     } catch (err) {
-      console.error('خطأ في حفظ الحضور:', err);
-      setAlert({ type: "error", message: "حدث خطأ أثناء حفظ الحضور في قاعدة البيانات" });
+      console.error('❌ Error saving attendance:', err);
+      setAlert({ type: "error", message: `حدث خطأ أثناء حفظ الحضور في قاعدة البيانات: ${err instanceof Error ? err.message : 'خطأ غير معروف'}` });
     }
-  };
+  }
 
   // تحديث سجل حضور
-  const handleUpdateAttendance = async (id: string, updatedRecord: AttendanceRecord) => {
+  async function handleUpdateAttendance(id: string, updatedRecord: AttendanceRecord) {
     try {
       const attendanceData = {
         ...updatedRecord,
@@ -177,7 +199,7 @@ function AttendancePageContent() {
         manualEntryBy: updatedRecord.isManualEntry ? currentUser?.id || "" : undefined
       };
 
-      const res = await fetch(`${API_BASE_URL}/api/attendance/${id}`, {
+      const res = await fetch(`/api/attendance/${id}`, {
         method: "PUT",
         headers: { 
           "Content-Type": "application/json",
@@ -192,14 +214,20 @@ function AttendancePageContent() {
         setAttendanceRecords((prev) => prev.map((r) => r.id === id ? data.data : r));
         setAlert({ type: "success", message: "تم تحديث الحضور في قاعدة البيانات بنجاح" });
         
-        // بث تحديث فوري لجميع المستخدمين
-        if (window.realtimeUpdates) {
-          window.realtimeUpdates.sendAttendanceUpdate({ 
-            action: 'update', 
-            attendance: data.data, 
-            userId: data.data.userId, 
-            userName: data.data.userName 
-          });
+        // بث تحديث فوري لجميع المستخدمين - مع فحص الأمان
+        try {
+          if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
+            const realtimeUpdates = (window as any).realtimeUpdates;
+            if (typeof realtimeUpdates.sendAttendanceUpdate === 'function') {
+              realtimeUpdates.sendAttendanceUpdate({ 
+                attendance: data.data, 
+                userId: data.data.userId || "", 
+                userName: data.data.userName || "" 
+              });
+            }
+          }
+        } catch (realtimeError) {
+          console.error('❌ Realtime update error:', realtimeError);
         }
       } else {
         setAlert({ type: "error", message: data.error || "فشل تحديث الحضور في قاعدة البيانات" });
@@ -208,12 +236,12 @@ function AttendancePageContent() {
       console.error('خطأ في تحديث الحضور:', err);
       setAlert({ type: "error", message: "حدث خطأ أثناء تحديث الحضور في قاعدة البيانات" });
     }
-  };
+  }
 
   // حذف سجل حضور
-  const handleDeleteAttendance = async (id: string) => {
+  async function handleDeleteAttendance(id: string) {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/attendance/${id}`, {
+      const res = await fetch(`/api/attendance/${id}`, {
         method: "DELETE",
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
@@ -222,18 +250,24 @@ function AttendancePageContent() {
       
       const data = await res.json();
       if (data.success) {
-        dispatch({ type: "DELETE_ATTENDANCE", payload: id });
+        // إزالة السجل من القائمة بدلاً من dispatch
         setAttendanceRecords((prev) => prev.filter((r) => r.id !== id));
         setAlert({ type: "success", message: "تم حذف السجل بنجاح" });
         
-        // بث تحديث فوري لجميع المستخدمين
-        if (window.realtimeUpdates && data.data) {
-          window.realtimeUpdates.sendAttendanceUpdate({ 
-            action: 'delete', 
-            attendance: data.data, 
-            userId: data.data.userId, 
-            userName: data.data.userName 
-          });
+        // بث تحديث فوري لجميع المستخدمين - مع فحص الأمان
+        try {
+          if (typeof window !== 'undefined' && (window as any).realtimeUpdates && data.data) {
+            const realtimeUpdates = (window as any).realtimeUpdates;
+            if (typeof realtimeUpdates.sendAttendanceUpdate === 'function') {
+              realtimeUpdates.sendAttendanceUpdate({ 
+                attendance: data.data, 
+                userId: data.data.userId || "", 
+                userName: data.data.userName || "" 
+              });
+            }
+          }
+        } catch (realtimeError) {
+          console.error('❌ Realtime update error:', realtimeError);
         }
       } else {
         setAlert({ type: "error", message: data.error || "فشل حذف سجل الحضور من قاعدة البيانات" });
@@ -242,7 +276,7 @@ function AttendancePageContent() {
       console.error('خطأ في حذف سجل الحضور:', err);
       setAlert({ type: "error", message: "حدث خطأ أثناء حذف سجل الحضور من قاعدة البيانات" });
     }
-  };
+  }
 
   // تحميل المستخدمين من localStorage
   useEffect(() => {
