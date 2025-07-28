@@ -701,8 +701,22 @@ function SettingsPageContent() {
       localStorage.setItem("companySettings", JSON.stringify(officeData));
       
       // إرسال تحديث فوري لجميع المستخدمين
-      if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
-        (window as any).realtimeUpdates.sendCompanySettingsUpdate(officeData);
+      try {
+        if (typeof window !== 'undefined') {
+          const realtimeUpdates = (window as any).realtimeUpdates;
+          if (realtimeUpdates && realtimeUpdates.sendCompanySettingsUpdate && typeof realtimeUpdates.sendCompanySettingsUpdate === 'function') {
+            realtimeUpdates.sendCompanySettingsUpdate(officeData);
+          } else {
+            // استخدام الدالة المباشرة إذا لم تكن متاحة على window
+            const { realtimeUpdates: directRealtimeUpdates } = await import('@/lib/realtime-updates');
+            if (directRealtimeUpdates && directRealtimeUpdates.sendCompanySettingsUpdate) {
+              directRealtimeUpdates.sendCompanySettingsUpdate(officeData);
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('Could not send realtime update for company settings:', error);
+        // لا نريد أن نوقف العملية إذا فشل البث الفوري
       }
       
       setAlert(null);
