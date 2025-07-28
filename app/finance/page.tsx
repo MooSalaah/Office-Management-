@@ -1078,14 +1078,16 @@ function FinancePageContent() {
           <p className="text-muted-foreground mt-1">إدارة الدخل والمصروفات والتقارير المالية</p>
         </div>
         <div className="flex space-x-2 space-x-reverse">
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button variant="outline">
-                <Download className="w-4 h-4 mr-2" />
-                تصدير التقرير
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
+                    {/* إظهار زر تصدير التقرير للمديرين والمحاسبين فقط */}
+          {(currentUser?.role === "admin" || currentUser?.role === "accountant") && (
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <Download className="w-4 h-4 mr-2" />
+                  تصدير التقرير
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md">
               <DialogHeader>
                 <DialogTitle>تصدير التقرير المالي</DialogTitle>
                 <DialogDescription>اختر نوع التقرير المراد تصديره</DialogDescription>
@@ -1118,6 +1120,7 @@ function FinancePageContent() {
               </div>
             </DialogContent>
           </Dialog>
+          )}
           {canCreateTransaction && (
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
@@ -1437,8 +1440,9 @@ function FinancePageContent() {
         </div>
       </div>
 
-      {/* Financial Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* Financial Summary - إظهار للمديرين والمحاسبين فقط */}
+      {(currentUser?.role === "admin" || currentUser?.role === "accountant") && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card 
           className="cursor-pointer hover:shadow-md transition-shadow bg-card text-card-foreground"
           onClick={() => setFilterType("income")}
@@ -1531,6 +1535,7 @@ function FinancePageContent() {
           </CardContent>
         </Card>
       </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Transactions */}
