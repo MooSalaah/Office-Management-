@@ -965,9 +965,13 @@ function SettingsPageContent() {
       }
 
       // تحديث في قاعدة البيانات
-      const response = await fetch(`/api/roles/${editingJobRole._id}`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
+      const response = await fetch(`${apiUrl}/api/roles/${editingJobRole._id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+        },
         body: JSON.stringify(updatedRole),
       });
 
@@ -1041,8 +1045,12 @@ function SettingsPageContent() {
         throw new Error('الدور غير موجود');
       }
 
-      const response = await fetch(`/api/roles/${roleToDelete._id}`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
+      const response = await fetch(`${apiUrl}/api/roles/${roleToDelete._id}`, {
         method: 'DELETE',
+        headers: { 
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+        },
       });
 
       if (!response.ok) {
