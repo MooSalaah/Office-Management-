@@ -56,36 +56,39 @@ export function PermissionGuard({
   // Check specific permission if provided
   if (requiredPermission) {
     const hasSpecificPermission = hasPermission(currentUser.role, requiredAction, requiredModule || "", currentUser.permissions)
-    if (!hasSpecificPermission) {
-      return fallback || (
-        <div className="max-w-screen-xl mx-auto space-y-6">
-          <Card className="bg-card text-card-foreground border border-border">
-            <CardHeader>
-              <CardTitle className="flex items-center text-foreground">
-                <Shield className="w-5 h-5 mr-2" />
-                غير مصرح لك بالدخول
-              </CardTitle>
-              <CardDescription className="text-muted-foreground">
-                ليس لديك الصلاحية المطلوبة للوصول إلى هذه الصفحة
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  عذراً، غير مصرح لك بالدخول إلى {moduleName || "هذه الصفحة"}.
-                  يرجى التواصل مع المدير إذا كنت تعتقد أن هذا خطأ.
-                </AlertDescription>
-              </Alert>
-            </CardContent>
-          </Card>
-        </div>
-      )
+
+    if (hasSpecificPermission) {
+      return <>{children}</>
     }
+
+    return fallback || (
+      <div className="max-w-screen-xl mx-auto space-y-6">
+        <Card className="bg-card text-card-foreground border border-border">
+          <CardHeader>
+            <CardTitle className="flex items-center text-foreground">
+              <Shield className="w-5 h-5 mr-2" />
+              غير مصرح لك بالدخول
+            </CardTitle>
+            <CardDescription className="text-muted-foreground">
+              ليس لديك الصلاحية المطلوبة للوصول إلى هذه الصفحة
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                عذراً، غير مصرح لك بالدخول إلى {moduleName || "هذه الصفحة"}.
+                يرجى التواصل مع المدير إذا كنت تعتقد أن هذا خطأ.
+              </AlertDescription>
+            </Alert>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   // Check view permission for the module if no specific permission is provided
-  if (requiredModule && !requiredPermission) {
+  if (requiredModule) {
     const hasViewPermission = hasPermission(currentUser.role, "view", requiredModule, currentUser.permissions)
     if (!hasViewPermission) {
       return fallback || (
@@ -113,10 +116,8 @@ export function PermissionGuard({
         </div>
       )
     }
-  }
 
-  // Check module access if provided
-  if (requiredModule) {
+    // Check module access
     const canAccess = canAccessModule(currentUser.role, requiredModule)
     if (!canAccess) {
       return fallback || (

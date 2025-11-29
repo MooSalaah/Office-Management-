@@ -370,7 +370,7 @@ export const hasPermission = (
 	if (userRole === "admin") return true;
 
 	// Grant view_dashboard to all authenticated users
-	if (action === "view" && module === "dashboard") return true;
+	if (action === "view" && (module === "dashboard" || module === "settings")) return true;
 
 	// 1. Check user specific permissions first (from DB)
 	if (userPermissions && userPermissions.length > 0) {
@@ -478,7 +478,7 @@ export const canAccessModule = (userRole: string, module: string): boolean => {
 	if (userRole === "admin") return true;
 
 	// Grant access to dashboard for all authenticated users
-	if (module === "dashboard") return true;
+	if (module === "dashboard" || module === "settings") return true;
 
 	// First check custom job roles from localStorage
 	const jobRoles = localStorage.getItem("jobRoles");
