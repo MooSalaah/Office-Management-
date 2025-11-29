@@ -84,9 +84,9 @@ function ProjectsPageContent() {
       const updateId = `${(lastUpdate as any).project.id || ''}_${(lastUpdate as any).action}_${(lastUpdate as any).timestamp || ''}`;
       if (handledProjectUpdateIdsRef.current.has(updateId)) return;
       handledProjectUpdateIdsRef.current.add(updateId);
-      
+
       logger.debug('=== PROJECT UPDATE RECEIVED ===', { lastUpdate, projectsCount: state.projects.length }, 'PROJECTS');
-      
+
       if ((lastUpdate as any).action === 'create') {
         const exists = state.projects.some(p => p.id === (lastUpdate as any).project.id);
         logger.debug('Project exists in state', { exists, projectId: (lastUpdate as any).project.id }, 'PROJECTS');
@@ -104,7 +104,7 @@ function ProjectsPageContent() {
         dispatch({ type: "DELETE_PROJECT", payload: (lastUpdate as any).project.id });
         logger.debug('Project deleted from state successfully', { projectId: (lastUpdate as any).project.id }, 'PROJECTS');
       }
-      
+
       if ((lastUpdate as any).userId && (lastUpdate as any).userId !== currentUser?.id && (lastUpdate as any).userName) {
         toast({
           title: "تحديث مشروع جديد",
@@ -150,7 +150,7 @@ function ProjectsPageContent() {
   const [projectToDelete, setProjectToDelete] = useState<string | null>(null)
   const [deleteError, setDeleteError] = useState<string>("")
   const [updateSuccessDialogOpen, setUpdateSuccessDialogOpen] = useState(false)
-  
+
   // States for inline inputs
   const [showNewClientInput, setShowNewClientInput] = useState(false)
   const [showNewTypeInput, setShowNewTypeInput] = useState(false)
@@ -180,11 +180,6 @@ function ProjectsPageContent() {
     startDate: new Date().toISOString().split("T")[0],
   })
 
-  // Show loading skeleton if data is loading
-  if (state.isLoading || state.loadingStates.projects) {
-    return LoadingStates.projects(9)
-  }
-
   const memoizedProjects = useMemo(() => {
     let filtered = projects
 
@@ -207,8 +202,8 @@ function ProjectsPageContent() {
       filtered = filtered.filter((project) => project.status === filterStatus)
     }
 
-      // Filter by user role - جميع المستخدمين يرون جميع المشاريع طالما لديهم صلاحية العرض
-  // لا يتم فلترة المشاريع حسب المستخدم، فقط حسب الصلاحيات
+    // Filter by user role - جميع المستخدمين يرون جميع المشاريع طالما لديهم صلاحية العرض
+    // لا يتم فلترة المشاريع حسب المستخدم، فقط حسب الصلاحيات
 
     return filtered
   }, [projects, searchTerm, filterStatus, currentUser, clientParam])
@@ -216,6 +211,11 @@ function ProjectsPageContent() {
   useEffect(() => {
     setFilteredProjects(memoizedProjects)
   }, [memoizedProjects])
+
+  // Show loading skeleton if data is loading
+  if (state.isLoading || state.loadingStates.projects) {
+    return LoadingStates.projects(9)
+  }
 
   // تحديث getStatusColor لإرجاع variant أو className مخصص
   const getStatusColor = (status: string) => {
@@ -258,12 +258,12 @@ function ProjectsPageContent() {
       setAlert({ type: "error", message: "ليس لديك صلاحية لإنشاء المشاريع" });
       return;
     }
-    
+
     // منع الحفظ المتكرر
     if (state.loadingStates.projects) {
       return;
     }
-    
+
     const missing: string[] = [];
     if (!formData.name.trim()) missing.push("اسم المشروع");
     if (!formData.clientId) missing.push("العميل");
@@ -329,25 +329,25 @@ function ProjectsPageContent() {
     try {
       // تعيين حالة التحميل لمنع الحفظ المتكرر
       dispatch({ type: "SET_LOADING_STATE", payload: { key: 'projects', value: true } });
-      
+
       console.log('بيانات المشروع المرسلة للسيرفر:', { project: newProject, tasks, createdByName: currentUser?.name || '' });
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
       const response = await fetch(`${apiUrl}/api/projects`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
         },
-        body: JSON.stringify({ 
-          project: newProject, 
-          tasks, 
-          createdByName: currentUser?.name || '' 
+        body: JSON.stringify({
+          project: newProject,
+          tasks,
+          createdByName: currentUser?.name || ''
         }),
       });
       const data = await response.json();
       if (data.success && data.data) {
         dispatch({ type: "ADD_PROJECT", payload: data.data });
-        
+
         // إنشاء معاملة مالية للدفعة المقدمة إذا كانت موجودة
         if (downPayment > 0) {
           const downPaymentTransaction: Transaction = {
@@ -368,18 +368,18 @@ function ProjectsPageContent() {
             createdBy: currentUser?.id || "",
             createdAt: new Date().toISOString(),
           }
-          
+
           // حفظ المعاملة المالية في قاعدة البيانات
           try {
             const transactionResponse = await fetch(`${apiUrl}/api/transactions`, {
               method: 'POST',
-              headers: { 
+              headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
               },
               body: JSON.stringify(downPaymentTransaction),
             });
-            
+
             if (transactionResponse.ok) {
               const transactionData = await transactionResponse.json();
               if (transactionData.success) {
@@ -398,7 +398,7 @@ function ProjectsPageContent() {
         } else {
           showSuccessToast("تم إنشاء المشروع بنجاح", `تم إنشاء المشروع "${data.data.name}" بنجاح`);
         }
-        
+
         setIsDialogOpen(false);
         resetForm();
         setSelectedTasks([]);
@@ -485,15 +485,15 @@ function ProjectsPageContent() {
 
       // Update local state
       dispatch({ type: "UPDATE_PROJECT", payload: updatedProject })
-      
+
       // Update in localStorage
       const existingProjects = JSON.parse(localStorage.getItem("projects") || "[]")
       const updatedProjects = existingProjects.map((p: any) => p.id === editingProject.id ? updatedProject : p)
       localStorage.setItem("projects", JSON.stringify(updatedProjects))
-      
+
       // إرسال تحديث فوري لجميع المستخدمين
       realtimeUpdates.sendProjectUpdate({ action: 'update', project: updatedProject, userId: currentUser?.id, userName: currentUser?.name })
-      
+
       setIsDialogOpen(false)
       setEditingProject(null)
       resetForm()
@@ -501,12 +501,12 @@ function ProjectsPageContent() {
       // Add notification to assigned engineer if changed
       if (engineer && engineer.id !== currentUser?.id && engineer.id !== editingProject.assignedEngineerId) {
         // البحث عن المستخدم المسؤول في قائمة المستخدمين
-        const assignee = users.find(u => 
-          u._id === engineer.id || 
+        const assignee = users.find(u =>
+          u._id === engineer.id ||
           u.id === engineer.id ||
           u.email === engineer.email
         );
-        
+
         if (assignee) {
           addNotification({
             userId: assignee._id || assignee.id,
@@ -517,7 +517,7 @@ function ProjectsPageContent() {
             triggeredBy: currentUser?.id || "",
             isRead: false,
           })
-          
+
           // إرسال تحديث فوري للمهندس الجديد
           try {
             if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
@@ -580,7 +580,7 @@ function ProjectsPageContent() {
     try {
       setDeleteError("")
       const project = projects.find(p => p.id === projectToDelete)
-      
+
       if (!project) {
         setDeleteError("المشروع غير موجود")
         return
@@ -617,10 +617,10 @@ function ProjectsPageContent() {
 
       // حذف المهام المرتبطة بالمشروع
       const projectTasks = state.tasks.filter(task => task.projectId === projectToDelete);
-      
+
       if (projectTasks.length > 0) {
         console.log(`حذف ${projectTasks.length} مهمة مرتبطة بالمشروع "${project.name}"`);
-        
+
         // حذف المهام من قاعدة البيانات
         for (const task of projectTasks) {
           try {
@@ -655,11 +655,11 @@ function ProjectsPageContent() {
         // إرسال تحديث فوري لحذف المهام
         if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
           projectTasks.forEach(task => {
-            (window as any).realtimeUpdates.sendTaskUpdate({ 
-              action: 'delete', 
-              task: task, 
-              userId: currentUser?.id, 
-              userName: currentUser?.name 
+            (window as any).realtimeUpdates.sendTaskUpdate({
+              action: 'delete',
+              task: task,
+              userId: currentUser?.id,
+              userName: currentUser?.name
             });
           });
         }
@@ -684,15 +684,15 @@ function ProjectsPageContent() {
 
       // Update local state
       dispatch({ type: "DELETE_PROJECT", payload: projectToDelete })
-      
+
       // Remove from localStorage
       const existingProjects = JSON.parse(localStorage.getItem("projects") || "[]")
       const filteredProjects = existingProjects.filter((p: any) => p.id !== projectToDelete)
       localStorage.setItem("projects", JSON.stringify(filteredProjects))
-      
+
       // إرسال تحديث فوري لجميع المستخدمين
       realtimeUpdates.sendProjectUpdate({ action: 'delete', project: project, userId: currentUser?.id, userName: currentUser?.name })
-      
+
       // إشعار أعضاء الفريق بعد نجاح الحذف
       if (project && Array.isArray(project.team)) {
         project.team.forEach((engineerId: string) => {
@@ -716,12 +716,12 @@ function ProjectsPageContent() {
       // إظهار رسالة نجاح مع عدد المهام المحذوفة
       if (projectTasks.length > 0) {
         showSuccessToast(
-          "تم حذف المشروع والمهام المرتبطة به بنجاح", 
+          "تم حذف المشروع والمهام المرتبطة به بنجاح",
           `تم حذف مشروع "${project.name}" مع ${projectTasks.length} مهمة مرتبطة به`
         );
       } else {
         showSuccessToast(
-          "تم حذف المشروع بنجاح", 
+          "تم حذف المشروع بنجاح",
           `تم حذف مشروع "${project.name}" بنجاح`
         );
       }
@@ -774,7 +774,7 @@ function ProjectsPageContent() {
       description: "",
       startDate: new Date().toISOString().split("T")[0],
     })
-    
+
     // Reset all inline inputs
     setShowNewClientInput(false)
     setShowNewTypeInput(false)
@@ -845,14 +845,14 @@ function ProjectsPageContent() {
     setNewTypeInputError("");
     // Update form data with new type
     setFormData(prev => ({ ...prev, type: newProjectType.trim() }))
-    
+
     // Save project types to localStorage
     const existingTypes = JSON.parse(localStorage.getItem("projectTypes") || "[]")
     if (!existingTypes.includes(newProjectType.trim())) {
       existingTypes.push(newProjectType.trim())
       localStorage.setItem("projectTypes", JSON.stringify(existingTypes))
     }
-    
+
     // Add notification to admin
     if (currentUser?.role !== "admin") {
       addNotification({
@@ -864,7 +864,7 @@ function ProjectsPageContent() {
         triggeredBy: currentUser?.id || "",
       })
     }
-    
+
     // Reset input
     setShowNewTypeInput(false)
     setNewProjectType("")
@@ -874,17 +874,17 @@ function ProjectsPageContent() {
   const handleDeleteProjectType = (typeToDelete: string) => {
     // Check if type is being used in any project
     const isTypeInUse = projects.some(project => project.type === typeToDelete)
-    
+
     if (isTypeInUse) {
       setAlert({ type: "error", message: "لا يمكن حذف هذا النوع لأنه مستخدم في مشاريع حالية" })
       return
     }
-    
+
     // Remove from localStorage
     const existingTypes = JSON.parse(localStorage.getItem("projectTypes") || "[]")
     const updatedTypes = existingTypes.filter((type: string) => type !== typeToDelete)
     localStorage.setItem("projectTypes", JSON.stringify(updatedTypes))
-    
+
     setAlert({ type: "success", message: "تم حذف نوع المشروع بنجاح" })
   }
 
@@ -906,11 +906,11 @@ function ProjectsPageContent() {
       const nameParts = newEngineerName.trim().split(' ')
       const firstName = nameParts[0] || ''
       const lastName = nameParts[nameParts.length - 1] || ''
-      
+
       // Create email: first letter of first name + last name + @newcorner.sa
       const emailPrefix = transliterateArabicToEnglish(firstName.charAt(0) + lastName).toLowerCase();
       let email = `${emailPrefix}@newcorner.sa`
-      
+
       // Check if email already exists and add number if needed
       const existingUsers = JSON.parse(localStorage.getItem("users") || "[]")
       let emailCounter = 1
@@ -919,7 +919,7 @@ function ProjectsPageContent() {
         finalEmail = `${emailPrefix}${emailCounter}@newcorner.sa`
         emailCounter++
       }
-      
+
       // Create default password: first letter of first name + last name + 123
       const defaultPassword = transliterateArabicToEnglish(`${firstName.charAt(0)}${lastName}123`).toLowerCase();
 
@@ -935,7 +935,7 @@ function ProjectsPageContent() {
         monthlySalary: 5000, // مرتب مبدئي 5000 ريال
         createdAt: new Date().toISOString(),
       }
-      
+
       try {
         // Save to backend database
         const response = await fetch('/api/users', {
@@ -955,11 +955,11 @@ function ProjectsPageContent() {
 
         // Add to users list
         dispatch({ type: "ADD_USER", payload: newEngineer })
-        
+
         // Save to localStorage
         existingUsers.push(newEngineer)
         localStorage.setItem("users", JSON.stringify(existingUsers))
-        
+
         // إرسال تحديث فوري
         realtimeUpdates.sendUserUpdate({ action: 'create', user: newEngineer })
       } catch (error) {
@@ -967,10 +967,10 @@ function ProjectsPageContent() {
         setNewEngineerInputError("حدث خطأ أثناء حفظ المهندس في قاعدة البيانات");
         return;
       }
-      
+
       // Update form data
       setFormData(prev => ({ ...prev, team: [...prev.team, newEngineer.id] }))
-      
+
       // Add notification
       addNotification({
         userId: currentUser?.id || "",
@@ -980,7 +980,7 @@ function ProjectsPageContent() {
         isRead: false,
         triggeredBy: currentUser?.id || "",
       })
-      
+
       // Reset input
       setShowNewEngineerInput(false)
       setNewEngineerName("")
@@ -1021,13 +1021,13 @@ function ProjectsPageContent() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-foreground mb-1">
-            {clientParam && clientNameParam 
+            {clientParam && clientNameParam
               ? `مشاريع ${decodeURIComponent(clientNameParam)}`
               : "إدارة المشاريع"
             }
           </h1>
           <p className="text-muted-foreground mt-1">
-            {clientParam && clientNameParam 
+            {clientParam && clientNameParam
               ? `مشاريع العميل ${decodeURIComponent(clientNameParam)}`
               : "إدارة ومتابعة المشاريع الحالية والسابقة"
             }
@@ -1199,7 +1199,7 @@ function ProjectsPageContent() {
                           <SelectItem value="تجاري">تجاري</SelectItem>
                           <SelectItem value="صناعي">صناعي</SelectItem>
                           <SelectItem value="حكومي">حكومي</SelectItem>
-                          
+
                           {/* Custom types from localStorage */}
                           {(() => {
                             const customTypes = JSON.parse(localStorage.getItem("projectTypes") || "[]")
@@ -1294,29 +1294,29 @@ function ProjectsPageContent() {
                     <DropdownMenuContent className="max-h-60 overflow-y-auto w-64">
                       {users
                         .filter((u) => u.role === "engineer" || u.role === "admin")
-                        .filter((user, index, self) => 
+                        .filter((user, index, self) =>
                           // إزالة التكرار بناءً على المعرف
                           index === self.findIndex(u => u.id === user.id)
                         )
                         .map((engineer) => (
-                        <DropdownMenuCheckboxItem
-                          key={engineer.id}
-                          checked={formData.team.includes(engineer.id)}
-                          onCheckedChange={(checked) => {
-                            setFormData((prev) => {
-                              let newTeam = prev.team.includes(engineer.id)
-                                ? prev.team.filter((id) => id !== engineer.id)
-                                : [...prev.team, engineer.id];
-                              return { ...prev, team: newTeam };
-                            });
-                          }}
-                        >
-                          {engineer.name}
-                          {formData.team[0] === engineer.id && (
-                            <Badge variant="outline" className="text-xs bg-blue-100 text-blue-800 ml-2">قائد المشروع</Badge>
-                          )}
-                        </DropdownMenuCheckboxItem>
-                      ))}
+                          <DropdownMenuCheckboxItem
+                            key={engineer.id}
+                            checked={formData.team.includes(engineer.id)}
+                            onCheckedChange={(checked) => {
+                              setFormData((prev) => {
+                                let newTeam = prev.team.includes(engineer.id)
+                                  ? prev.team.filter((id) => id !== engineer.id)
+                                  : [...prev.team, engineer.id];
+                                return { ...prev, team: newTeam };
+                              });
+                            }}
+                          >
+                            {engineer.name}
+                            {formData.team[0] === engineer.id && (
+                              <Badge variant="outline" className="text-xs bg-blue-100 text-blue-800 ml-2">قائد المشروع</Badge>
+                            )}
+                          </DropdownMenuCheckboxItem>
+                        ))}
                     </DropdownMenuContent>
                   </DropdownMenu>
                   <p className="text-xs text-muted-foreground mt-1">أول مهندس يتم اختياره هو قائد المشروع تلقائيًا.</p>
@@ -1497,7 +1497,7 @@ function ProjectsPageContent() {
                         {taskTypes.map((type) => {
                           const isSelected = selectedTasks.some((t) => t.typeId === type._id);
                           const selectedTask = selectedTasks.find((t) => t.typeId === type._id);
-                          
+
                           return (
                             <div key={type._id} className="flex items-center gap-3 p-3 border rounded bg-background hover:bg-muted/50 transition-colors w-full">
                               <Checkbox
@@ -1515,8 +1515,8 @@ function ProjectsPageContent() {
                                 <Select
                                   value={selectedTask?.assigneeId || ''}
                                   onValueChange={(value) => {
-                                    setSelectedTasks((prev) => 
-                                      prev.map((t) => 
+                                    setSelectedTasks((prev) =>
+                                      prev.map((t) =>
                                         t.typeId === type._id ? { ...t, assigneeId: value } : t
                                       )
                                     );
@@ -1527,13 +1527,13 @@ function ProjectsPageContent() {
                                   </SelectTrigger>
                                   <SelectContent>
                                     {users
-                                      .filter((user, index, self) => 
+                                      .filter((user, index, self) =>
                                         // إزالة التكرار بناءً على المعرف
                                         index === self.findIndex(u => u.id === user.id)
                                       )
                                       .map((user) => (
-                                      <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
-                                    ))}
+                                        <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
+                                      ))}
                                   </SelectContent>
                                 </Select>
                               )}
@@ -1635,7 +1635,7 @@ function ProjectsPageContent() {
                   <span>المهندس: {project.assignedEngineerName}</span>
                 </div>
                 {/* Click to view details */}
-                <div 
+                <div
                   className="absolute inset-0 cursor-pointer"
                   onClick={() => openDetailsDialog(project)}
                   title="عرض التفاصيل"
@@ -1844,15 +1844,15 @@ function ProjectsPageContent() {
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
                               <h5 className="font-medium text-sm">{task.title}</h5>
-                              <Badge 
+                              <Badge
                                 variant={
                                   task.status === "completed" ? "default" :
-                                  task.status === "in-progress" ? "secondary" : "outline"
+                                    task.status === "in-progress" ? "secondary" : "outline"
                                 }
                                 className="text-xs"
                               >
                                 {task.status === "completed" ? "مكتملة" :
-                                 task.status === "in-progress" ? "قيد التنفيذ" : "قيد الانتظار"}
+                                  task.status === "in-progress" ? "قيد التنفيذ" : "قيد الانتظار"}
                               </Badge>
                             </div>
                             <p className="text-xs text-muted-foreground mb-1">{task.description}</p>
@@ -1886,7 +1886,7 @@ function ProjectsPageContent() {
                                     });
                                     if (response.ok) {
                                       dispatch({ type: "UPDATE_TASK", payload: updatedTask });
-                                      
+
                                       // Update project progress
                                       const projectTasks = tasks.filter(t => t.projectId === selectedProject.id);
                                       const completedTasks = projectTasks.filter(t => t.status === "completed").length;
@@ -1894,7 +1894,7 @@ function ProjectsPageContent() {
                                       const updatedProject = { ...selectedProject, progress: newProgress };
                                       setSelectedProject(updatedProject);
                                       dispatch({ type: "UPDATE_PROJECT", payload: updatedProject });
-                                      
+
                                       // إرسال إشعار للمديرين عند إكمال المهمة من قبل المهندس
                                       if (currentUser?.role !== "admin") {
                                         // إرسال إشعار لجميع المديرين
@@ -1910,7 +1910,7 @@ function ProjectsPageContent() {
                                             isRead: false,
                                           });
                                         });
-                                        
+
                                         // إشعار إضافي إذا اكتمل المشروع بالكامل
                                         if (newProgress === 100) {
                                           adminUsers.forEach(admin => {
@@ -1926,10 +1926,10 @@ function ProjectsPageContent() {
                                           });
                                         }
                                       }
-                                      
+
                                       // إظهار رسالة نجاح
                                       showSuccessToast(
-                                        "تم إكمال المهمة بنجاح", 
+                                        "تم إكمال المهمة بنجاح",
                                         `تم إكمال مهمة "${task.title}" وتحديث تقدم المشروع إلى ${newProgress}%`
                                       );
                                     }
@@ -2012,11 +2012,11 @@ function ProjectsPageContent() {
                       />
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">يمكنك تحريك الشريط لتغيير نسبة الإنجاز أو إكمال المهام أعلاه</p>
-                    
+
                     {/* Progress Bar */}
                     <div className="relative">
                       <div className="relative h-6 bg-gray-200 rounded-full">
-                        <div 
+                        <div
                           className="h-full bg-blue-600 rounded-full transition-all duration-200 relative"
                           style={{ width: `${selectedProject.progress}%` }}
                         />
@@ -2027,7 +2027,7 @@ function ProjectsPageContent() {
                         </div>
                       </div>
                     </div>
-                    
+
                     {/* Progress Labels */}
                     <div className="flex justify-between text-xs text-gray-500">
                       <span>0%</span>
