@@ -61,14 +61,16 @@ export function Navbar() {
 
   // Get user's allowed modules
   const userModules = currentUser ? getUserModules(currentUser.role) : []
-  
+
   // Filter navigation items based on user permissions
   const allowedNavigation = navigation.filter(item => {
     // Admin can access all modules
     if (currentUser?.role === "admin") return true
-    
-    // Check if user has access to this module
-    return userModules.includes(item.module)
+
+    // Check if user has access to this module using dynamic permissions
+    // This checks user-specific permissions first, then role permissions
+    // We check for 'view' action on the module
+    return hasPermission(currentUser.role, "view", item.module, currentUser.permissions)
   })
 
   // Count unread notifications for current user
@@ -77,13 +79,13 @@ export function Navbar() {
   const handleLogout = () => {
     // Clear user data
     logout()
-    
+
     // Clear any additional state
     dispatch({ type: "SET_CURRENT_USER", payload: null })
-    
+
     // Redirect to home page
     router.push("/")
-    
+
     // Force page reload to clear all state
     setTimeout(() => {
       window.location.reload()
@@ -98,9 +100,9 @@ export function Navbar() {
           <div className="flex items-center">
             <Link href="/dashboard" className="flex items-center space-x-3 space-x-reverse">
               <div className="flex items-center justify-center w-20 h-20">
-                <img 
-                  src={companySettings.logo || "/logo.png"} 
-                  alt={companySettings.name || "الركن الجديد للاستشارات الهندسية"} 
+                <img
+                  src={companySettings.logo || "/logo.png"}
+                  alt={companySettings.name || "الركن الجديد للاستشارات الهندسية"}
                   className="w-20 h-20 object-contain"
                   loading="lazy"
                   onError={(e) => {
