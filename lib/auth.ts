@@ -363,41 +363,66 @@ export const getCurrentUser = (): User | null => {
 export const hasPermission = (
 	userRole: string,
 	action: string,
-	module: string
+	module: string,
+	userPermissions: string[] = []
 ): boolean => {
 	// Admin has all permissions
 	if (userRole === "admin") return true;
 
-	// First check custom job roles from localStorage
-	const jobRoles = localStorage.getItem("jobRoles");
-	if (jobRoles) {
-		const roles = JSON.parse(jobRoles);
-		const customRole = roles.find((role: any) => role.id === userRole);
-		if (customRole) {
-			// Check if role has all permissions
-			if (customRole.permissions.includes("*")) return true;
+	// Grant view_dashboard to all authenticated users
+	if (action === "view" && module === "dashboard") return true;
 
-			// Check specific permission - handle multiple formats
-			const permission1 = `${action}_${module}`;
-			const permission2 = `${action} ${module}`;
-			const permission3 = `${action}${module}`;
+	// 1. Check user specific permissions first (from DB)
+	if (userPermissions && userPermissions.length > 0) {
+		// Admin wildcard in user permissions
+		if (userPermissions.includes("*")) return true;
 
-			return (
-				customRole.permissions.includes(permission1) ||
-				customRole.permissions.includes(permission2) ||
-				customRole.permissions.includes(permission3) ||
-				customRole.permissions.includes(`${action}_${module}`) ||
-				customRole.permissions.includes(`${action} ${module}`) ||
-				customRole.permissions.includes(`${action}${module}`)
-			);
+		// Check specific permission - handle multiple formats
+		const permission1 = `${action}_${module}`;
+		const permission2 = `${action} ${module}`;
+		const permission3 = `${action}${module}`;
+
+		if (
+			userPermissions.includes(permission1) ||
+			userPermissions.includes(permission2) ||
+			userPermissions.includes(permission3)
+		) {
+			return true;
 		}
 	}
 
-	// Fallback to default rolePermissions
-	const savedRolePermissions = localStorage.getItem("rolePermissions");
-	if (savedRolePermissions) {
-		const updatedRolePermissions = JSON.parse(savedRolePermissions);
-		Object.assign(rolePermissions, updatedRolePermissions);
+	// 2. Check custom job roles from localStorage
+	if (typeof window !== "undefined") {
+		const jobRoles = localStorage.getItem("jobRoles");
+		if (jobRoles) {
+			const roles = JSON.parse(jobRoles);
+			const customRole = roles.find((role: any) => role.id === userRole);
+			if (customRole) {
+				// Check if role has all permissions
+				if (customRole.permissions.includes("*")) return true;
+
+				// Check specific permission - handle multiple formats
+				const permission1 = `${action}_${module}`;
+				const permission2 = `${action} ${module}`;
+				const permission3 = `${action}${module}`;
+
+				return (
+					customRole.permissions.includes(permission1) ||
+					customRole.permissions.includes(permission2) ||
+					customRole.permissions.includes(permission3) ||
+					customRole.permissions.includes(`${action}_${module}`) ||
+					customRole.permissions.includes(`${action} ${module}`) ||
+					customRole.permissions.includes(`${action}${module}`)
+				);
+			}
+		}
+
+		// 3. Fallback to default rolePermissions
+		const savedRolePermissions = localStorage.getItem("rolePermissions");
+		if (savedRolePermissions) {
+			const updatedRolePermissions = JSON.parse(savedRolePermissions);
+			Object.assign(rolePermissions, updatedRolePermissions);
+		}
 	}
 
 	const role = rolePermissions[userRole as keyof typeof rolePermissions];

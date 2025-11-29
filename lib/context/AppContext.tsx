@@ -564,6 +564,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
                     logger.info("Initial data fetch completed successfully", {}, 'API');
 
+                    // Fetch current user specifically to ensure fresh data (avatar, etc.)
+                    const storedUser = localStorage.getItem("currentUser");
+                    if (storedUser) {
+                        try {
+                            const parsedUser = JSON.parse(storedUser);
+                            if (parsedUser.id) {
+                                const meRes = await api.users.get(parsedUser.id);
+                                if (meRes.success && meRes.data) {
+                                    const freshUser = {
+                                        ...meRes.data,
+                                        permissions: meRes.data.permissions || parsedUser.permissions || []
+                                    };
+                                    localStorage.setItem("currentUser", JSON.stringify(freshUser));
+                                    dispatch({ type: "SET_CURRENT_USER", payload: updateUserPermissionsByRole(freshUser) });
+                                }
+                            }
+                        } catch (e) {
+                            console.error("Error refreshing current user", e);
+                        }
+                    }
+
                 } catch (error) {
                     logger.error("Error fetching initial data from backend", { error }, 'API');
                 } finally {
@@ -977,12 +998,37 @@ export function useAppActions() {
         }
     }
 
-    const refreshCurrentUser = () => {
+    const refreshCurrentUser = async () => {
         const userData = localStorage.getItem("currentUser")
         if (userData) {
             const user = JSON.parse(userData)
-            const updatedUser = updateUserPermissionsByRole(user)
-            dispatch({ type: "SET_CURRENT_USER", payload: updatedUser })
+            try {
+                // Fetch fresh user data from API
+                const response = await api.users.get(user.id)
+                if (response.success && response.data) {
+                    const freshUser = {
+                        ...response.data,
+                        // Ensure permissions are preserved or updated correctly
+                        permissions: response.data.permissions || user.permissions || []
+                    }
+
+                    // Update localStorage with fresh data
+                    localStorage.setItem("currentUser", JSON.stringify(freshUser))
+
+                    // Update state
+                    const updatedUser = updateUserPermissionsByRole(freshUser)
+                    dispatch({ type: "SET_CURRENT_USER", payload: updatedUser })
+                } else {
+                    // Fallback to local data if API fails but token exists
+                    const updatedUser = updateUserPermissionsByRole(user)
+                    dispatch({ type: "SET_CURRENT_USER", payload: updatedUser })
+                }
+            } catch (error) {
+                console.error("Failed to refresh user data:", error)
+                // Fallback to local data
+                const updatedUser = updateUserPermissionsByRole(user)
+                dispatch({ type: "SET_CURRENT_USER", payload: updatedUser })
+            }
         }
     }
 

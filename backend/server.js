@@ -18,8 +18,8 @@ app.use(cors({
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: [
-    'Content-Type', 
-    'Authorization', 
+    'Content-Type',
+    'Authorization',
     'X-Requested-With',
     'Cache-Control',
     'Pragma',
@@ -66,7 +66,7 @@ const connectDB = async () => {
       JWT_SECRET: process.env.JWT_SECRET ? 'EXISTS' : 'NOT FOUND',
       CORS_ORIGIN: process.env.CORS_ORIGIN
     });
-    
+
     if (!mongoURI) {
       logger.warn('⚠️ MONGODB_URI not found, using fallback', undefined, 'DATABASE');
       console.log('❌ MONGODB_URI is missing!');
@@ -88,7 +88,7 @@ const connectDB = async () => {
 
     logger.info('✅ MongoDB connected successfully', undefined, 'DATABASE');
     console.log('✅ MongoDB connected successfully!');
-    
+
     // Monitor connection events
     mongoose.connection.on('error', (err) => {
       logger.error('❌ MongoDB connection error', { error: err.message }, 'DATABASE');
@@ -109,7 +109,11 @@ const connectDB = async () => {
 };
 
 // Connect to MongoDB
-connectDB();
+// Connect to MongoDB
+connectDB().then(() => {
+  // Start background jobs
+  require('./jobs/cleanupUsers').startCleanupJob();
+});
 
 // Example route
 app.get('/', (req, res) => {
@@ -141,10 +145,10 @@ app.use('/api/taskTypes', require('./routes/taskTypes'));
 // Add error handling middleware
 app.use((err, req, res, next) => {
   console.error('Global error handler:', err);
-  res.status(500).json({ 
-    success: false, 
+  res.status(500).json({
+    success: false,
     error: 'Internal server error',
-    message: err.message 
+    message: err.message
   });
 });
 

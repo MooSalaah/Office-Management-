@@ -53,6 +53,7 @@ import TaskForm from "@/components/tasks/TaskForm"
 import { DashboardLoadingSkeleton } from "@/components/ui/loading-skeleton"
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { useToast } from "@/hooks/use-toast"
+import { FinancialChart } from "@/components/dashboard/FinancialChart"
 
 // Project Card Component
 function ProjectCard({ project }: { project: Project }) {
@@ -1168,6 +1169,13 @@ function DashboardPageContent() {
           )
         })}
       </div>
+
+      {/* Financial Chart - Admin Only */}
+      {currentUser?.role === "admin" && (
+        <div className="grid grid-cols-1 gap-6">
+          <FinancialChart transactions={transactions} />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-6">
         {/* Today's Tasks */}

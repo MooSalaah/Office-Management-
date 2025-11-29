@@ -55,7 +55,7 @@ export function PermissionGuard({
 
   // Check specific permission if provided
   if (requiredPermission) {
-    const hasSpecificPermission = hasPermission(currentUser.role, requiredAction, requiredModule || "")
+    const hasSpecificPermission = hasPermission(currentUser.role, requiredAction, requiredModule || "", currentUser.permissions)
     if (!hasSpecificPermission) {
       return fallback || (
         <div className="max-w-screen-xl mx-auto space-y-6">
@@ -73,7 +73,7 @@ export function PermissionGuard({
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                  عذراً، غير مصرح لك بالدخول إلى {moduleName || "هذه الصفحة"}. 
+                  عذراً، غير مصرح لك بالدخول إلى {moduleName || "هذه الصفحة"}.
                   يرجى التواصل مع المدير إذا كنت تعتقد أن هذا خطأ.
                 </AlertDescription>
               </Alert>
@@ -86,7 +86,7 @@ export function PermissionGuard({
 
   // Check view permission for the module if no specific permission is provided
   if (requiredModule && !requiredPermission) {
-    const hasViewPermission = hasPermission(currentUser.role, "view", requiredModule)
+    const hasViewPermission = hasPermission(currentUser.role, "view", requiredModule, currentUser.permissions)
     if (!hasViewPermission) {
       return fallback || (
         <div className="max-w-screen-xl mx-auto space-y-6">
@@ -104,7 +104,7 @@ export function PermissionGuard({
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                  عذراً، غير مصرح لك بالدخول إلى {moduleName || "هذه الصفحة"}. 
+                  عذراً، غير مصرح لك بالدخول إلى {moduleName || "هذه الصفحة"}.
                   يرجى التواصل مع المدير إذا كنت تعتقد أن هذا خطأ.
                 </AlertDescription>
               </Alert>
@@ -135,7 +135,7 @@ export function PermissionGuard({
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                  عذراً، غير مصرح لك بالدخول إلى {moduleName || "هذه الصفحة"}. 
+                  عذراً، غير مصرح لك بالدخول إلى {moduleName || "هذه الصفحة"}.
                   يرجى التواصل مع المدير إذا كنت تعتقد أن هذا خطأ.
                 </AlertDescription>
               </Alert>
@@ -147,4 +147,4 @@ export function PermissionGuard({
   }
 
   return <>{children}</>
-} 
+}

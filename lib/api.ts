@@ -325,6 +325,7 @@ export const api = {
 	},
 	users: {
 		getAll: () => apiClient.getUsers(),
+		get: (id: string) => apiClient.request(`/api/users/${id}`),
 		create: (data: any) => apiClient.createUser(data),
 		update: (id: string, data: any) => apiClient.updateUser(id, data),
 		delete: (id: string) => apiClient.deleteUser(id),
