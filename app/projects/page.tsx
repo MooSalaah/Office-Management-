@@ -797,7 +797,9 @@ function ProjectsPageContent() {
   const canEditProject = hasPermission(currentUser?.role || "", "edit", "projects")
   const canDeleteProject = hasPermission(currentUser?.role || "", "delete", "projects")
 
-  const remainingBalance = Number.parseFloat(formData.price) - (Number.parseFloat(formData.downPayment) || 0)
+  const priceValue = Number.parseFloat(formData.price) || 0
+  const downPaymentValue = Number.parseFloat(formData.downPayment) || 0
+  const remainingBalance = priceValue - downPaymentValue
 
   // Handle adding new client
   const handleAddNewClient = async () => {
