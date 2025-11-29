@@ -1169,9 +1169,9 @@ function DashboardPageContent() {
         })}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6">
         {/* Today's Tasks */}
-        <div className="lg:col-span-2">
+        <div>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
@@ -1227,78 +1227,6 @@ function DashboardPageContent() {
             </CardContent>
           </Card>
         </div>
-
-        {/* System Notifications */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-2xl font-extrabold mb-4">الإشعارات</CardTitle>
-            <CardDescription>آخر التحديثات والأنشطة</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {userNotifications.length > 0 ? (
-              userNotifications.map((notification) => (
-                <SwipeToDelete
-                  key={notification.id}
-                  onDelete={() => deleteNotification(notification.id)}
-                >
-                  <div className="flex items-start space-x-3 space-x-reverse group p-2 rounded-lg hover:bg-gray-50 transition-colors">
-                    <Avatar className="w-6 h-6">
-                      <AvatarFallback className="text-xs">
-                        {notification.type === "task"
-                          ? "📋"
-                          : notification.type === "project"
-                            ? "🏗️"
-                            : notification.type === "finance"
-                              ? "💰"
-                              : "🔔"}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <p className={`text-sm font-medium ${!notification.isRead ? "text-foreground" : "text-muted-foreground"}`}>
-                          {notification.title}
-                        </p>
-                        <div className="flex items-center space-x-1 space-x-reverse">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className={`h-5 w-5 p-0 ${notification.isRead ? 'text-gray-400 cursor-not-allowed' : ''}`}
-                            onClick={() => {
-                              if (!notification.isRead) handleMarkAsRead(notification.id)
-                            }}
-                            disabled={notification.isRead}
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-5 w-5 p-0 text-red-600 hover:text-red-700"
-                            onClick={() => deleteNotification(notification.id)}
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </Button>
-                        </div>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{notification.message}</p>
-                      <div className="flex items-center justify-between mt-1">
-                        <p className="text-xs text-gray-400">
-                          {new Date(notification.createdAt).toLocaleDateString("ar-SA")}
-                        </p>
-                        {!notification.isRead && <div className="w-2 h-2 bg-blue-600 rounded-full"></div>}
-                      </div>
-                    </div>
-                  </div>
-                </SwipeToDelete>
-              ))
-            ) : (
-              <div className="text-center py-6 text-gray-500">
-                <CheckCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">لا توجد إشعارات</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
       </div>
 
       {/* Quick Actions */}
