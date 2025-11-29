@@ -28,7 +28,7 @@ import TaskCard from "@/components/tasks/TaskCard"
 import { SwipeToDelete } from "@/components/ui/swipe-to-delete"
 import { PermissionGuard } from "@/components/ui/permission-guard"
 import { DeleteDialog } from "@/components/ui/delete-dialog"
-import { useTaskSearch, useStatusFilter, usePriorityFilter, useCachedCallback } from "@/lib/performance"
+import { useMemo } from "react"
 import { useToast } from "@/components/ui/use-toast"
 import { logger } from "@/lib/logger"
 
@@ -50,10 +50,10 @@ function TasksPageContent() {
 
   // Get highlight parameter from URL for task highlighting
   const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null)
-  
+
   // Project filter state
   const [projectFilter, setProjectFilter] = useState<string>("all")
-  
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search)
@@ -82,10 +82,10 @@ function TasksPageContent() {
       const updateId = `${lastUpdate.task.id || ''}_${lastUpdate.action}_${lastUpdate.timestamp || ''}`;
       if (handledTaskUpdateIdsRef.current.has(updateId)) return;
       handledTaskUpdateIdsRef.current.add(updateId);
-      
+
       // Debug logs
       logger.debug('=== TASK UPDATE RECEIVED ===', { lastUpdate, currentUser, tasksCount: state.tasks.length }, 'TASKS');
-      
+
       if (lastUpdate.action === 'create') {
         const exists = state.tasks.some(t => t.id === lastUpdate.task.id);
         logger.debug('Task exists in state', { exists, taskId: lastUpdate.task.id }, 'TASKS');
@@ -103,7 +103,7 @@ function TasksPageContent() {
         dispatch({ type: "DELETE_TASK", payload: lastUpdate.task.id });
         logger.debug('Task deleted from state successfully', { taskId: lastUpdate.task.id }, 'TASKS');
       }
-      
+
       if (lastUpdate.userId && lastUpdate.userId !== currentUser?.id && lastUpdate.userName) {
         showSuccessToast && showSuccessToast(`تمت إضافة/تعديل/حذف مهمة بواسطة ${lastUpdate.userName}`);
       }
@@ -129,10 +129,10 @@ function TasksPageContent() {
       try {
         const response = await fetch('/api/tasks');
         const data = await response.json();
-        
+
         if (data.success && Array.isArray(data.data)) {
           dispatch({ type: "LOAD_TASKS", payload: data.data });
-          
+
           // حفظ المهام في localStorage للتحديثات الفورية
           localStorage.setItem("tasks", JSON.stringify(data.data));
         }
@@ -220,7 +220,7 @@ function TasksPageContent() {
       if (!task.dueDate) return false
       return new Date(task.dueDate) < new Date() && task.status !== "completed"
     })
-    
+
     switch (status) {
       case "todo":
         const overdueCount = overdueTasks.filter(task => task.status === "todo").length
@@ -286,7 +286,7 @@ function TasksPageContent() {
 
       // Broadcast realtime update
       broadcastTaskUpdate('update', { task: updatedTask, userId: currentUser?.id, userName: currentUser?.name })
-      
+
       // إرسال تحديث فوري لجميع المستخدمين
       realtimeUpdates.sendTaskUpdate({ action: 'update', task: updatedTask, userId: currentUser?.id, userName: currentUser?.name })
 
@@ -295,23 +295,23 @@ function TasksPageContent() {
         // إرسال إشعار لجميع المديرين
         const adminUsers = users.filter(user => user.role === "admin");
         adminUsers.forEach(admin => {
-        addNotification({
+          addNotification({
             userId: admin.id,
-          title: "مهمة مكتملة",
-          message: `تم إنجاز مهمة "${task.title}" بواسطة ${currentUser?.name}`,
-          type: "task",
+            title: "مهمة مكتملة",
+            message: `تم إنجاز مهمة "${task.title}" بواسطة ${currentUser?.name}`,
+            type: "task",
             actionUrl: `/tasks?highlight=${task.id}`,
-          triggeredBy: currentUser?.id || "",
-          isRead: false,
+            triggeredBy: currentUser?.id || "",
+            isRead: false,
           });
         });
-        
+
         // إشعار إضافي إذا كان المشروع مكتمل
         if (task.projectId) {
           const projectTasks = tasks.filter(t => t.projectId === task.projectId);
           const completedTasks = projectTasks.filter(t => t.status === "completed").length;
           const projectProgress = projectTasks.length > 0 ? Math.round((completedTasks / projectTasks.length) * 100) : 0;
-          
+
           if (projectProgress === 100) {
             const project = projects.find(p => p.id === task.projectId);
             adminUsers.forEach(admin => {
@@ -352,17 +352,17 @@ function TasksPageContent() {
       setAlert({ type: "error", message: "ليس لديك صلاحية لإنشاء المهام" });
       return;
     }
-    
+
     // منع الحفظ المتكرر
     if (state.loadingStates.tasks) {
       return;
     }
-    
+
     const missing: string[] = [];
     if (!formData.title.trim()) missing.push("عنوان المهمة");
     if (!formData.assigneeId) missing.push("المسؤول");
     if (!formData.dueDate) missing.push("تاريخ الاستحقاق");
-    
+
     if (missing.length > 0) {
       setShowValidationErrors(true);
       setMissingFields(missing);
@@ -393,17 +393,17 @@ function TasksPageContent() {
     try {
       // تعيين حالة التحميل لمنع الحفظ المتكرر
       dispatch({ type: "SET_LOADING_STATE", payload: { key: 'tasks', value: true } });
-      
+
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
       const response = await fetch(`${apiUrl}/api/tasks`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
         },
         body: JSON.stringify(newTask),
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
@@ -511,7 +511,7 @@ function TasksPageContent() {
 
       // Broadcast realtime update
       broadcastTaskUpdate('delete', { ...task })
-      
+
       // إرسال تحديث فوري لجميع المستخدمين
       realtimeUpdates.sendTaskUpdate({ action: 'delete', task: task, userId: currentUser?.id, userName: currentUser?.name })
 
@@ -566,22 +566,32 @@ function TasksPageContent() {
   }
 
   // استخدام التحسينات الجديدة للبحث والفلترة
-  const searchedTasks = useTaskSearch(tasks, searchTerm)
-  
+  // استخدام التحسينات الجديدة للبحث والفلترة
+  const searchedTasks = useMemo(() => {
+    if (!searchTerm) return tasks;
+    const lowerTerm = searchTerm.toLowerCase();
+    return tasks.filter(t =>
+      t.title.toLowerCase().includes(lowerTerm) ||
+      (t.description && t.description.toLowerCase().includes(lowerTerm)) ||
+      (t.projectName && t.projectName.toLowerCase().includes(lowerTerm)) ||
+      (t.assigneeName && t.assigneeName.toLowerCase().includes(lowerTerm))
+    );
+  }, [tasks, searchTerm]);
 
-  
+
+
   // Filter by user role and project - المدير يرى جميع المهام، المستخدم يرى مهامه المخصصة له فقط
   const filteredTasks = searchedTasks.filter((task) => {
     // Filter by user role
     let userFilter = true
     if (currentUser?.role !== "admin") {
       // البحث عن المستخدم الحالي في قائمة المستخدمين المحدثة من قاعدة البيانات
-      const currentUserFromDB = users.find(u => 
-        u.email === currentUser?.email || 
+      const currentUserFromDB = users.find(u =>
+        u.email === currentUser?.email ||
         u.name === currentUser?.name ||
         u.id === currentUser?.id
       );
-      
+
       if (currentUserFromDB) {
         userFilter = task.assigneeId === currentUserFromDB._id || task.assigneeId === currentUserFromDB.id;
       } else {
@@ -589,17 +599,17 @@ function TasksPageContent() {
         userFilter = task.assigneeId === currentUser?.id;
       }
     }
-    
+
     // Filter by project
     let projectFilterResult = true
     if (projectFilter !== "all") {
       projectFilterResult = task.projectId === projectFilter
     }
-    
-    const result = userFilter && projectFilterResult;
-    
 
-    
+    const result = userFilter && projectFilterResult;
+
+
+
     return result;
   })
 
@@ -638,11 +648,11 @@ function TasksPageContent() {
       const nameParts = newAssigneeName.trim().split(' ')
       const firstName = nameParts[0] || ''
       const lastName = nameParts[nameParts.length - 1] || ''
-      
+
       // Create email: first letter of first name + last name + @newcorner.sa
       const emailPrefix = (firstName.charAt(0) + lastName).toLowerCase().replace(/\s+/g, '')
       let email = `${emailPrefix}@newcorner.sa`
-      
+
       // Check if email already exists and add number if needed
       const existingUsers = JSON.parse(localStorage.getItem("users") || "[]")
       let emailCounter = 1
@@ -651,7 +661,7 @@ function TasksPageContent() {
         finalEmail = `${emailPrefix}${emailCounter}@newcorner.sa`
         emailCounter++
       }
-      
+
       // Create default password: first letter of first name + last name + 123
       const defaultPassword = `${firstName.charAt(0)}${lastName}123`.toLowerCase().replace(/\s+/g, '')
 
@@ -667,7 +677,7 @@ function TasksPageContent() {
         monthlySalary: 5000, // مرتب مبدئي 5000 ريال
         createdAt: new Date().toISOString(),
       }
-      
+
       try {
         // Save to backend database
         const response = await fetch('/api/users', {
@@ -687,17 +697,17 @@ function TasksPageContent() {
 
         // Add to users list
         dispatch({ type: "ADD_USER", payload: newAssignee })
-        
+
         // Save to localStorage
         existingUsers.push(newAssignee)
         localStorage.setItem("users", JSON.stringify(existingUsers))
-        
+
         // إرسال تحديث فوري
         realtimeUpdates.sendUserUpdate({ action: 'create', user: newAssignee })
-        
+
         // Update form data
         setFormData(prev => ({ ...prev, assigneeId: newAssignee.id }))
-        
+
         // Add notification
         addNotification({
           userId: currentUser?.id || "",
@@ -707,7 +717,7 @@ function TasksPageContent() {
           isRead: false,
           triggeredBy: currentUser?.id || "",
         })
-        
+
         // Reset input
         setShowNewAssigneeInput(false)
         setNewAssigneeName("")
@@ -742,7 +752,7 @@ function TasksPageContent() {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       }
-      
+
       try {
         // Save to backend database
         const response = await fetch('/api/projects', {
@@ -762,18 +772,18 @@ function TasksPageContent() {
 
         // Add to projects list
         dispatch({ type: "ADD_PROJECT", payload: newProject })
-        
+
         // Save to localStorage
         const existingProjects = JSON.parse(localStorage.getItem("projects") || "[]")
         existingProjects.push(newProject)
         localStorage.setItem("projects", JSON.stringify(existingProjects))
-        
+
         // إرسال تحديث فوري لجميع المستخدمين
         realtimeUpdates.sendProjectUpdate({ action: 'create', project: newProject, userId: currentUser?.id, userName: currentUser?.name })
-        
+
         // Update form data
         setFormData(prev => ({ ...prev, projectId: newProject.id }))
-        
+
         // Add notification
         addNotification({
           userId: currentUser?.id || "",
@@ -783,7 +793,7 @@ function TasksPageContent() {
           isRead: false,
           triggeredBy: currentUser?.id || "",
         })
-        
+
         // Reset input
         setShowNewProjectInput(false)
         setNewProjectName("")
@@ -888,23 +898,23 @@ function TasksPageContent() {
                           </SelectTrigger>
                           <SelectContent>
                             {users
-                              .filter((user, index, self) => 
+                              .filter((user, index, self) =>
                                 // إزالة التكرار بناءً على المعرف
                                 index === self.findIndex(u => u.id === user.id)
                               )
                               .map((user) => (
-                              <SelectItem key={user.id} value={user.id}>
-                                <div className="flex items-center space-x-2 space-x-reverse">
-                                  <span>{user.name}</span>
-                                  <Badge variant="outline" className="text-xs">
-                                    {user.role === "admin" ? "مدير" : 
-                                     user.role === "engineer" ? "مهندس" :
-                                     user.role === "accountant" ? "محاسب" :
-                                     user.role === "hr" ? "موارد بشرية" : user.role}
-                                  </Badge>
-                                </div>
-                              </SelectItem>
-                            ))}
+                                <SelectItem key={user.id} value={user.id}>
+                                  <div className="flex items-center space-x-2 space-x-reverse">
+                                    <span>{user.name}</span>
+                                    <Badge variant="outline" className="text-xs">
+                                      {user.role === "admin" ? "مدير" :
+                                        user.role === "engineer" ? "مهندس" :
+                                          user.role === "accountant" ? "محاسب" :
+                                            user.role === "hr" ? "موارد بشرية" : user.role}
+                                    </Badge>
+                                  </div>
+                                </SelectItem>
+                              ))}
                           </SelectContent>
                         </Select>
                         {(hasPermission(currentUser?.role || "", "create", "users") || currentUser?.role === "engineer") && (
@@ -996,8 +1006,8 @@ function TasksPageContent() {
                                 <span>{project.name}</span>
                                 <Badge variant="outline" className="text-xs">
                                   {project.status === "in-progress" ? "قيد التنفيذ" :
-                                   project.status === "completed" ? "مكتمل" :
-                                   project.status === "canceled" ? "ملغي" : "مسودة"}
+                                    project.status === "completed" ? "مكتمل" :
+                                      project.status === "canceled" ? "ملغي" : "مسودة"}
                                 </Badge>
                               </div>
                             </SelectItem>
@@ -1054,12 +1064,12 @@ function TasksPageContent() {
                   )}
                 </div>
               </div>
-                              <div className="flex justify-end space-x-2 space-x-reverse">
-                  <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                    إلغاء
-                  </Button>
-                  <Button onClick={handleCreateTask}>حفظ المهمة</Button>
-                </div>
+              <div className="flex justify-end space-x-2 space-x-reverse">
+                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                  إلغاء
+                </Button>
+                <Button onClick={handleCreateTask}>حفظ المهمة</Button>
+              </div>
             </DialogContent>
           </Dialog>
         )}
@@ -1137,9 +1147,8 @@ function TasksPageContent() {
                     <div
                       ref={provided.innerRef}
                       {...provided.droppableProps}
-                      className={`space-y-3 min-h-[200px] p-2 rounded-lg transition-colors ${
-                        snapshot.isDraggingOver ? "bg-blue-50" : ""
-                      }`}
+                      className={`space-y-3 min-h-[200px] p-2 rounded-lg transition-colors ${snapshot.isDraggingOver ? "bg-blue-50" : ""
+                        }`}
                     >
                       {tasksByStatus[status].map((task, index) => (
                         <Draggable key={task.id} draggableId={task.id} index={index}>
@@ -1258,10 +1267,10 @@ function TasksPageContent() {
                             <div className="flex items-center space-x-2 space-x-reverse">
                               <span>{user.name}</span>
                               <Badge variant="outline" className="text-xs">
-                                {user.role === "admin" ? "مدير" : 
-                                 user.role === "engineer" ? "مهندس" :
-                                 user.role === "accountant" ? "محاسب" :
-                                 user.role === "hr" ? "موارد بشرية" : user.role}
+                                {user.role === "admin" ? "مدير" :
+                                  user.role === "engineer" ? "مهندس" :
+                                    user.role === "accountant" ? "محاسب" :
+                                      user.role === "hr" ? "موارد بشرية" : user.role}
                               </Badge>
                             </div>
                           </SelectItem>
@@ -1350,8 +1359,8 @@ function TasksPageContent() {
                             <span>{project.name}</span>
                             <Badge variant="outline" className="text-xs">
                               {project.status === "in-progress" ? "قيد التنفيذ" :
-                               project.status === "completed" ? "مكتمل" :
-                               project.status === "canceled" ? "ملغي" : "مسودة"}
+                                project.status === "completed" ? "مكتمل" :
+                                  project.status === "canceled" ? "ملغي" : "مسودة"}
                             </Badge>
                           </div>
                         </SelectItem>
@@ -1467,12 +1476,12 @@ function TasksPageContent() {
                   <Badge variant={getPriorityColor(selectedTask.priority)} className="mt-2">
                     {getPriorityText(selectedTask.priority)}
                   </Badge>
-                  <Badge 
+                  <Badge
                     variant={selectedTask.status === "completed" ? "default" : selectedTask.status === "in-progress" ? "secondary" : "outline"}
                     className="mr-2"
                   >
-                    {selectedTask.status === "todo" ? "قائمة المهام" : 
-                     selectedTask.status === "in-progress" ? "قيد التنفيذ" : "مكتملة"}
+                    {selectedTask.status === "todo" ? "قائمة المهام" :
+                      selectedTask.status === "in-progress" ? "قيد التنفيذ" : "مكتملة"}
                   </Badge>
                 </div>
               </div>

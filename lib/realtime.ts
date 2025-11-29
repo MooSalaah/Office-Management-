@@ -5,7 +5,7 @@ export class RealtimeUpdates {
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
   private isConnected = false;
-  private listeners: Map<string, Function[]> = new Map();
+  private listeners: Map<string, ((...args: any[]) => void)[]> = new Map();
 
   constructor() {
     this.initialize();
@@ -15,7 +15,7 @@ export class RealtimeUpdates {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
       this.eventSource = new EventSource(`${apiUrl}/api/realtime`);
-      
+
       this.eventSource.onopen = () => {
         console.log('✅ Realtime connection established');
         this.isConnected = true;
@@ -53,7 +53,7 @@ export class RealtimeUpdates {
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
       console.log(`🔄 Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
-      
+
       setTimeout(() => {
         this.cleanup();
         this.initialize();
@@ -66,7 +66,7 @@ export class RealtimeUpdates {
   private handleMessage(data: any) {
     const { type, action, ...payload } = data;
     const eventKey = `${type}:${action}`;
-    
+
     if (this.listeners.has(eventKey)) {
       this.listeners.get(eventKey)?.forEach(callback => {
         try {
@@ -78,14 +78,14 @@ export class RealtimeUpdates {
     }
   }
 
-  public on(event: string, callback: Function) {
+  public on(event: string, callback: (...args: any[]) => void) {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, []);
     }
     this.listeners.get(event)?.push(callback);
   }
 
-  public off(event: string, callback: Function) {
+  public off(event: string, callback: (...args: any[]) => void) {
     const callbacks = this.listeners.get(event);
     if (callbacks) {
       const index = callbacks.indexOf(callback);
@@ -136,12 +136,13 @@ export class RealtimeUpdates {
 }
 
 // Create global instance
+export const sseRealtime = new RealtimeUpdates();
 if (typeof window !== 'undefined') {
-  const realtimeUpdates = new RealtimeUpdates();
-  
+  const realtimeUpdates = sseRealtime;
+
   // تعيين مباشر بدون getter/setter
   (window as any).realtimeUpdates = realtimeUpdates;
-  
+
   // Expose methods on window for compatibility
   (window as any).realtimeUpdates.on = realtimeUpdates.on.bind(realtimeUpdates);
   (window as any).realtimeUpdates.off = realtimeUpdates.off.bind(realtimeUpdates);
@@ -163,7 +164,7 @@ export type RealtimeDataType = any;
 export type RealtimeUpdate = any;
 
 // Export hook
-export const useRealtime = (event: string, callback: Function) => {
+export const useRealtime = (_event: string, _callback: (...args: any[]) => void) => {
   // Implementation for useRealtime hook
   return { realtimeManager: (window as any).realtimeUpdates };
 };

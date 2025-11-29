@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { broadcastUpdate, useRealtime as useSSERealtime, RealtimeDataType, RealtimeUpdate } from "./realtime";
+import { RealtimeDataType, RealtimeUpdate, sseRealtime } from "./realtime";
 import { Project, Task, Client, Transaction, Notification, User, AttendanceRecord } from './types';
 
 // نظام التحديثات الحية باستخدام SSE (Server-Sent Events)
@@ -29,7 +29,7 @@ export class RealtimeUpdates {
 
 			// إرسال التحديث للمستمعين المحليين فقط
 			this.notifyListeners(type, data);
-			
+
 			// إرسال عبر SSE إذا كان متاحاً
 			if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
 				const realtimeUpdates = (window as any).realtimeUpdates;
@@ -73,9 +73,9 @@ export class RealtimeUpdates {
 		if (typeof window === "undefined") return;
 
 		// استخدام SSE من realtime.ts
-		const { realtimeManager } = require("./realtime");
-		if (realtimeManager) {
-			realtimeManager.subscribe(type, (update: RealtimeUpdate) => {
+		// استخدام SSE من realtime.ts
+		if (sseRealtime) {
+			sseRealtime.on(type, (update: RealtimeUpdate) => {
 				// إرسال التحديث لجميع المستمعين المحليين
 				this.notifyListeners(type, update.data);
 			});
@@ -102,36 +102,10 @@ export class RealtimeUpdates {
 	}
 
 	// الحصول على معرف المستخدم الحالي
-	private getCurrentUserId(): string {
-		if (typeof window === "undefined") return "";
-
-		const userData = localStorage.getItem("currentUser");
-		if (userData) {
-			try {
-				const user = JSON.parse(userData);
-				return user.id || "";
-			} catch (error) {
-				console.error("Error parsing current user:", error);
-			}
-		}
-		return "";
-	}
+	// private getCurrentUserId(): string { ... } - Removed unused method
 
 	// الحصول على اسم المستخدم الحالي
-	private getCurrentUserName(): string {
-		if (typeof window === "undefined") return "";
-
-		const userData = localStorage.getItem("currentUser");
-		if (userData) {
-			try {
-				const user = JSON.parse(userData);
-				return user.name || "";
-			} catch (error) {
-				console.error("Error parsing current user:", error);
-			}
-		}
-		return "";
-	}
+	// private getCurrentUserName(): string { ... } - Removed unused method
 
 	// إرسال إشعار فوري
 	sendNotification(notification: Notification) {

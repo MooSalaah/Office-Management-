@@ -44,7 +44,7 @@ import { formatCurrency } from "@/lib/utils"
 import { ArabicNumber } from "@/components/ui/ArabicNumber"
 import { SwipeToDelete } from "@/components/ui/swipe-to-delete"
 import { PermissionGuard } from "@/components/ui/permission-guard"
-import { useTransactionSearch, useTypeFilter, useDateFilter, useSortedData } from "@/lib/performance"
+import { useMemo } from "react"
 import { InvoiceGenerator } from "@/lib/invoice-generator"
 import { DeleteDialog } from "@/components/ui/delete-dialog"
 import { useSearchParams } from "next/navigation"
@@ -74,13 +74,13 @@ function FinancePageContent() {
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false)
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
-  const [transactionLocks, setTransactionLocks] = useState<{[key: string]: {userId: string, userName: string, timestamp: number}}>({})
+  const [transactionLocks, setTransactionLocks] = useState<{ [key: string]: { userId: string, userName: string, timestamp: number } }>({})
   const [isMonthlyGrowthDialogOpen, setIsMonthlyGrowthDialogOpen] = useState(false)
   const [isPaymentDetailsDialogOpen, setIsPaymentDetailsDialogOpen] = useState(false)
   const [selectedPayment, setSelectedPayment] = useState<any>(null)
   const [isAddPaymentDialogOpen, setIsAddPaymentDialogOpen] = useState(false)
   const [isPaymentConfirmDialogOpen, setIsPaymentConfirmDialogOpen] = useState(false)
-  const [paymentActionToConfirm, setPaymentActionToConfirm] = useState<{action: 'complete' | 'delete', payment: any} | null>(null)
+  const [paymentActionToConfirm, setPaymentActionToConfirm] = useState<{ action: 'complete' | 'delete', payment: any } | null>(null)
   const [isSuccessDialogOpen, setIsSuccessDialogOpen] = useState(false)
   const [successMessage, setSuccessMessage] = useState("")
   const [alert, setAlert] = useState<{ type: "success" | "error"; message: string } | null>(null)
@@ -142,22 +142,22 @@ function FinancePageContent() {
 
   const currentMonthIncome = monthlyTransactions.filter((t) => t.type === "income").reduce((sum, t) => sum + t.amount, 0)
   const currentMonthExpenses = monthlyTransactions.filter((t) => t.type === "expense").reduce((sum, t) => sum + t.amount, 0)
-  
+
   const lastMonthIncome = lastMonthTransactions.filter((t) => t.type === "income").reduce((sum, t) => sum + t.amount, 0)
   const lastMonthExpenses = lastMonthTransactions.filter((t) => t.type === "expense").reduce((sum, t) => sum + t.amount, 0)
 
-  const incomeGrowth = lastMonthIncome > 0 
+  const incomeGrowth = lastMonthIncome > 0
     ? (((currentMonthIncome - lastMonthIncome) / lastMonthIncome) * 100).toFixed(1)
     : currentMonthIncome > 0 ? "100" : "0"
 
-  const expensesGrowth = lastMonthExpenses > 0 
+  const expensesGrowth = lastMonthExpenses > 0
     ? (((currentMonthExpenses - lastMonthExpenses) / lastMonthExpenses) * 100).toFixed(1)
     : currentMonthExpenses > 0 ? "100" : "0"
 
   const currentMonthProfit = currentMonthIncome - currentMonthExpenses
   const lastMonthProfit = lastMonthIncome - lastMonthExpenses
 
-  const profitGrowth = lastMonthProfit > 0 
+  const profitGrowth = lastMonthProfit > 0
     ? (((currentMonthProfit - lastMonthProfit) / lastMonthProfit) * 100).toFixed(1)
     : currentMonthProfit > 0 ? "100" : "0"
 
@@ -172,9 +172,28 @@ function FinancePageContent() {
   const upcomingPaymentsList = state.upcomingPayments || []
 
   // استخدام التحسينات الجديدة للبحث والفلترة
-  const searchedTransactions = useTransactionSearch(transactions, searchTerm)
-  const typeFilteredTransactions = useTypeFilter(searchedTransactions, filterType)
-  const filteredTransactions = typeFilteredTransactions
+  // استخدام التحسينات الجديدة للبحث والفلترة
+  const filteredTransactions = useMemo(() => {
+    let result = transactions;
+
+    // Search
+    if (searchTerm) {
+      const lowerTerm = searchTerm.toLowerCase();
+      result = result.filter(t =>
+        t.description.toLowerCase().includes(lowerTerm) ||
+        t.amount.toString().includes(lowerTerm) ||
+        (t.clientName && t.clientName.toLowerCase().includes(lowerTerm)) ||
+        (t.projectName && t.projectName.toLowerCase().includes(lowerTerm))
+      );
+    }
+
+    // Filter by type
+    if (filterType !== 'all') {
+      result = result.filter(t => t.type === filterType);
+    }
+
+    return result;
+  }, [transactions, searchTerm, filterType]);
 
   const [requiredFieldsTransaction, setRequiredFieldsTransaction] = useState({
     description: false,
@@ -195,7 +214,7 @@ function FinancePageContent() {
         if (data.success) {
           dispatch({ type: "LOAD_UPCOMING_PAYMENTS", payload: data.data });
         }
-      } catch (err) {}
+      } catch (err) { }
     }
     fetchUpcomingPayments();
   }, [dispatch]);
@@ -206,7 +225,7 @@ function FinancePageContent() {
     if (state.loadingStates.transactions) {
       return;
     }
-    
+
     const missingFields = {
       description: !formData.description,
       amount: !formData.amount,
@@ -252,22 +271,22 @@ function FinancePageContent() {
     try {
       // تعيين حالة التحميل لمنع الحفظ المتكرر
       dispatch({ type: "SET_LOADING_STATE", payload: { key: 'transactions', value: true } });
-      
+
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
       const response = await fetch(`${apiUrl}/api/transactions`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
         },
         body: JSON.stringify(newTransaction),
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
           dispatch({ type: "ADD_TRANSACTION", payload: data.data || newTransaction });
-          
+
           // إضافة المعاملة تلقائياً للدفعات القادمة إذا كانت من نوع "income"
           if (formData.type === "income" && formData.amount) {
             const newUpcomingPayment = {
@@ -288,16 +307,16 @@ function FinancePageContent() {
               status: "pending" as "pending" | "overdue",
               createdAt: new Date().toISOString(),
             };
-            
+
             // إضافة للدفعات القادمة
             dispatch({ type: "ADD_UPCOMING_PAYMENT", payload: newUpcomingPayment });
-            
+
             // حفظ في localStorage
             const existingPayments = JSON.parse(localStorage.getItem("upcomingPayments") || "[]");
             existingPayments.push(newUpcomingPayment);
             localStorage.setItem("upcomingPayments", JSON.stringify(existingPayments));
           }
-          
+
           setAlert({ type: "success", message: "تم إضافة المعاملة المالية بنجاح" });
           resetForm();
         } else {
@@ -384,7 +403,7 @@ function FinancePageContent() {
   const acquireTransactionLock = (transactionId: string): boolean => {
     const now = Date.now()
     const lockTimeout = 5 * 60 * 1000 // 5 minutes
-    
+
     // Check if transaction is already locked
     const existingLock = transactionLocks[transactionId]
     if (existingLock) {
@@ -411,22 +430,22 @@ function FinancePageContent() {
         })
       }
     }
-    
+
     // Acquire new lock
     setTransactionLocks(prev => ({
       ...prev,
       [transactionId]: { userId: currentUser?.id || "", userName: currentUser?.name || "", timestamp: now }
     }))
-    
+
     // Broadcast lock to other users
     if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
-      (window as any).realtimeUpdates.sendUpdate('transaction', 'lock', { 
-        transactionId, 
-        userId: currentUser?.id, 
-        userName: currentUser?.name 
+      (window as any).realtimeUpdates.sendUpdate('transaction', 'lock', {
+        transactionId,
+        userId: currentUser?.id,
+        userName: currentUser?.name
       })
     }
-    
+
     return true
   }
 
@@ -436,13 +455,13 @@ function FinancePageContent() {
       delete newLocks[transactionId]
       return newLocks
     })
-    
+
     // Broadcast lock release to other users
     if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
-      (window as any).realtimeUpdates.sendUpdate('transaction', 'unlock', { 
-        transactionId, 
-        userId: currentUser?.id, 
-        userName: currentUser?.name 
+      (window as any).realtimeUpdates.sendUpdate('transaction', 'unlock', {
+        transactionId,
+        userId: currentUser?.id,
+        userName: currentUser?.name
       })
     }
   }
@@ -451,13 +470,13 @@ function FinancePageContent() {
     // Try to acquire lock
     if (!acquireTransactionLock(transaction.id)) {
       const lock = transactionLocks[transaction.id]
-      setAlert({ 
-        type: "error", 
-        message: `هذه المعاملة محجوزة للتعديل بواسطة ${lock?.userName || "مستخدم آخر"}. يرجى المحاولة لاحقاً.` 
+      setAlert({
+        type: "error",
+        message: `هذه المعاملة محجوزة للتعديل بواسطة ${lock?.userName || "مستخدم آخر"}. يرجى المحاولة لاحقاً.`
       })
       return
     }
-    
+
     setEditingTransaction(transaction)
     setFormData({
       type: transaction.type,
@@ -529,37 +548,37 @@ function FinancePageContent() {
         const completePayment = async () => {
           try {
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
-            
+
             // استدعاء API لإكمال الدفعة وإنشاء المعاملة
             const response = await fetch(`/api/upcomingPayments/${payment.id}/complete`, {
               method: 'POST',
-              headers: { 
+              headers: {
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
                 completedBy: currentUser?.id || ""
               }),
             });
-            
+
             if (response.ok) {
               const data = await response.json();
               if (data.success) {
                 // إضافة المعاملة المالية
                 dispatch({ type: "ADD_TRANSACTION", payload: data.data.transaction });
-                
+
                 // حذف الدفعة القادمة من القائمة
                 dispatch({ type: "DELETE_UPCOMING_PAYMENT", payload: payment.id });
-                
+
                 // حفظ في localStorage
                 const existingTransactions = JSON.parse(localStorage.getItem("transactions") || "[]");
                 const updatedTransactions = [...existingTransactions, data.data.transaction];
                 localStorage.setItem("transactions", JSON.stringify(updatedTransactions));
-                
+
                 // حذف الدفعة من localStorage
                 const existingPayments = JSON.parse(localStorage.getItem("upcomingPayments") || "[]");
                 const filteredPayments = existingPayments.filter((p: any) => p.id !== payment.id);
                 localStorage.setItem("upcomingPayments", JSON.stringify(filteredPayments));
-                
+
                 setSuccessMessage("تم إكمال الدفعة وإنشاء المعاملة المالية بنجاح");
                 setIsSuccessDialogOpen(true);
               } else {
@@ -574,24 +593,24 @@ function FinancePageContent() {
             setAlert({ type: "error", message: "حدث خطأ في إكمال الدفعة" });
           }
         };
-        
+
         // تنفيذ إكمال الدفعة
         completePayment();
         break
-        
+
       case 'delete':
         dispatch({ type: "DELETE_UPCOMING_PAYMENT", payload: payment.id })
-        
+
         // Remove from localStorage
         const existingPaymentsForDelete = JSON.parse(localStorage.getItem("upcomingPayments") || "[]")
         const filteredPaymentsForDelete = existingPaymentsForDelete.filter((p: any) => p.id !== payment.id)
         localStorage.setItem("upcomingPayments", JSON.stringify(filteredPaymentsForDelete))
-        
+
         setSuccessMessage("تم حذف الدفعة بنجاح")
         setIsSuccessDialogOpen(true)
         break
     }
-    
+
     setIsPaymentConfirmDialogOpen(false)
     setPaymentActionToConfirm(null)
   }
@@ -612,7 +631,7 @@ function FinancePageContent() {
     // تحديد اسم الدافع والمستلم بناءً على نوع الدفعة
     let payerName = paymentFormData.payerName || "";
     let recipientName = currentUser?.name || "";
-    
+
     // إذا كانت دفعة مقدمة لمشروع، اسم الدافع هو العميل واسم المستلم هو منشئ المشروع
     if (paymentFormData.projectId) {
       const project = projects.find(p => p.id === paymentFormData.projectId);
@@ -647,20 +666,20 @@ function FinancePageContent() {
     try {
       const res = await fetch(`${API_BASE_URL}/api/upcomingPayments`, {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
         },
         body: JSON.stringify(newPayment),
       });
-      
+
       const data = await res.json();
       if (res.ok && data.success) {
         dispatch({ type: "ADD_UPCOMING_PAYMENT", payload: data.data });
         setIsAddPaymentDialogOpen(false);
         setSuccessMessage("تمت إضافة الدفعة القادمة بنجاح!");
         setIsSuccessDialogOpen(true);
-        
+
         // إعادة تعيين النموذج
         setPaymentFormData({
           client: "",
@@ -725,7 +744,7 @@ function FinancePageContent() {
           notes: "",
         });
       }
-    } catch (err) {}
+    } catch (err) { }
   };
 
   // حذف دفعة قادمة
@@ -737,12 +756,12 @@ function FinancePageContent() {
       const data = await res.json();
       if (data.success) {
         dispatch({ type: "DELETE_UPCOMING_PAYMENT", payload: id });
-        
+
         // حذف من localStorage
         const existingPayments = JSON.parse(localStorage.getItem("upcomingPayments") || "[]");
         const filteredPayments = existingPayments.filter((p: any) => p.id !== id);
         localStorage.setItem("upcomingPayments", JSON.stringify(filteredPayments));
-        
+
         setSuccessMessage("تم حذف الدفعة بنجاح");
         setIsSuccessDialogOpen(true);
       } else {
@@ -761,7 +780,7 @@ function FinancePageContent() {
     const companyLogo = String(state.companySettings?.logo || "")
     const companyName = state.companySettings?.name || "اسم الشركة"
     const companyPhones = "0557917094 - 0533560878"
-    
+
     // Filter transactions based on type
     let filteredTransactions = transactions
     if (type === "income") {
@@ -924,17 +943,17 @@ function FinancePageContent() {
       return;
     }
     setNewTransactionTypeError("");
-    
+
     // تحديث بيانات النموذج بالنوع الجديد
     setFormData(prev => ({ ...prev, transactionType: newTransactionType.trim() as "license" | "certificate" | "safety" | "consultation" | "design" | "supervision" | "maintenance" | "renovation" | "inspection" | "other" }))
-    
+
     // حفظ أنواع المعاملات في localStorage
     const existingTypes = JSON.parse(localStorage.getItem("transactionTypes") || "[]")
     if (!existingTypes.includes(newTransactionType.trim())) {
       existingTypes.push(newTransactionType.trim())
       localStorage.setItem("transactionTypes", JSON.stringify(existingTypes))
     }
-    
+
     // إرسال إشعار للمدير
     if (currentUser?.role !== "admin") {
       addNotification({
@@ -946,7 +965,7 @@ function FinancePageContent() {
         triggeredBy: currentUser?.id || "",
       })
     }
-    
+
     // إعادة تعيين الحقول
     setShowNewTransactionTypeInput(false)
     setNewTransactionType("")
@@ -959,17 +978,17 @@ function FinancePageContent() {
       return;
     }
     setNewPaymentMethodError("");
-    
+
     // تحديث بيانات النموذج بالطريقة الجديدة
     setFormData(prev => ({ ...prev, paymentMethod: newPaymentMethod.trim() as "cash" | "transfer" | "pos" | "check" | "credit" }))
-    
+
     // حفظ طرق الدفع في localStorage
     const existingMethods = JSON.parse(localStorage.getItem("paymentMethods") || "[]")
     if (!existingMethods.includes(newPaymentMethod.trim())) {
       existingMethods.push(newPaymentMethod.trim())
       localStorage.setItem("paymentMethods", JSON.stringify(existingMethods))
     }
-    
+
     // إرسال إشعار للمدير
     if (currentUser?.role !== "admin") {
       addNotification({
@@ -981,7 +1000,7 @@ function FinancePageContent() {
         triggeredBy: currentUser?.id || "",
       })
     }
-    
+
     // إعادة تعيين الحقول
     setShowNewPaymentMethodInput(false)
     setNewPaymentMethod("")
@@ -1041,7 +1060,7 @@ function FinancePageContent() {
     const due = new Date(dueDate)
     const diffTime = due.getTime() - today.getTime()
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    
+
     if (diffDays < 0) {
       return {
         status: "overdue",
@@ -1080,7 +1099,7 @@ function FinancePageContent() {
   // دالة لإرسال إشعارات للدفعات المتأخرة والقادمة
   const checkOverduePayments = () => {
     const today = new Date()
-    
+
     // فحص الدفعات المتأخرة
     const overduePayments = upcomingPaymentsList.filter(payment => {
       const dueDate = new Date(payment.dueDate)
@@ -1089,7 +1108,7 @@ function FinancePageContent() {
 
     overduePayments.forEach(payment => {
       const daysOverdue = Math.ceil((today.getTime() - new Date(payment.dueDate).getTime()) / (1000 * 60 * 60 * 24))
-      
+
       // إرسال إشعار فقط إذا كانت الدفعة متأخرة ولم يتم إرسال إشعار لها من قبل
       if (payment.status !== "overdue") {
         addNotification({
@@ -1152,7 +1171,7 @@ function FinancePageContent() {
   // تشغيل فحص الدفعات المتأخرة عند تحميل الصفحة
   useEffect(() => {
     checkOverduePayments()
-    
+
     // تحديث حالة الدفعات كل دقيقة
     const interval = setInterval(() => {
       const updatedPayments = upcomingPaymentsList.map(payment => {
@@ -1178,27 +1197,27 @@ function FinancePageContent() {
   const handleCreateInvoice = async (transaction: Transaction) => {
     const project = projects.find(p => p.id === transaction.projectId)
     const client = clients.find(c => c.id === transaction.clientId || c.id === project?.clientId)
-    
+
     if (project && client) {
       try {
         // تحميل أحدث بيانات المكتب من قاعدة البيانات
         const response = await fetch('/api/companySettings');
         const data = await response.json();
-        
+
         let companySettings = state.companySettings;
         if (data.success && data.data) {
           companySettings = data.data;
           // تحديث localStorage
           localStorage.setItem("companySettings", JSON.stringify(companySettings));
         }
-        
+
         const htmlContent = InvoiceGenerator.generateInvoiceFromTransaction(
           transaction,
           project,
           client,
           companySettings
         )
-        
+
         InvoiceGenerator.openInvoiceInNewTab(htmlContent)
       } catch (error) {
         console.error('Error loading company settings:', error);
@@ -1209,7 +1228,7 @@ function FinancePageContent() {
           client,
           state.companySettings
         )
-        
+
         InvoiceGenerator.openInvoiceInNewTab(htmlContent)
       }
     } else {
@@ -1263,7 +1282,7 @@ function FinancePageContent() {
           <p className="text-muted-foreground mt-1">إدارة الدخل والمصروفات والتقارير المالية</p>
         </div>
         <div className="flex space-x-2 space-x-reverse">
-                    {/* إظهار زر تصدير التقرير للمديرين والمحاسبين فقط */}
+          {/* إظهار زر تصدير التقرير للمديرين والمحاسبين فقط */}
           {(currentUser?.role === "admin" || currentUser?.role === "accountant") && (
             <Dialog>
               <DialogTrigger asChild>
@@ -1273,38 +1292,38 @@ function FinancePageContent() {
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>تصدير التقرير المالي</DialogTitle>
-                <DialogDescription>اختر نوع التقرير المراد تصديره</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start"
-                  onClick={() => exportPDF("income")}
-                >
-                  <ArrowUpCircle className="w-4 h-4 mr-2" />
-                  تقرير الدخل
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start"
-                  onClick={() => exportPDF("expense")}
-                >
-                  <ArrowDownCircle className="w-4 h-4 mr-2" />
-                  تقرير المصروفات
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start"
-                  onClick={() => exportPDF("all")}
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  التقرير المالي الشامل
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+                <DialogHeader>
+                  <DialogTitle>تصدير التقرير المالي</DialogTitle>
+                  <DialogDescription>اختر نوع التقرير المراد تصديره</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() => exportPDF("income")}
+                  >
+                    <ArrowUpCircle className="w-4 h-4 mr-2" />
+                    تقرير الدخل
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() => exportPDF("expense")}
+                  >
+                    <ArrowDownCircle className="w-4 h-4 mr-2" />
+                    تقرير المصروفات
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() => exportPDF("all")}
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    التقرير المالي الشامل
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           )}
           {canCreateTransaction && (
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -1573,8 +1592,8 @@ function FinancePageContent() {
                       value={formData.projectId}
                       onValueChange={(value) => {
                         const project = projects.find(p => p.id === value);
-                        setFormData((prev) => ({ 
-                          ...prev, 
+                        setFormData((prev) => ({
+                          ...prev,
                           projectId: value,
                           payerName: project ? project.client : prev.payerName
                         }));
@@ -1700,98 +1719,98 @@ function FinancePageContent() {
       {/* Financial Summary - إظهار للمديرين والمحاسبين فقط */}
       {(currentUser?.role === "admin" || currentUser?.role === "accountant") && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card 
-          className="cursor-pointer hover:shadow-md transition-shadow bg-card text-card-foreground"
-          onClick={() => setFilterType("income")}
-        >
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">إجمالي الدخل</p>
-                <div className="flex items-center gap-1 mt-1">
-                  <span className="text-2xl font-bold text-green-400">
-                    <ArabicNumber value={financialSummary.totalIncome} />
-                  </span>
-                  <img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="w-5 h-5 opacity-80 block dark:hidden" />
-                  <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="w-5 h-5 opacity-80 hidden dark:block" />
+          <Card
+            className="cursor-pointer hover:shadow-md transition-shadow bg-card text-card-foreground"
+            onClick={() => setFilterType("income")}
+          >
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">إجمالي الدخل</p>
+                  <div className="flex items-center gap-1 mt-1">
+                    <span className="text-2xl font-bold text-green-400">
+                      <ArabicNumber value={financialSummary.totalIncome} />
+                    </span>
+                    <img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="w-5 h-5 opacity-80 block dark:hidden" />
+                    <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="w-5 h-5 opacity-80 hidden dark:block" />
+                  </div>
+                </div>
+                <div className="p-3 rounded-full bg-green-900">
+                  <ArrowUpCircle className="w-6 h-6 text-green-400" />
                 </div>
               </div>
-              <div className="p-3 rounded-full bg-green-900">
-                <ArrowUpCircle className="w-6 h-6 text-green-400" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card 
-          className="cursor-pointer hover:shadow-md transition-shadow bg-card text-card-foreground"
-          onClick={() => setFilterType("expense")}
-        >
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">إجمالي المصروفات</p>
-                <div className="flex items-center gap-1 mt-1">
-                  <span className="text-2xl font-bold text-red-400">
-                    <ArabicNumber value={financialSummary.totalExpenses} />
-                  </span>
-                  <img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="w-5 h-5 opacity-80 block dark:hidden" />
-                  <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="w-5 h-5 opacity-80 hidden dark:block" />
+            </CardContent>
+          </Card>
+          <Card
+            className="cursor-pointer hover:shadow-md transition-shadow bg-card text-card-foreground"
+            onClick={() => setFilterType("expense")}
+          >
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">إجمالي المصروفات</p>
+                  <div className="flex items-center gap-1 mt-1">
+                    <span className="text-2xl font-bold text-red-400">
+                      <ArabicNumber value={financialSummary.totalExpenses} />
+                    </span>
+                    <img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="w-5 h-5 opacity-80 block dark:hidden" />
+                    <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="w-5 h-5 opacity-80 hidden dark:block" />
+                  </div>
+                </div>
+                <div className="p-3 rounded-full bg-red-900">
+                  <ArrowDownCircle className="w-6 h-6 text-red-400" />
                 </div>
               </div>
-              <div className="p-3 rounded-full bg-red-900">
-                <ArrowDownCircle className="w-6 h-6 text-red-400" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card 
-          className="cursor-pointer hover:shadow-md transition-shadow bg-card text-card-foreground"
-          onClick={() => setFilterType("all")}
-        >
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">صافي الربح</p>
-                <div className="flex items-center gap-1 mt-1">
-                  <span className={`text-2xl font-bold ${financialSummary.netProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    <ArabicNumber value={financialSummary.netProfit} />
-                  </span>
-                  <img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="w-5 h-5 opacity-80 block dark:hidden" />
-                  <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="w-5 h-5 opacity-80 hidden dark:block" />
+            </CardContent>
+          </Card>
+          <Card
+            className="cursor-pointer hover:shadow-md transition-shadow bg-card text-card-foreground"
+            onClick={() => setFilterType("all")}
+          >
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">صافي الربح</p>
+                  <div className="flex items-center gap-1 mt-1">
+                    <span className={`text-2xl font-bold ${financialSummary.netProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      <ArabicNumber value={financialSummary.netProfit} />
+                    </span>
+                    <img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="w-5 h-5 opacity-80 block dark:hidden" />
+                    <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="w-5 h-5 opacity-80 hidden dark:block" />
+                  </div>
+                </div>
+                <div className={`p-3 rounded-full ${financialSummary.netProfit >= 0 ? 'bg-green-900' : 'bg-red-900'}`}>
+                  <DollarSign className={`w-6 h-6 ${financialSummary.netProfit >= 0 ? 'text-green-400' : 'text-red-400'}`} />
                 </div>
               </div>
-              <div className={`p-3 rounded-full ${financialSummary.netProfit >= 0 ? 'bg-green-900' : 'bg-red-900'}`}>
-                <DollarSign className={`w-6 h-6 ${financialSummary.netProfit >= 0 ? 'text-green-400' : 'text-red-400'}`} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card 
-          className="cursor-pointer hover:shadow-md transition-shadow bg-card text-card-foreground"
-          onClick={openMonthlyGrowthDialog}
-        >
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">
-                  النمو الشهري - {new Date().toLocaleDateString('ar-SA', { month: 'long', year: 'numeric' })}
-                </p>
-                <div className="flex items-center gap-1 mt-1">
-                  <span className="text-2xl font-bold text-blue-400">
-                    {financialSummary.monthlyGrowth}
-                  </span>
+            </CardContent>
+          </Card>
+          <Card
+            className="cursor-pointer hover:shadow-md transition-shadow bg-card text-card-foreground"
+            onClick={openMonthlyGrowthDialog}
+          >
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    النمو الشهري - {new Date().toLocaleDateString('ar-SA', { month: 'long', year: 'numeric' })}
+                  </p>
+                  <div className="flex items-center gap-1 mt-1">
+                    <span className="text-2xl font-bold text-blue-400">
+                      {financialSummary.monthlyGrowth}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    مقارنة بـ {new Date(lastMonthYear, lastMonth).toLocaleDateString('ar-SA', { month: 'long', year: 'numeric' })}
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  مقارنة بـ {new Date(lastMonthYear, lastMonth).toLocaleDateString('ar-SA', { month: 'long', year: 'numeric' })}
-                </p>
+                <div className="p-3 rounded-full bg-blue-900">
+                  <TrendingUp className="w-6 h-6 text-blue-400" />
+                </div>
               </div>
-              <div className="p-3 rounded-full bg-blue-900">
-                <TrendingUp className="w-6 h-6 text-blue-400" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1842,10 +1861,10 @@ function FinancePageContent() {
             </CardHeader>
             <CardContent className="space-y-4">
               {filteredTransactions.map((transaction, idx) => (
-                                 <SwipeToDelete
-                   key={transaction.id}
-                   onDelete={() => handleDeleteTransaction(transaction.id)}
-                 >
+                <SwipeToDelete
+                  key={transaction.id}
+                  onDelete={() => handleDeleteTransaction(transaction.id)}
+                >
                   <div
                     className={`flex items-center justify-between p-4 border rounded-lg transition-colors cursor-pointer ${idx % 2 === 0 ? 'bg-muted' : ''} hover:bg-muted`}
                     onClick={() => openDetailsDialog(transaction)}
@@ -1993,8 +2012,8 @@ function FinancePageContent() {
             {upcomingPaymentsList.map((payment, index) => {
               const paymentStatus = getPaymentStatus(payment.dueDate)
               return (
-                <div 
-                  key={payment.id} 
+                <div
+                  key={payment.id}
                   className={`p-4 border-2 rounded-lg hover:bg-muted transition-colors cursor-pointer ${paymentStatus.color}`}
                   onClick={() => openPaymentDetailsDialog(payment)}
                 >
@@ -2015,7 +2034,7 @@ function FinancePageContent() {
                           <ArrowDownCircle className="w-4 h-4 text-red-400" />
                         )}
                       </div>
-                      <Badge 
+                      <Badge
                         className={`text-xs ${paymentStatus.badgeColor} text-white`}
                       >
                         {paymentStatus.daysText}
@@ -2276,10 +2295,10 @@ function FinancePageContent() {
                 <CardHeader>
                   <CardTitle className="text-lg">الشهر السابق</CardTitle>
                   <CardDescription className="text-muted-foreground">
-                    {lastMonth === 11 ? "ديسمبر" : lastMonth === 10 ? "نوفمبر" : lastMonth === 9 ? "أكتوبر" : 
-                     lastMonth === 8 ? "سبتمبر" : lastMonth === 7 ? "أغسطس" : lastMonth === 6 ? "يوليو" :
-                     lastMonth === 5 ? "يونيو" : lastMonth === 4 ? "مايو" : lastMonth === 3 ? "أبريل" :
-                     lastMonth === 2 ? "مارس" : lastMonth === 1 ? "فبراير" : "يناير"} {lastMonthYear}
+                    {lastMonth === 11 ? "ديسمبر" : lastMonth === 10 ? "نوفمبر" : lastMonth === 9 ? "أكتوبر" :
+                      lastMonth === 8 ? "سبتمبر" : lastMonth === 7 ? "أغسطس" : lastMonth === 6 ? "يوليو" :
+                        lastMonth === 5 ? "يونيو" : lastMonth === 4 ? "مايو" : lastMonth === 3 ? "أبريل" :
+                          lastMonth === 2 ? "مارس" : lastMonth === 1 ? "فبراير" : "يناير"} {lastMonthYear}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -2405,13 +2424,13 @@ function FinancePageContent() {
               <div className="flex items-start justify-between">
                 <div>
                   <h3 className="text-xl font-bold text-foreground">{selectedPayment.client}</h3>
-                  <Badge 
+                  <Badge
                     variant={selectedPayment.status === "overdue" ? "destructive" : "secondary"}
                     className="mt-2"
                   >
                     {selectedPayment.status === "overdue" ? "متأخر" : "قادم"}
                   </Badge>
-                  <Badge 
+                  <Badge
                     variant={selectedPayment.type === "income" ? "default" : "destructive"}
                     className="mr-2"
                   >
@@ -2604,7 +2623,7 @@ function FinancePageContent() {
           <DialogHeader>
             <DialogTitle>تأكيد الإجراء</DialogTitle>
             <DialogDescription>
-              {paymentActionToConfirm?.action === 'complete' 
+              {paymentActionToConfirm?.action === 'complete'
                 ? "هل أنت متأكد من إكمال هذه الدفعة؟ سيتم إضافتها للمعاملات المالية."
                 : "هل أنت متأكد من حذف هذه الدفعة؟ لا يمكن التراجع عن هذا الإجراء."
               }
@@ -2615,7 +2634,7 @@ function FinancePageContent() {
               <div className="p-4 border rounded-lg bg-muted">
                 <div className="flex items-center justify-between mb-2">
                   <p className="font-medium">{paymentActionToConfirm.payment.client}</p>
-                  <Badge 
+                  <Badge
                     variant={paymentActionToConfirm.payment.type === "income" ? "default" : "destructive"}
                     className="text-xs"
                   >

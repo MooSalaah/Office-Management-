@@ -48,12 +48,11 @@ import TaskCard from "@/components/tasks/TaskCard"
 import { SwipeToDelete } from "@/components/ui/swipe-to-delete"
 import { PermissionGuard } from "@/components/ui/permission-guard"
 import { hasPermission } from "@/lib/auth"
-import { useStatistics, useProjectSearch, useTaskSearch, useCachedCallback } from "@/lib/performance"
-import { LoadingStates, DashboardLoadingSkeleton } from "@/components/ui/loading-skeleton"
+import { useMemo } from "react"
+import TaskForm from "@/components/tasks/TaskForm"
+import { DashboardLoadingSkeleton } from "@/components/ui/loading-skeleton"
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { useToast } from "@/components/ui/use-toast"
-import TaskForm from "@/components/tasks/TaskForm"
-import { useMemoizedFilter, useMemoizedReduce } from "@/lib/memoization"
 
 // Project Card Component
 function ProjectCard({ project }: { project: Project }) {
@@ -482,11 +481,11 @@ function DashboardPageContent() {
       const updateId = `${lastUpdate.task?.id || ''}_${lastUpdate.action}_${lastUpdate.timestamp || ''}`;
       if (handledTaskUpdateIdsRef.current.has(updateId)) return;
       handledTaskUpdateIdsRef.current.add(updateId);
-      
+
       console.log('=== DASHBOARD TASK UPDATE RECEIVED ===');
       console.log('Task update:', lastUpdate);
       console.log('Current tasks count:', state.tasks.length);
-      
+
       if (lastUpdate.userId && lastUpdate.userId !== currentUser?.id && lastUpdate.userName) {
         toast({
           title: `تحديث مهمة جديد`,
@@ -519,11 +518,11 @@ function DashboardPageContent() {
       const updateId = `${lastUpdate.project?.id || ''}_${lastUpdate.action}_${lastUpdate.timestamp || ''}`;
       if (handledProjectUpdateIdsRef.current.has(updateId)) return;
       handledProjectUpdateIdsRef.current.add(updateId);
-      
+
       console.log('=== DASHBOARD PROJECT UPDATE RECEIVED ===');
       console.log('Project update:', lastUpdate);
       console.log('Current projects count:', state.projects.length);
-      
+
       if (lastUpdate.userId && lastUpdate.userId !== currentUser?.id && lastUpdate.userName) {
         toast({
           title: `تحديث مشروع جديد`,
@@ -633,8 +632,12 @@ function DashboardPageContent() {
   }
 
   // استخدام التحسينات الجديدة لحساب الإحصائيات
-  const statistics = useStatistics(projects, tasks, transactions)
-  
+  const statistics = useMemo(() => {
+    return {
+      activeProjects: projects.filter(p => p.status === 'in-progress').length
+    };
+  }, [projects]);
+
   // حساب النمو الشهري
   const currentMonth = new Date().getMonth()
   const currentYear = new Date().getFullYear()
@@ -668,90 +671,82 @@ function DashboardPageContent() {
   const isPositiveGrowth = Number(growthPercentage) >= 0
 
   // حساب المشاريع النشطة للشهر الحالي والشهر الماضي
-  const currentMonthActiveProjects = useMemoizedFilter(
-    projects,
-    (p) => {
+  const currentMonthActiveProjects = useMemo(() =>
+    projects.filter((p) => {
       const projectDate = new Date(p.createdAt)
       return (
         p.status === "in-progress" &&
         projectDate.getMonth() === currentMonth &&
         projectDate.getFullYear() === currentYear
       )
-    },
+    }),
     [projects, currentMonth, currentYear]
   ).length;
 
-  const lastMonthActiveProjects = useMemoizedFilter(
-    projects,
-    (p) => {
+  const lastMonthActiveProjects = useMemo(() =>
+    projects.filter((p) => {
       const projectDate = new Date(p.createdAt)
       return (
         p.status === "in-progress" &&
         projectDate.getMonth() === lastMonth &&
         projectDate.getFullYear() === lastMonthYear
       )
-    },
+    }),
     [projects, lastMonth, lastMonthYear]
   ).length;
 
-  const projectsGrowth = lastMonthActiveProjects > 0 
+  const projectsGrowth = lastMonthActiveProjects > 0
     ? (((currentMonthActiveProjects - lastMonthActiveProjects) / lastMonthActiveProjects) * 100).toFixed(1)
     : currentMonthActiveProjects > 0 ? "100" : "0"
 
   // حساب العملاء الجدد للشهر الحالي والشهر الماضي
-  const currentMonthNewClients = useMemoizedFilter(
-    clients,
-    (c) => {
+  const currentMonthNewClients = useMemo(() =>
+    clients.filter((c) => {
       const clientDate = new Date(c.createdAt)
       return (
         clientDate.getMonth() === currentMonth &&
         clientDate.getFullYear() === currentYear
       )
-    },
+    }),
     [clients, currentMonth, currentYear]
   ).length;
 
-  const lastMonthNewClients = useMemoizedFilter(
-    clients,
-    (c) => {
+  const lastMonthNewClients = useMemo(() =>
+    clients.filter((c) => {
       const clientDate = new Date(c.createdAt)
       return (
         clientDate.getMonth() === lastMonth &&
         clientDate.getFullYear() === lastMonthYear
       )
-    },
+    }),
     [clients, lastMonth, lastMonthYear]
   ).length;
 
-  const clientsGrowth = lastMonthNewClients > 0 
+  const clientsGrowth = lastMonthNewClients > 0
     ? (((currentMonthNewClients - lastMonthNewClients) / lastMonthNewClients) * 100).toFixed(1)
     : currentMonthNewClients > 0 ? "100" : "0"
 
   // حساب جميع المهام غير المكتملة (todo + in-progress)
-  const incompleteTasks = useMemoizedFilter(
-    tasks,
-    (t) => t.status !== "completed" && t.assigneeId === currentUser?.id,
+  const incompleteTasks = useMemo(() =>
+    tasks.filter((t) => t.status !== "completed" && t.assigneeId === currentUser?.id),
     [tasks, currentUser?.id]
   );
   const incompleteTasksCount = incompleteTasks.length;
 
   // حساب جميع المهام الجديدة وقيد التنفيذ للمستخدم الحالي
-  const userTodoTasksCount = useMemoizedFilter(
-    tasks,
-    (t) => t.status === "todo" && t.assigneeId === currentUser?.id,
+  const userTodoTasksCount = useMemo(() =>
+    tasks.filter((t) => t.status === "todo" && t.assigneeId === currentUser?.id),
     [tasks, currentUser?.id]
   ).length;
-  const userInProgressTasksCount = useMemoizedFilter(
-    tasks,
-    (t) => t.status === "in-progress" && t.assigneeId === currentUser?.id,
+  const userInProgressTasksCount = useMemo(() =>
+    tasks.filter((t) => t.status === "in-progress" && t.assigneeId === currentUser?.id),
     [tasks, currentUser?.id]
   ).length;
   const userActiveTasksCount = userTodoTasksCount + userInProgressTasksCount;
 
   // حساب جميع المهام غير المكتملة في النظام (للمدير)
-  const allIncompleteTasksCount = useMemoizedFilter(
-    tasks,
-    (t) => t.status !== "completed",
+  const allIncompleteTasksCount = useMemo(() =>
+    tasks.filter((t) => t.status !== "completed"),
     [tasks]
   ).length;
 
@@ -764,7 +759,7 @@ function DashboardPageContent() {
   // Filter tasks based on user role
   let delayedTasksCount = 0
   let delayedTasks: any[] = []
-  
+
   // المستخدم يرى جميع مهامه المتأخرة (بغض النظر عن من أنشأها)
   delayedTasks = tasks.filter((t) => {
     // المهمة غير مكتملة
@@ -784,7 +779,7 @@ function DashboardPageContent() {
   // تحسين عرض المهام المتأخرة في البطاقة
   const getDelayedTasksText = () => {
     if (delayedTasksCount === 0) return "لا توجد مهام متأخرة"
-    
+
     const overdueDays = delayedTasks.map(task => {
       const dueDate = new Date(task.dueDate)
       const today = new Date()
@@ -792,13 +787,13 @@ function DashboardPageContent() {
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
       return diffDays
     })
-    
+
     const maxOverdue = Math.max(...overdueDays)
     return `${delayedTasksCount} مهمة غير مكتملة بحاجة للإنجاز`;
   }
 
   // Get today's attendance for current user
-  const todayAttendance = state.attendanceRecords.filter((record: any) => 
+  const todayAttendance = state.attendanceRecords.filter((record: any) =>
     record.userId === currentUser?.id && record.date === today
   )
 
@@ -906,48 +901,48 @@ function DashboardPageContent() {
   ]
 
   // مهام اليوم - المدير يرى جميع المهام غير المكتملة، المستخدم العادي يرى مهامه فقط
-  const todayTasks = currentUser?.role === "admin" 
+  const todayTasks = currentUser?.role === "admin"
     ? tasks.filter((task) => task.status !== "completed")
-        .sort((a, b) => {
-          // ترتيب المهام: المتأخرة أولاً، ثم المهام اليوم، ثم المهام قيد التنفيذ
-          const aDate = a.dueDate ? new Date(a.dueDate) : new Date()
-          const bDate = b.dueDate ? new Date(b.dueDate) : new Date()
-          const today = new Date()
-          
-          const aIsOverdue = aDate < today && a.status !== "completed"
-          const bIsOverdue = bDate < today && b.status !== "completed"
-          
-          if (aIsOverdue && !bIsOverdue) return -1
-          if (!aIsOverdue && bIsOverdue) return 1
-          
-          return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-        })
-        .slice(0, 4) // المدير يرى 4 مهام
+      .sort((a, b) => {
+        // ترتيب المهام: المتأخرة أولاً، ثم المهام اليوم، ثم المهام قيد التنفيذ
+        const aDate = a.dueDate ? new Date(a.dueDate) : new Date()
+        const bDate = b.dueDate ? new Date(b.dueDate) : new Date()
+        const today = new Date()
+
+        const aIsOverdue = aDate < today && a.status !== "completed"
+        const bIsOverdue = bDate < today && b.status !== "completed"
+
+        if (aIsOverdue && !bIsOverdue) return -1
+        if (!aIsOverdue && bIsOverdue) return 1
+
+        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      })
+      .slice(0, 4) // المدير يرى 4 مهام
     : tasks.filter((task) => task.assigneeId === currentUser?.id)
-        .filter((task) => {
-          if (!task.dueDate) return task.status === "in-progress"
-          // تشمل المهام المتأخرة أيضاً
-          const taskDate = new Date(task.dueDate)
-          const today = new Date()
-          return task.dueDate === today.toISOString().split("T")[0] || 
-                 task.status === "in-progress" ||
-                 (taskDate < today && task.status !== "completed")
-        })
-        .sort((a, b) => {
-          // ترتيب المهام: المتأخرة أولاً، ثم المهام اليوم، ثم المهام قيد التنفيذ
-          const aDate = a.dueDate ? new Date(a.dueDate) : new Date()
-          const bDate = b.dueDate ? new Date(b.dueDate) : new Date()
-          const today = new Date()
-          
-          const aIsOverdue = aDate < today && a.status !== "completed"
-          const bIsOverdue = bDate < today && b.status !== "completed"
-          
-          if (aIsOverdue && !bIsOverdue) return -1
-          if (!aIsOverdue && bIsOverdue) return 1
-          
-          return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-        })
-        .slice(0, 2) // المستخدم العادي يرى مهمتين
+      .filter((task) => {
+        if (!task.dueDate) return task.status === "in-progress"
+        // تشمل المهام المتأخرة أيضاً
+        const taskDate = new Date(task.dueDate)
+        const today = new Date()
+        return task.dueDate === today.toISOString().split("T")[0] ||
+          task.status === "in-progress" ||
+          (taskDate < today && task.status !== "completed")
+      })
+      .sort((a, b) => {
+        // ترتيب المهام: المتأخرة أولاً، ثم المهام اليوم، ثم المهام قيد التنفيذ
+        const aDate = a.dueDate ? new Date(a.dueDate) : new Date()
+        const bDate = b.dueDate ? new Date(b.dueDate) : new Date()
+        const today = new Date()
+
+        const aIsOverdue = aDate < today && a.status !== "completed"
+        const bIsOverdue = bDate < today && b.status !== "completed"
+
+        if (aIsOverdue && !bIsOverdue) return -1
+        if (!aIsOverdue && bIsOverdue) return 1
+
+        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      })
+      .slice(0, 2) // المستخدم العادي يرى مهمتين
 
   // إشعارات المستخدم الحالي - عرض 4 إشعارات فقط
   const userNotifications = notifications
@@ -958,10 +953,10 @@ function DashboardPageContent() {
   // إضافة إشعار للمهام المتأخرة لجميع المستخدمين
   useEffect(() => {
     if (delayedTasksCount > 0) {
-      const hasOverdueNotification = userNotifications.some(n => 
+      const hasOverdueNotification = userNotifications.some(n =>
         n.title === "مهام متأخرة" && !n.isRead
       )
-      
+
       if (!hasOverdueNotification) {
         addNotification({
           userId: currentUser?.id || "",
@@ -980,19 +975,19 @@ function DashboardPageContent() {
   const getQuickActions = () => {
     const baseActions = {
       addProject: {
-      title: "إضافة مشروع جديد",
-      description: "إنشاء مشروع جديد وربطه بعميل",
-      icon: Building,
-      color: "bg-blue-600 hover:bg-blue-700",
+        title: "إضافة مشروع جديد",
+        description: "إنشاء مشروع جديد وربطه بعميل",
+        icon: Building,
+        color: "bg-blue-600 hover:bg-blue-700",
         onClick: () => router.push("/projects?action=create"),
-    },
+      },
       addClient: {
-      title: "إضافة عميل جديد",
-      description: "تسجيل عميل جديد في النظام",
-      icon: UserPlus,
-      color: "bg-green-600 hover:bg-green-700",
-      onClick: () => setIsClientDialogOpen(true),
-    },
+        title: "إضافة عميل جديد",
+        description: "تسجيل عميل جديد في النظام",
+        icon: UserPlus,
+        color: "bg-green-600 hover:bg-green-700",
+        onClick: () => setIsClientDialogOpen(true),
+      },
       addTask: {
         title: "إضافة مهمة جديدة",
         description: "تعيين مهمة لأحد أعضاء الفريق",
@@ -1007,19 +1002,19 @@ function DashboardPageContent() {
         },
       },
       addTransaction: {
-      title: "تسجيل معاملة مالية",
-      description: "إضافة دخل أو مصروف جديد",
-      icon: Receipt,
-      color: "bg-yellow-600 hover:bg-yellow-700",
+        title: "تسجيل معاملة مالية",
+        description: "إضافة دخل أو مصروف جديد",
+        icon: Receipt,
+        color: "bg-yellow-600 hover:bg-yellow-700",
         onClick: () => router.push("/finance?action=create"),
-    },
+      },
       addUpcomingPayment: {
-      title: "إضافة دفعة قادمة",
-      description: "تسجيل دفعة قادمة أو مصروف متوقع",
-      icon: Calendar,
-      color: "bg-orange-600 hover:bg-orange-700",
-      onClick: () => setIsUpcomingPaymentDialogOpen(true),
-    },
+        title: "إضافة دفعة قادمة",
+        description: "تسجيل دفعة قادمة أو مصروف متوقع",
+        icon: Calendar,
+        color: "bg-orange-600 hover:bg-orange-700",
+        onClick: () => setIsUpcomingPaymentDialogOpen(true),
+      },
       addUser: {
         title: "إضافة مستخدم جديد",
         description: "إضافة مستخدم جديد للنظام",
@@ -1028,12 +1023,12 @@ function DashboardPageContent() {
         onClick: () => router.push("/settings?action=add-user"),
       },
       settings: {
-      title: "إعدادات النظام",
-      description: "إدارة المستخدمين وإعدادات المكتب",
-      icon: Settings,
-      color: "bg-gray-600 hover:bg-gray-700",
-      onClick: () => router.push("/settings"),
-    },
+        title: "إعدادات النظام",
+        description: "إدارة المستخدمين وإعدادات المكتب",
+        icon: Settings,
+        color: "bg-gray-600 hover:bg-gray-700",
+        onClick: () => router.push("/settings"),
+      },
     };
 
     // المدير - جميع الإجراءات
@@ -1184,8 +1179,8 @@ function DashboardPageContent() {
                   {currentUser?.role === "admin" ? "المهام غير المكتملة" : "مهام اليوم"}
                 </CardTitle>
                 <CardDescription>
-                  {currentUser?.role === "admin" 
-                    ? "جميع المهام غير المكتملة في النظام" 
+                  {currentUser?.role === "admin"
+                    ? "جميع المهام غير المكتملة في النظام"
                     : "المهام المطلوبة منك اليوم"
                   }
                 </CardDescription>
@@ -1216,14 +1211,14 @@ function DashboardPageContent() {
                 <div className="text-center py-8 text-gray-500">
                   <CheckCircle className="w-12 h-12 mx-auto mb-4 opacity-50" />
                   <p>
-                    {currentUser?.role === "admin" 
-                      ? "لا توجد مهام غير مكتملة في النظام" 
+                    {currentUser?.role === "admin"
+                      ? "لا توجد مهام غير مكتملة في النظام"
                       : "لا توجد مهام لهذا اليوم"
                     }
                   </p>
                   <p className="text-sm mt-1">
-                    {currentUser?.role === "admin" 
-                      ? "جميع المهام مكتملة بنجاح" 
+                    {currentUser?.role === "admin"
+                      ? "جميع المهام مكتملة بنجاح"
                       : "أحسنت! لقد أنجزت جميع مهامك"
                     }
                   </p>
@@ -1420,7 +1415,7 @@ function DashboardPageContent() {
                 </div>
                 <div className="text-right">
                   <p className="text-2xl font-bold text-green-600">{selectedProject.price.toLocaleString()}<img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 block dark:hidden" loading="lazy" />
-<img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 hidden dark:block" loading="lazy" /></p>
+                    <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 hidden dark:block" loading="lazy" /></p>
                   <p className="text-sm text-gray-600">السعر الإجمالي</p>
                 </div>
               </div>
@@ -1470,17 +1465,17 @@ function DashboardPageContent() {
                       <div className="flex justify-between">
                         <span className="text-gray-600">السعر الإجمالي:</span>
                         <span className="font-medium">{selectedProject.price.toLocaleString()}<img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 block dark:hidden" loading="lazy" />
-<img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 hidden dark:block" loading="lazy" /></span>
+                          <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 hidden dark:block" loading="lazy" /></span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">الدفعة المقدمة:</span>
-                                                  <span className="text-green-600">{selectedProject.downPayment.toLocaleString()}<img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 block dark:hidden" loading="lazy" />
-<img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 hidden dark:block" loading="lazy" /></span>
+                        <span className="text-green-600">{selectedProject.downPayment.toLocaleString()}<img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 block dark:hidden" loading="lazy" />
+                          <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 hidden dark:block" loading="lazy" /></span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">المبلغ المتبقي:</span>
-                                                  <span className="text-red-600">{selectedProject.remainingBalance.toLocaleString()}<img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 block dark:hidden" loading="lazy" />
-<img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 hidden dark:block" loading="lazy" /></span>
+                        <span className="text-red-600">{selectedProject.remainingBalance.toLocaleString()}<img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 block dark:hidden" loading="lazy" />
+                          <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline w-5 h-5 opacity-80 ml-1 hidden dark:block" loading="lazy" /></span>
                       </div>
                     </div>
                   </CardContent>
@@ -1531,10 +1526,10 @@ function DashboardPageContent() {
             <DialogTitle>إضافة مهمة جديدة</DialogTitle>
             <DialogDescription>قم بإدخال تفاصيل المهمة الجديدة</DialogDescription>
           </DialogHeader>
-          <TaskForm 
-            onClose={() => setIsTaskDialogOpen(false)} 
-            defaultAssigneeId={defaultTaskForm.assigneeId || undefined} 
-            defaultDueDate={defaultTaskForm.dueDate || undefined} 
+          <TaskForm
+            onClose={() => setIsTaskDialogOpen(false)}
+            defaultAssigneeId={defaultTaskForm.assigneeId || undefined}
+            defaultDueDate={defaultTaskForm.dueDate || undefined}
           />
         </DialogContent>
       </Dialog>

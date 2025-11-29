@@ -3,7 +3,9 @@ import { logger } from "./logger";
 
 const API_BASE_URL =
 	process.env.NEXT_PUBLIC_API_URL ||
-	"https://office-management-fsy7.onrender.com";
+	(process.env.NODE_ENV === "development"
+		? "http://localhost:5000"
+		: "https://office-management-fsy7.onrender.com");
 
 export interface ApiResponse<T = any> {
 	success: boolean;
@@ -262,12 +264,7 @@ class ApiClient {
 		});
 	}
 
-	async register(userData: any) {
-		return this.request("/api/auth/register", {
-			method: "POST",
-			body: JSON.stringify(userData),
-		});
-	}
+
 
 	// Health check
 	async healthCheck() {
@@ -295,7 +292,7 @@ class ApiClient {
 			method: "DELETE",
 		});
 	}
-	
+
 	async seedTaskTypes() {
 		return this.request("/api/taskTypes/seed", {
 			method: "POST",
@@ -354,7 +351,6 @@ export const api = {
 	auth: {
 		login: (credentials: { email: string; password: string }) =>
 			apiClient.login(credentials),
-		register: (userData: any) => apiClient.register(userData),
 	},
 	health: () => apiClient.healthCheck(),
 	taskTypes: {

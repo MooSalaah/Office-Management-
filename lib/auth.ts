@@ -237,16 +237,20 @@ export const login = async (email: string, password: string): Promise<User | nul
 		}
 		return null;
 	} catch (err) {
-		// fallback: mockUsers (dev only)
+		console.error("Login failed:", err);
+		// Fallback removed to enforce backend usage
+		/*
 		if (process.env.NODE_ENV === "development") {
 			const user = mockUsers.find(
 				(u) => u.email === email && u.password === password && u.isActive
 			);
 			if (user) {
+				console.warn("⚠️ USING MOCK AUTH - BACKEND UNREACHABLE");
 				localStorage.setItem("currentUser", JSON.stringify(user));
 				return user;
 			}
 		}
+		*/
 		return null;
 	}
 };
