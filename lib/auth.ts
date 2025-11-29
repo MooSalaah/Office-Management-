@@ -462,12 +462,23 @@ export const getUserModules = (userRole: string): string[] => {
 	}
 
 	const role = rolePermissions[userRole as keyof typeof rolePermissions];
-	return role ? role.modules : [];
+	const modules = role ? role.modules : [];
+
+	// Ensure dashboard is always included
+	if (!modules.includes("dashboard")) {
+		return ["dashboard", ...modules];
+	}
+
+	return modules;
 };
 
 export const canAccessModule = (userRole: string, module: string): boolean => {
 	// Admin has access to all modules
+	// Admin has access to all modules
 	if (userRole === "admin") return true;
+
+	// Grant access to dashboard for all authenticated users
+	if (module === "dashboard") return true;
 
 	// First check custom job roles from localStorage
 	const jobRoles = localStorage.getItem("jobRoles");
