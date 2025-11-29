@@ -29,7 +29,7 @@ import { SwipeToDelete } from "@/components/ui/swipe-to-delete"
 import { PermissionGuard } from "@/components/ui/permission-guard"
 import { DeleteDialog } from "@/components/ui/delete-dialog"
 import { useMemo } from "react"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/hooks/use-toast"
 import { logger } from "@/lib/logger"
 
 type TaskStatus = "todo" | "in-progress" | "completed"

@@ -52,7 +52,7 @@ import { useMemo } from "react"
 import TaskForm from "@/components/tasks/TaskForm"
 import { DashboardLoadingSkeleton } from "@/components/ui/loading-skeleton"
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/hooks/use-toast"
 
 // Project Card Component
 function ProjectCard({ project }: { project: Project }) {

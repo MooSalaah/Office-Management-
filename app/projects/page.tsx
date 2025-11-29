@@ -45,7 +45,7 @@ import { PermissionGuard } from "@/components/ui/permission-guard"
 import { DeleteConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { LoadingStates } from "@/components/ui/loading-skeleton"
 import { transliterateArabicToEnglish } from "@/lib/utils";
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/hooks/use-toast"
 import { Checkbox } from "@/components/ui/checkbox"
 import { logger } from "@/lib/logger"
 import { api } from "@/lib/api"

@@ -44,7 +44,7 @@ import { PermissionGuard } from "@/components/ui/permission-guard"
 import { DeleteDialog } from "@/components/ui/delete-dialog"
 import { useRealtimeUpdatesByType } from "@/lib/realtime-updates"
 import { useRouter } from "next/navigation"
-import { toast } from "@/components/ui/use-toast"
+import { toast } from "@/hooks/use-toast"
 import { logger } from "@/lib/logger"
 
 export default function ClientsPage() {
@@ -119,9 +119,9 @@ function ClientsPageContent() {
       const updateId = `${lastUpdate.client.id || ''}_${lastUpdate.action}_${lastUpdate.timestamp || ''}`;
       if (handledClientUpdateIdsRef.current.has(updateId)) return;
       handledClientUpdateIdsRef.current.add(updateId);
-      
+
       logger.debug('=== CLIENT UPDATE RECEIVED ===', { lastUpdate, clientsCount: state.clients.length }, 'CLIENTS');
-      
+
       if (lastUpdate.action === 'create') {
         const exists = state.clients.some(c => c.id === lastUpdate.client.id);
         logger.debug('Client exists in state', { exists, clientId: lastUpdate.client.id }, 'CLIENTS');
@@ -147,7 +147,7 @@ function ClientsPageContent() {
         dispatch({ type: "DELETE_CLIENT", payload: lastUpdate.client.id });
         logger.debug('Client deleted from state successfully', { clientId: lastUpdate.client.id }, 'CLIENTS');
       }
-      
+
       if (lastUpdate.userId && lastUpdate.userId !== currentUser?.id && lastUpdate.userName) {
         toast({
           title: "تحديث عميل جديد",
@@ -192,18 +192,18 @@ function ClientsPageContent() {
       setAlert({ type: "error", message: "ليس لديك صلاحية لإنشاء العملاء" });
       return;
     }
-    
+
     // منع الحفظ المتكرر
     if (state.loadingStates.clients) {
       return;
     }
-    
+
     const missing: string[] = [];
     if (!formData.name.trim()) missing.push("اسم العميل");
     if (!formData.phone.trim()) missing.push("رقم الهاتف");
     if (!formData.email.trim()) missing.push("البريد الإلكتروني");
     if (!formData.address.trim()) missing.push("العنوان");
-    
+
     if (missing.length > 0) {
       setShowValidationErrors(true);
       setMissingFields(missing);
@@ -228,17 +228,17 @@ function ClientsPageContent() {
     try {
       // تعيين حالة التحميل لمنع الحفظ المتكرر
       dispatch({ type: "SET_LOADING_STATE", payload: { key: 'clients', value: true } });
-      
+
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
       const response = await fetch(`${apiUrl}/api/clients`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
         },
         body: JSON.stringify(newClient),
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
@@ -289,7 +289,7 @@ function ClientsPageContent() {
 
     // استخدام وظيفة AppContext
     await updateClient(updatedClient)
-    
+
     setIsDialogOpen(false)
     setEditingClient(null)
     resetForm()
@@ -487,7 +487,7 @@ function ClientsPageContent() {
                         <SelectItem value="government">حكومي</SelectItem>
                         <SelectItem value="inactive">غير نشط</SelectItem>
                         {/* إضافة الحالات الجديدة */}
-                        {typeof formData.status === 'string' && !['active','vip','government','inactive'].includes(formData.status) && (
+                        {typeof formData.status === 'string' && !['active', 'vip', 'government', 'inactive'].includes(formData.status) && (
                           <SelectItem value={formData.status}>{formData.status}</SelectItem>
                         )}
                       </SelectContent>
@@ -559,10 +559,10 @@ function ClientsPageContent() {
                       >
                         {formData.avatar ? (
                           <div className="relative">
-                            <img 
-                              src={formData.avatar} 
-                              alt="صورة العميل" 
-                              className="w-20 h-20 rounded-full object-cover border-2 border-white shadow-sm" 
+                            <img
+                              src={formData.avatar}
+                              alt="صورة العميل"
+                              className="w-20 h-20 rounded-full object-cover border-2 border-white shadow-sm"
                               loading="lazy"
                             />
                             <div className="absolute -top-1 -right-1 w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center">
@@ -583,8 +583,8 @@ function ClientsPageContent() {
                     </div>
                     <div className="flex-1">
                       <p className="text-sm text-gray-600 dark:text-gray-400">
-                        {formData.avatar 
-                          ? "تم رفع الصورة بنجاح. اضغط على الصورة لتغييرها." 
+                        {formData.avatar
+                          ? "تم رفع الصورة بنجاح. اضغط على الصورة لتغييرها."
                           : "اختر صورة للعميل (اختياري). يفضل أن تكون الصورة مربعة الشكل."
                         }
                       </p>
@@ -643,60 +643,60 @@ function ClientsPageContent() {
               onDelete={() => handleDeleteClient(client.id)}
             >
               <Card className="hover:shadow-lg transition-shadow cursor-pointer bg-card text-card-foreground border border-border" onClick={() => openDetailsDialog(client)}>
-              <CardHeader className="pb-3">
-                <div className="flex items-start space-x-3 space-x-reverse">
-                  <Avatar className="w-12 h-12">
-                    <AvatarImage src={client.avatar || "/placeholder.svg"} alt={client.name} />
-                    <AvatarFallback>
-                      {client.name
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")
-                        .substring(0, 2)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <CardTitle className="text-lg leading-tight truncate text-foreground">{client.name}</CardTitle>
-                    <CardDescription className="truncate text-muted-foreground">{client.email}</CardDescription>
-                    <Badge variant={getStatusColor(client.status)} className="text-xs mt-2">
-                      {getStatusText(client.status)}
-                    </Badge>
+                <CardHeader className="pb-3">
+                  <div className="flex items-start space-x-3 space-x-reverse">
+                    <Avatar className="w-12 h-12">
+                      <AvatarImage src={client.avatar || "/placeholder.svg"} alt={client.name} />
+                      <AvatarFallback>
+                        {client.name
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")
+                          .substring(0, 2)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <CardTitle className="text-lg leading-tight truncate text-foreground">{client.name}</CardTitle>
+                      <CardDescription className="truncate text-muted-foreground">{client.email}</CardDescription>
+                      <Badge variant={getStatusColor(client.status)} className="text-xs mt-2">
+                        {getStatusText(client.status)}
+                      </Badge>
+                    </div>
                   </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between text-sm text-muted-foreground">
-                    <span>المشاريع</span>
-                    <span className="font-bold text-foreground text-xl">{projectsCount}</span>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-sm text-muted-foreground">
+                      <span>المشاريع</span>
+                      <span className="font-bold text-foreground text-xl">{projectsCount}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>المشاريع النشطة</span>
+                      <span className="text-green-600 font-semibold text-sm">
+                        {clientProjects.filter(p => p.status === "in-progress").length}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>المشاريع النشطة</span>
-                    <span className="text-green-600 font-semibold text-sm">
-                      {clientProjects.filter(p => p.status === "in-progress").length}
-                    </span>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-sm text-muted-foreground">
+                      <span>إجمالي القيمة</span>
+                      <span className="flex items-center gap-1 font-bold text-foreground text-lg">
+                        <ArabicNumber value={totalValue} />
+                        <img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline align-middle w-5 h-5 opacity-80 ml-1 block dark:hidden" />
+                        <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline align-middle w-5 h-5 opacity-80 ml-1 hidden dark:block" />
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>قيمة المشاريع المنفذة</span>
+                      <span className="flex items-center gap-1 text-blue-600 font-semibold text-sm">
+                        <ArabicNumber value={clientProjects.filter(p => p.status === "completed").reduce((sum, p) => sum + p.price, 0)} />
+                        <img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline align-middle w-4 h-4 opacity-80 ml-1 block dark:hidden" />
+                        <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline align-middle w-4 h-4 opacity-80 ml-1 hidden dark:block" />
+                      </span>
+                    </div>
                   </div>
-                </div>
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between text-sm text-muted-foreground">
-                    <span>إجمالي القيمة</span>
-                    <span className="flex items-center gap-1 font-bold text-foreground text-lg">
-                      <ArabicNumber value={totalValue} />
-                      <img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline align-middle w-5 h-5 opacity-80 ml-1 block dark:hidden" />
-                      <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline align-middle w-5 h-5 opacity-80 ml-1 hidden dark:block" />
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>قيمة المشاريع المنفذة</span>
-                    <span className="flex items-center gap-1 text-blue-600 font-semibold text-sm">
-                      <ArabicNumber value={clientProjects.filter(p => p.status === "completed").reduce((sum, p) => sum + p.price, 0)} />
-                      <img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline align-middle w-4 h-4 opacity-80 ml-1 block dark:hidden" />
-                      <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline align-middle w-4 h-4 opacity-80 ml-1 hidden dark:block" />
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
             </SwipeToDelete>
           )
         })}
