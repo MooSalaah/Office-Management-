@@ -235,11 +235,5 @@ export const ChartContainer: React.FC<{
 }
 
 // تصدير المكونات
-export {
-  Chart as default,
-  LineChart,
-  BarChart,
-  PieChart,
-  DoughnutChart,
-  ChartContainer,
-}
+// تصدير المكونات
+export { Chart as default }
