@@ -397,7 +397,7 @@ export const hasPermission = (
 		if (jobRoles) {
 			const roles = JSON.parse(jobRoles);
 			const customRole = roles.find((role: any) => role.id === userRole);
-			if (customRole) {
+			if (customRole && customRole.permissions) {
 				// Check if role has all permissions
 				if (customRole.permissions.includes("*")) return true;
 
@@ -426,7 +426,7 @@ export const hasPermission = (
 	}
 
 	const role = rolePermissions[userRole as keyof typeof rolePermissions];
-	if (!role) return false;
+	if (!role || !role.permissions) return false;
 
 	// Admin has all permissions
 	if (role.permissions.includes("*")) return true;
@@ -462,7 +462,7 @@ export const getUserModules = (userRole: string): string[] => {
 	}
 
 	const role = rolePermissions[userRole as keyof typeof rolePermissions];
-	const modules = role ? role.modules : [];
+	const modules = role && role.modules ? role.modules : [];
 
 	// Ensure dashboard is always included
 	if (!modules.includes("dashboard")) {
@@ -498,7 +498,7 @@ export const canAccessModule = (userRole: string, module: string): boolean => {
 	}
 
 	const modules = getUserModules(userRole);
-	return modules.includes(module);
+	return modules && modules.includes(module);
 };
 
 export const getRolePermissions = (role: string) => {
