@@ -52,7 +52,7 @@ export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [lastClick, setLastClick] = useState<{ id: string; time: number } | null>(null)
   const { state } = useApp()
-  const { markNotificationAsRead, deleteNotification, logout: logoutAction } = useAppActions()
+  const { markNotificationAsRead, deleteNotification, clearAllNotifications, logout: logoutAction } = useAppActions()
   const { currentUser, notifications, companySettings } = state
 
   // Force re-render when currentUser changes
@@ -61,7 +61,7 @@ export function Header() {
   useEffect(() => {
     // Force re-render when currentUser changes to update role display
     forceUpdate({})
-    
+
     // Update current user permissions if exists
     if (currentUser) {
       const updatedUser = updateUserPermissionsByRole(currentUser)
@@ -82,7 +82,7 @@ export function Header() {
 
   const handleNotificationClick = (notificationId: string) => {
     const now = Date.now()
-    
+
     if (lastClick && lastClick.id === notificationId && (now - lastClick.time) < 300) {
       // Double click - delete notification
       deleteNotification(notificationId)
@@ -146,7 +146,7 @@ export function Header() {
           <div className="flex items-center space-x-4 space-x-reverse">
             {/* Connection Status */}
             <ConnectionStatus />
-            
+
             {/* Notifications */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -182,9 +182,8 @@ export function Header() {
                     {/* Action buttons - positioned absolutely */}
                     <div className="absolute left-2 top-1/2 transform -translate-y-1/2 flex gap-1">
                       <button
-                        className={`p-1 rounded hover:bg-gray-100 transition-colors ${
-                          notification.isRead ? 'text-gray-400 cursor-not-allowed' : 'text-blue-600 hover:text-blue-700'
-                        }`}
+                        className={`p-1 rounded hover:bg-gray-100 transition-colors ${notification.isRead ? 'text-gray-400 cursor-not-allowed' : 'text-blue-600 hover:text-blue-700'
+                          }`}
                         onClick={(e) => {
                           e.stopPropagation()
                           if (!notification.isRead) markNotificationAsRead(notification.id)
@@ -216,7 +215,7 @@ export function Header() {
                       size="sm"
                       className="w-11/12 flex items-center gap-2 rounded-md"
                       onClick={() => {
-                        userNotifications.forEach(n => deleteNotification(n.id))
+                        if (currentUser?.id) clearAllNotifications(currentUser.id)
                       }}
                     >
                       <Trash2 className="w-4 h-4" />
@@ -256,11 +255,11 @@ export function Header() {
                         // Get role name from jobRoles if exists
                         const jobRoles = JSON.parse(localStorage.getItem("jobRoles") || "[]")
                         const userRole = jobRoles.find((role: any) => role.id === currentUser.role)
-                        
+
                         if (userRole) {
                           return userRole.name
                         }
-                        
+
                         // Fallback to default roles
                         switch (currentUser.role) {
                           case "admin":

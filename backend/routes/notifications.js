@@ -38,6 +38,21 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+// Delete all notifications for a user
+router.delete('/clear', async (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) {
+      return res.status(400).json({ success: false, error: 'User ID is required' });
+    }
+
+    await Notification.deleteMany({ userId });
+    res.json({ success: true, message: 'All notifications deleted' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Delete notification - search by id field instead of _id
 router.delete('/:id', async (req, res) => {
   try {
@@ -49,4 +64,4 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-module.exports = router; 
+module.exports = router;

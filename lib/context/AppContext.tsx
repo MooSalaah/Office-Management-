@@ -105,6 +105,7 @@ type AppAction =
   | { type: "SET_LOADING"; payload: boolean }
   | { type: "SET_LOADING_STATE"; payload: { key: keyof AppState['loadingStates']; value: boolean } }
   | { type: "SET_USERS"; payload: User[] }
+  | { type: "CLEAR_NOTIFICATIONS"; payload: string } // payload is userId
 
 const initialState: AppState = {
   currentUser: null,
@@ -245,6 +246,12 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         notifications: state.notifications.filter((n) => n.id !== action.payload),
+      }
+
+    case "CLEAR_NOTIFICATIONS":
+      return {
+        ...state,
+        notifications: state.notifications.filter((n) => n.userId !== action.payload),
       }
 
     case "ADD_USER":
@@ -1492,6 +1499,40 @@ export function useAppActions() {
     }
   };
 
+  const clearAllNotifications = async (userId: string) => {
+    if (!userId) return;
+
+    // حذف الإشعارات من state
+    dispatch({ type: "CLEAR_NOTIFICATIONS", payload: userId });
+
+    // حذف الإشعارات من قاعدة البيانات عبر Backend API
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
+      const response = await fetch(`${apiUrl}/api/notifications/clear`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+        },
+        body: JSON.stringify({ userId })
+      });
+
+      if (!response.ok) {
+        logger.error('Failed to clear notifications from database', {
+          status: response.status,
+          userId
+        }, 'NOTIFICATIONS');
+        showErrorToast("خطأ في حذف الإشعارات", "فشل حذف الإشعارات من قاعدة البيانات");
+      } else {
+        logger.info('All notifications cleared for user', { userId }, 'NOTIFICATIONS');
+        showSuccessToast("تم حذف الإشعارات", "تم حذف جميع الإشعارات بنجاح");
+      }
+    } catch (error) {
+      logger.error('Error clearing notifications from database', { error, userId }, 'NOTIFICATIONS');
+      showErrorToast("خطأ في الاتصال", "حدث خطأ أثناء حذف الإشعارات");
+    }
+  };
+
   const notifyProjectEngineers = async (project: Project, action: 'update' | 'delete', actorName: string) => {
     try {
       const engineers = state.users.filter(user => user.role === 'engineer' && user.isActive);
@@ -2067,6 +2108,7 @@ export function useAppActions() {
     addNotification,
     markNotificationAsRead,
     deleteNotification,
+    clearAllNotifications,
 
     // User management
     setCurrentUser,
