@@ -49,39 +49,11 @@ router.get('/month/:year/:month', async (req, res) => {
     const { year, month } = req.params;
     const startDate = `${year}-${month.padStart(2, '0')}-01`;
     const endDate = `${year}-${month.padStart(2, '0')}-31`;
-    
+
     const records = await Attendance.find({
       date: { $gte: startDate, $lte: endDate }
     }).sort({ date: -1, createdAt: -1 });
-    
-    res.json({ success: true, data: records });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
 
-// Create new attendance record
-router.post('/', async (req, res) => {
-  try {
-    const attendanceData = {
-      ...req.body,
-      id: req.body.id || `attendance_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    
-    const record = new Attendance(attendanceData);
-    const newRecord = await record.save();
-    res.status(201).json({ success: true, data: newRecord });
-  } catch (err) {
-    res.status(400).json({ success: false, error: err.message });
-  }
-});
-
-// Update attendance record
-router.put('/:id', async (req, res) => {
-  try {
-    // البحث بالـ id المخصص بدلاً من _id
     const updatedRecord = await Attendance.findOneAndUpdate(
       { id: req.params.id },
       { ...req.body, updatedAt: new Date().toISOString() },
@@ -133,11 +105,11 @@ router.delete('/bulk', async (req, res) => {
     if (!ids || !Array.isArray(ids)) {
       return res.status(400).json({ success: false, error: 'IDs array is required' });
     }
-    
+
     // البحث بالـ id المخصص بدلاً من _id
     const result = await Attendance.deleteMany({ id: { $in: ids } });
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       message: `${result.deletedCount} attendance records deleted`,
       deletedCount: result.deletedCount
     });
@@ -152,15 +124,15 @@ router.get('/stats/:userId?', async (req, res) => {
   try {
     const { userId } = req.params;
     const { startDate, endDate } = req.query;
-    
+
     let query = {};
     if (userId) query.userId = userId;
     if (startDate && endDate) {
       query.date = { $gte: startDate, $lte: endDate };
     }
-    
+
     const records = await Attendance.find(query);
-    
+
     const stats = {
       totalRecords: records.length,
       presentDays: records.filter(r => r.status === 'present').length,
@@ -169,10 +141,10 @@ router.get('/stats/:userId?', async (req, res) => {
       overtimeDays: records.filter(r => r.status === 'overtime').length,
       totalHours: records.reduce((sum, r) => sum + (r.totalHours || 0), 0),
       totalOvertimeHours: records.reduce((sum, r) => sum + (r.overtimeHours || 0), 0),
-      averageHoursPerDay: records.length > 0 ? 
+      averageHoursPerDay: records.length > 0 ?
         records.reduce((sum, r) => sum + (r.totalHours || 0), 0) / records.length : 0
     };
-    
+
     res.json({ success: true, data: stats });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
