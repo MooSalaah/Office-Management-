@@ -53,35 +53,6 @@ router.get('/month/:year/:month', async (req, res) => {
     const records = await Attendance.find({
       date: { $gte: startDate, $lte: endDate }
     }).sort({ date: -1, createdAt: -1 });
-
-    const updatedRecord = await Attendance.findOneAndUpdate(
-      { id: req.params.id },
-      { ...req.body, updatedAt: new Date().toISOString() },
-      { new: true }
-    );
-    if (!updatedRecord) {
-      // إذا لم يجد بالـ id المخصص، جرب البحث بالـ _id
-      const updatedByMongoId = await Attendance.findByIdAndUpdate(
-        req.params.id,
-        { ...req.body, updatedAt: new Date().toISOString() },
-        { new: true }
-      );
-      if (!updatedByMongoId) {
-        return res.status(404).json({ success: false, error: 'Attendance record not found' });
-      }
-      return res.json({ success: true, data: updatedByMongoId });
-    }
-    res.json({ success: true, data: updatedRecord });
-  } catch (err) {
-    console.error('Error updating attendance record:', err);
-    res.status(400).json({ success: false, error: err.message });
-  }
-});
-
-// Delete attendance record
-router.delete('/:id', async (req, res) => {
-  try {
-    // البحث بالـ id المخصص بدلاً من _id
     const deletedRecord = await Attendance.findOneAndDelete({ id: req.params.id });
     if (!deletedRecord) {
       // إذا لم يجد بالـ id المخصص، جرب البحث بالـ _id
