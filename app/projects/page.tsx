@@ -212,6 +212,13 @@ function ProjectsPageContent() {
     setFilteredProjects(memoizedProjects)
   }, [memoizedProjects])
 
+  useEffect(() => {
+    // Fetch task types from API
+    api.taskTypes.getAll().then((res) => {
+      if (res.success && Array.isArray(res.data)) setTaskTypes(res.data);
+    });
+  }, []);
+
   // Show loading skeleton if data is loading
   if (state.isLoading || state.loadingStates.projects) {
     return LoadingStates.projects(9)
@@ -987,12 +994,7 @@ function ProjectsPageContent() {
     }
   }
 
-  useEffect(() => {
-    // Fetch task types from API
-    api.taskTypes.getAll().then((res) => {
-      if (res.success && Array.isArray(res.data)) setTaskTypes(res.data);
-    });
-  }, []);
+
 
   return (
     <div className="max-w-screen-xl mx-auto space-y-6">
