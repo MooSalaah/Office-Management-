@@ -66,7 +66,7 @@ export default function ProjectsPage() {
 
 function ProjectsPageContent() {
   const { state, dispatch } = useApp()
-  const { addNotification, createProjectWithDownPayment, updateProjectWithDownPayment, deleteProject, createClient, showSuccessToast } = useAppActions()
+  const { addNotification, createProjectWithDownPayment, updateProjectWithDownPayment, deleteProject, createClient, showSuccessToast, showErrorToast } = useAppActions()
   const { currentUser, projects, clients, users, tasks } = state
   const { toast } = useToast()
 
@@ -566,14 +566,7 @@ function ProjectsPageContent() {
 
   const handleDeleteProject = (projectId: string) => {
     if (!hasPermission(currentUser?.role || "", "delete", "projects")) {
-      addNotification({
-        userId: currentUser?.id || "",
-        title: "خطأ في حذف المشروع",
-        message: "ليس لديك صلاحية لحذف المشاريع",
-        type: "system",
-        isRead: false,
-        triggeredBy: currentUser?.id || "",
-      })
+      showErrorToast("خطأ في الصلاحيات", "ليس لديك صلاحية لحذف المشاريع")
       return
     }
 
