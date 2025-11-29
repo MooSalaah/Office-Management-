@@ -35,7 +35,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useApp, useAppActions } from "@/lib/context/AppContext"
-import { logout, getUserModules, canAccessModule } from "@/lib/auth"
+import { logout, getUserModules, canAccessModule, hasPermission } from "@/lib/auth"
 import { useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
 import { SwipeToDelete } from "@/components/ui/swipe-to-delete"
@@ -66,6 +66,8 @@ export function Navbar() {
   const allowedNavigation = navigation.filter(item => {
     // Admin can access all modules
     if (currentUser?.role === "admin") return true
+
+    if (!currentUser) return false
 
     // Check if user has access to this module using dynamic permissions
     // This checks user-specific permissions first, then role permissions
