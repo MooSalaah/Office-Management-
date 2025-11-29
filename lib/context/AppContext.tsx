@@ -138,6 +138,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, projects: [...state.projects, action.payload] }
 
     case "UPDATE_PROJECT":
+      if (!action.payload) return state;
       return {
         ...state,
         projects: state.projects.map((p) => (p.id === action.payload.id ? action.payload : p)),
@@ -159,6 +160,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, clients: [...state.clients, action.payload] }
 
     case "UPDATE_CLIENT":
+      if (!action.payload) return state;
       return {
         ...state,
         clients: state.clients.map((c) => (c.id === action.payload.id ? action.payload : c)),
@@ -180,6 +182,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, tasks: [...state.tasks, action.payload] }
 
     case "UPDATE_TASK":
+      if (!action.payload) return state;
       return {
         ...state,
         tasks: state.tasks.map((t) => (t.id === action.payload.id ? action.payload : t)),
@@ -201,6 +204,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, transactions: [...state.transactions, action.payload] }
 
     case "UPDATE_TRANSACTION":
+      if (!action.payload) return state;
       return {
         ...state,
         transactions: state.transactions.map((t) => (t.id === action.payload.id ? action.payload : t)),
@@ -231,6 +235,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, notifications: [...state.notifications, action.payload] }
 
     case "UPDATE_NOTIFICATION":
+      if (!action.payload) return state;
       return {
         ...state,
         notifications: state.notifications.map((n) => (n.id === action.payload.id ? action.payload : n)),
@@ -249,6 +254,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, users: [...state.users, action.payload] };
 
     case "UPDATE_USER":
+      if (!action.payload) return state;
       return {
         ...state,
         users: state.users.map((u) => (u.id === action.payload.id ? action.payload : u)),
@@ -282,28 +288,28 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, userSettings: action.payload }
 
     case "UPDATE_COMPANY_LOGO":
-      return { 
-        ...state, 
-        companySettings: { 
-          ...state.companySettings, 
-          logo: action.payload 
-        } 
+      return {
+        ...state,
+        companySettings: {
+          ...state.companySettings,
+          logo: action.payload
+        }
       }
 
     case "UPDATE_COMPANY_INFO":
-      return { 
-        ...state, 
-        companySettings: { 
-          ...state.companySettings, 
-          ...action.payload 
-        } 
+      return {
+        ...state,
+        companySettings: {
+          ...state.companySettings,
+          ...action.payload
+        }
       }
 
     case "UPDATE_NOTIFICATION_SETTINGS":
-      return { 
-        ...state, 
-        userSettings: state.userSettings ? { 
-          ...state.userSettings, 
+      return {
+        ...state,
+        userSettings: state.userSettings ? {
+          ...state.userSettings,
           notificationSettings: {
             emailNotifications: (action.payload as any).emailNotifications ?? state.userSettings.notificationSettings?.emailNotifications ?? state.userSettings.emailNotifications,
             taskNotifications: (action.payload as any).taskNotifications ?? state.userSettings.notificationSettings?.taskNotifications ?? state.userSettings.taskNotifications,
@@ -316,11 +322,11 @@ function appReducer(state: AppState, action: AppAction): AppState {
       }
 
     case "TOGGLE_DARK_MODE":
-      return { 
-        ...state, 
-        userSettings: state.userSettings ? { 
-          ...state.userSettings, 
-          darkMode: action.payload 
+      return {
+        ...state,
+        userSettings: state.userSettings ? {
+          ...state.userSettings,
+          darkMode: action.payload
         } : null
       }
 
@@ -386,7 +392,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const initializeNotifications = async () => {
       if ('Notification' in window) {
         const permission = await Notification.requestPermission()
-        
+
         // Register service worker
         if ('serviceWorker' in navigator) {
           try {
@@ -441,7 +447,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               console.warn('Invalid notification data received:', notification);
               return;
             }
-            
+
             // تحقق إذا كان الإشعار موجود مسبقاً
             if (!state.notifications.some(n => n.id === notification.id)) {
               dispatch({ type: 'ADD_NOTIFICATION', payload: notification })
@@ -467,13 +473,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           logger.info("تم جلب المستخدمين من الباكند", { count: response.data.length }, 'USERS');
           // استبدال جميع المستخدمين ببيانات قاعدة البيانات
           dispatch({ type: "LOAD_USERS", payload: response.data });
-          
+
           // تحديث المستخدم الحالي إذا كان موجوداً في قاعدة البيانات
           const currentUserData = localStorage.getItem("currentUser");
           if (currentUserData) {
             const currentUser = JSON.parse(currentUserData);
-            const currentUserFromDB = response.data.find((u: any) => 
-              u.email === currentUser.email || 
+            const currentUserFromDB = response.data.find((u: any) =>
+              u.email === currentUser.email ||
               u.name === currentUser.name ||
               u.id === currentUser.id ||
               u._id === currentUser.id // إضافة فحص _id أيضاً
@@ -483,7 +489,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               dispatch({ type: "SET_CURRENT_USER", payload: updatedCurrentUser });
               localStorage.setItem("currentUser", JSON.stringify(updatedCurrentUser));
               logger.info("تم تحديث المستخدم الحالي ببيانات قاعدة البيانات", { user: updatedCurrentUser }, 'USERS');
-              
+
               // إرسال إشعار للمستخدم أن بياناته تم تحديثها
               if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
                 const realtimeUpdates = (window as any).realtimeUpdates;
@@ -496,7 +502,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                   });
                 }
               }
-              
+
               // إرسال Storage Event لتحديث الأجهزة الأخرى
               if (typeof window !== 'undefined') {
                 window.dispatchEvent(new StorageEvent('storage', {
@@ -507,10 +513,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               }
             }
           }
-          
+
           // حفظ في localStorage للاستخدام offline
           localStorage.setItem("users", JSON.stringify(response.data));
-          
+
           // إرسال Storage Event لتحديث قائمة المستخدمين
           if (typeof window !== 'undefined') {
             const existingUsers = localStorage.getItem("users");
@@ -541,7 +547,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         dispatch({ type: "SET_LOADING_STATE", payload: { key: 'users', value: false } });
       }
     };
-    
+
     fetchUsers();
   }, []);
 
@@ -592,15 +598,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           const result = await response.json();
           if (result && result.success && Array.isArray(result.data)) {
             dispatch({ type: "LOAD_NOTIFICATIONS", payload: result.data });
-            logger.info('Notifications loaded from Backend API', { 
-              count: result.data.length 
+            logger.info('Notifications loaded from Backend API', {
+              count: result.data.length
             }, 'NOTIFICATIONS');
           } else {
             logger.warn('Invalid notifications response format from Backend API', { result }, 'NOTIFICATIONS');
           }
         } else {
-          logger.error('Failed to fetch notifications from Backend API', { 
-            status: response.status 
+          logger.error('Failed to fetch notifications from Backend API', {
+            status: response.status
           }, 'NOTIFICATIONS');
         }
       } catch (error) {
@@ -609,7 +615,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         dispatch({ type: "SET_LOADING_STATE", payload: { key: 'notifications', value: false } });
       }
     };
-    
+
     fetchNotifications();
   }, []);
 
@@ -632,7 +638,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // جلب جميع البيانات من قاعدة البيانات عند بدء التطبيق
   useEffect(() => {
     let isMounted = true; // منع التحديث إذا تم إلغاء التحميل
-    
+
     const fetchAllData = async () => {
       try {
         // جلب المستخدمين
@@ -684,7 +690,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
-        logger.info('All data loaded from Database successfully', { 
+        logger.info('All data loaded from Database successfully', {
           users: (usersResponse?.data as any[])?.length || 0,
           projects: (projectsResponse?.data as any[])?.length || 0,
           clients: (clientsResponse?.data as any[])?.length || 0,
@@ -700,9 +706,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
       }
     };
-    
+
     fetchAllData();
-    
+
     return () => {
       isMounted = false; // إلغاء التحديث عند إلغاء التحميل
     };
@@ -762,11 +768,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             // تحديث الإشعارات فقط إذا كان هناك تغيير
             const currentNotifications = state.notifications;
             const newNotifications = result.data;
-            
+
             // مقارنة عدد الإشعارات
             if (currentNotifications.length !== newNotifications.length) {
               dispatch({ type: "LOAD_NOTIFICATIONS", payload: newNotifications });
-              logger.info('Notifications updated from Backend API', { 
+              logger.info('Notifications updated from Backend API', {
                 oldCount: currentNotifications.length,
                 newCount: newNotifications.length
               }, 'NOTIFICATIONS');
@@ -774,10 +780,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               // مقارنة آخر إشعار
               const lastCurrentNotification = currentNotifications[0];
               const lastNewNotification = newNotifications[0];
-              
+
               if (lastCurrentNotification?.id !== lastNewNotification?.id) {
                 dispatch({ type: "LOAD_NOTIFICATIONS", payload: newNotifications });
-                logger.info('New notifications detected, updated from Backend API', { 
+                logger.info('New notifications detected, updated from Backend API', {
                   count: newNotifications.length
                 }, 'NOTIFICATIONS');
               }
@@ -801,7 +807,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           logger.info("تم جلب الأدوار من الباكند", { count: response.data.length }, 'ROLES');
           // حفظ الأدوار في localStorage للاستخدام في الإعدادات
           localStorage.setItem("jobRoles", JSON.stringify(response.data));
-          
+
           // تحديث rolePermissions بناءً على الأدوار الجديدة
           const rolePermissions: any = {};
           response.data.forEach((role: any) => {
@@ -828,7 +834,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       try {
         // Initialize default roles first
         initializeDefaultRoles()
-        
+
         // Load current user from localStorage first
         const userData = localStorage.getItem("currentUser")
         if (userData) {
@@ -851,13 +857,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               })
               // Save to localStorage for offline access
               localStorage.setItem("users", JSON.stringify(data.data))
-              
+
               // Update current user with database data if exists
               const currentUserData = localStorage.getItem("currentUser");
               if (currentUserData) {
                 const currentUser = JSON.parse(currentUserData);
-                const currentUserFromDB = data.data.find((u: User) => 
-                  u.email === currentUser.email || 
+                const currentUserFromDB = data.data.find((u: User) =>
+                  u.email === currentUser.email ||
                   u.name === currentUser.name ||
                   u.id === currentUser.id
                 );
@@ -1037,7 +1043,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
 
       localStorage.setItem("appData", JSON.stringify(dataToSave))
-      
+
       // حفظ البيانات بشكل منفصل أيضاً للتوافق
       localStorage.setItem("users", JSON.stringify(state.users))
       localStorage.setItem("projects", JSON.stringify(state.projects))
@@ -1130,11 +1136,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // عند أي تغيير في البيانات، إذا online أرسل broadcast، إذا offline أضف لقائمة الانتظار:
   const broadcastOrQueue = (type: string, data: unknown, isOnline: boolean, setPendingUpdates: React.Dispatch<React.SetStateAction<unknown[]>>) => {
     if (isOnline) {
-      		if (typeof window !== 'undefined' && window.realtimeUpdates && typeof window.realtimeUpdates === 'object' && typeof (window.realtimeUpdates as any).sendUpdate === 'function') {
-			(window.realtimeUpdates as any).sendUpdate(type, (data as any).action || 'update', data)
+      if (typeof window !== 'undefined' && window.realtimeUpdates && typeof window.realtimeUpdates === 'object' && typeof (window.realtimeUpdates as any).sendUpdate === 'function') {
+        (window.realtimeUpdates as any).sendUpdate(type, (data as any).action || 'update', data)
       }
     } else {
-              setPendingUpdates((prev: unknown[]) => [...prev, { type, data }])
+      setPendingUpdates((prev: unknown[]) => [...prev, { type, data }])
     }
   }
 
@@ -1198,7 +1204,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               console.warn('Invalid company settings data received:', settings);
               return;
             }
-            
+
             dispatch({ type: 'UPDATE_COMPANY_SETTINGS', payload: settings });
             localStorage.setItem('companySettings', JSON.stringify(settings));
           } catch (error) {
@@ -1264,10 +1270,10 @@ export function useAppActions() {
   const createProjectWithFinancialTransaction = async (project: Project) => {
     try {
       setLoadingState('projects', true)
-      
+
       // إضافة المشروع
       dispatch({ type: "ADD_PROJECT", payload: project })
-      
+
       // إنشاء معاملة مالية للدفعة المقدمة
       if (project.downPayment > 0) {
         const downPaymentTransaction: Transaction = {
@@ -1288,13 +1294,13 @@ export function useAppActions() {
           createdBy: currentUser?.id || "",
           createdAt: new Date().toISOString(),
         }
-        
+
         dispatch({ type: "ADD_TRANSACTION", payload: downPaymentTransaction })
       }
-      
+
       // حفظ البيانات
       saveDataToStorage()
-      
+
       showSuccessToast("تم إنشاء المشروع بنجاح", `تم إنشاء مشروع "${project.name}" مع المعاملات المالية المرتبطة`)
     } catch (error) {
       showErrorToast("خطأ في إنشاء المشروع", "حدث خطأ أثناء إنشاء المشروع")
@@ -1316,49 +1322,49 @@ export function useAppActions() {
       id: Date.now().toString(),
       createdAt: new Date().toISOString(),
     };
-    
+
     // تحقق من إعدادات الإشعارات للمستخدم
     const userSettings = state.userSettings;
     if (userSettings?.notificationSettings) {
       const notificationType = notification.type;
       const notificationKey = `${notificationType}Notifications` as keyof typeof userSettings.notificationSettings;
       const isEnabled = userSettings.notificationSettings[notificationKey] !== false;
-      
+
       if (!isEnabled) {
-        logger.info(`Notification disabled for user ${notification.userId}`, { 
-          type: notificationType, 
-          userId: notification.userId 
+        logger.info(`Notification disabled for user ${notification.userId}`, {
+          type: notificationType,
+          userId: notification.userId
         }, 'NOTIFICATIONS');
         return;
       }
     }
-    
+
     // إضافة الإشعار إلى state أولاً
     dispatch({ type: "ADD_NOTIFICATION", payload: newNotification });
-    
+
     // حفظ الإشعار في قاعدة البيانات عبر Backend API
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
       const response = await fetch(`${apiUrl}/api/notifications`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
         },
         body: JSON.stringify(newNotification),
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        logger.error('Failed to save notification to database via Backend API', { 
-          status: response.status, 
+        logger.error('Failed to save notification to database via Backend API', {
+          status: response.status,
           error: errorData.error,
-          notification: newNotification 
+          notification: newNotification
         }, 'NOTIFICATIONS');
       } else {
         const result = await response.json();
-        logger.info('Notification saved to database via Backend API', { 
-          id: newNotification.id, 
+        logger.info('Notification saved to database via Backend API', {
+          id: newNotification.id,
           type: newNotification.type,
           databaseId: result.data?._id
         }, 'NOTIFICATIONS');
@@ -1366,27 +1372,27 @@ export function useAppActions() {
     } catch (error) {
       logger.error('Error saving notification to database via Backend API', { error }, 'NOTIFICATIONS');
     }
-    
+
     // إرسال تحديث فوري (إذا كان متاحاً)
     try {
       if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
         const realtimeUpdates = (window as any).realtimeUpdates;
         if (realtimeUpdates.sendUpdate && typeof realtimeUpdates.sendUpdate === 'function') {
           realtimeUpdates.sendUpdate('notification', 'create', newNotification);
-          logger.info('Notification broadcasted via realtime updates', { 
-            id: newNotification.id 
+          logger.info('Notification broadcasted via realtime updates', {
+            id: newNotification.id
           }, 'NOTIFICATIONS');
         }
       }
     } catch (error) {
       logger.error('Error broadcasting notification update', { error }, 'NOTIFICATIONS');
     }
-    
+
     // عرض إشعار المتصفح إذا كان مسموحاً
     try {
-      if (userSettings?.notificationSettings?.browserNotifications && 
-          'Notification' in window && 
-          Notification.permission === 'granted') {
+      if (userSettings?.notificationSettings?.browserNotifications &&
+        'Notification' in window &&
+        Notification.permission === 'granted') {
         // إنشاء إشعار المتصفح
         const browserNotification = new Notification(newNotification.title, {
           body: newNotification.message,
@@ -1409,10 +1415,10 @@ export function useAppActions() {
         setTimeout(() => {
           browserNotification.close();
         }, 5000);
-        
-        logger.info('Browser notification shown', { 
+
+        logger.info('Browser notification shown', {
           id: newNotification.id,
-          title: newNotification.title 
+          title: newNotification.title
         }, 'NOTIFICATIONS');
       }
     } catch (error) {
@@ -1426,23 +1432,23 @@ export function useAppActions() {
     if (updatedNotification && !updatedNotification.isRead) {
       const notification = { ...updatedNotification, isRead: true };
       dispatch({ type: "UPDATE_NOTIFICATION", payload: notification });
-      
+
       // حفظ التحديث في قاعدة البيانات عبر Backend API
       try {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
         const response = await fetch(`${apiUrl}/api/notifications/${notificationId}`, {
           method: 'PUT',
-          headers: { 
+          headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
           },
           body: JSON.stringify({ isRead: true }),
         });
-        
+
         if (!response.ok) {
-          logger.error('Failed to update notification in database via Backend API', { 
-            status: response.status, 
-            notificationId 
+          logger.error('Failed to update notification in database via Backend API', {
+            status: response.status,
+            notificationId
           }, 'NOTIFICATIONS');
         } else {
           logger.info('Notification marked as read in database via Backend API', { notificationId }, 'NOTIFICATIONS');
@@ -1459,10 +1465,10 @@ export function useAppActions() {
       logger.error('Cannot delete notification: invalid notificationId', { notificationId }, 'NOTIFICATIONS');
       return;
     }
-    
+
     // حذف الإشعار من state
     dispatch({ type: "DELETE_NOTIFICATION", payload: notificationId });
-    
+
     // حذف الإشعار من قاعدة البيانات عبر Backend API
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
@@ -1472,11 +1478,11 @@ export function useAppActions() {
           'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
         }
       });
-      
+
       if (!response.ok) {
-        logger.error('Failed to delete notification from database via Backend API', { 
-          status: response.status, 
-          notificationId 
+        logger.error('Failed to delete notification from database via Backend API', {
+          status: response.status,
+          notificationId
         }, 'NOTIFICATIONS');
       } else {
         logger.info('Notification deleted from database via Backend API', { notificationId }, 'NOTIFICATIONS');
@@ -1601,7 +1607,7 @@ export function useAppActions() {
 
   const setCurrentUser = (user: User | null) => {
     dispatch({ type: "SET_CURRENT_USER", payload: user })
-    
+
     // تحديث فوري للبيانات المالية عند تسجيل دخول المدير
     if (user?.role === "admin") {
       const refreshFinancialData = async () => {
@@ -1610,33 +1616,33 @@ export function useAppActions() {
           const transactionsResponse = await api.transactions.getAll();
           if (transactionsResponse && transactionsResponse.success && Array.isArray(transactionsResponse.data)) {
             dispatch({ type: "LOAD_TRANSACTIONS", payload: transactionsResponse.data });
-            logger.info('Financial data refreshed for admin login', { 
-              transactionsCount: transactionsResponse.data.length 
+            logger.info('Financial data refreshed for admin login', {
+              transactionsCount: transactionsResponse.data.length
             }, 'FINANCE');
           }
-          
+
           // تحديث المشاريع
           const projectsResponse = await api.projects.getAll();
           if (projectsResponse && projectsResponse.success && Array.isArray(projectsResponse.data)) {
             dispatch({ type: "LOAD_PROJECTS", payload: projectsResponse.data });
-            logger.info('Projects data refreshed for admin login', { 
-              projectsCount: projectsResponse.data.length 
+            logger.info('Projects data refreshed for admin login', {
+              projectsCount: projectsResponse.data.length
             }, 'PROJECTS');
           }
-          
+
           // تحديث العملاء
           const clientsResponse = await api.clients.getAll();
           if (clientsResponse && clientsResponse.success && Array.isArray(clientsResponse.data)) {
             dispatch({ type: "LOAD_CLIENTS", payload: clientsResponse.data });
-            logger.info('Clients data refreshed for admin login', { 
-              clientsCount: clientsResponse.data.length 
+            logger.info('Clients data refreshed for admin login', {
+              clientsCount: clientsResponse.data.length
             }, 'CLIENTS');
           }
         } catch (error) {
           logger.error('Error refreshing financial data for admin login', { error }, 'FINANCE');
         }
       };
-      
+
       refreshFinancialData();
     }
   }
@@ -1685,11 +1691,11 @@ export function useAppActions() {
       localStorage.setItem("notifications", JSON.stringify(state.notifications))
       localStorage.setItem("attendanceRecords", JSON.stringify(state.attendanceRecords))
       localStorage.setItem("upcomingPayments", JSON.stringify(state.upcomingPayments))
-      
+
       if (state.currentUser) {
         localStorage.setItem("currentUser", JSON.stringify(state.currentUser))
       }
-      
+
       logger.debug("All data saved to localStorage successfully", undefined, 'STORAGE');
     } catch (error) {
       logger.error("Error saving data to localStorage", { error }, 'STORAGE');
@@ -1705,7 +1711,7 @@ export function useAppActions() {
       if (response && response.success) {
         const newTask = response.data as Task;
         dispatch({ type: "ADD_TASK", payload: newTask });
-        
+
         // إرسال إشعار للمستخدم المسند إليه المهمة
         if (task.assigneeId && task.assigneeId !== state.currentUser?.id) {
           await addNotification({
@@ -1718,7 +1724,7 @@ export function useAppActions() {
             isRead: false
           });
         }
-        
+
         // إرسال إشعار عام عن إنشاء المهمة
         await addNotification({
           userId: state.currentUser?.id || "system",
@@ -1729,7 +1735,7 @@ export function useAppActions() {
           triggeredBy: state.currentUser?.id || "system",
           isRead: false
         });
-        
+
         if (typeof window !== 'undefined' && window.realtimeUpdates && typeof window.realtimeUpdates === 'object' && typeof (window.realtimeUpdates as any).sendTaskUpdate === 'function') {
           (window.realtimeUpdates as any).sendTaskUpdate({ action: 'create', task: newTask });
         }
@@ -1795,29 +1801,29 @@ export function useAppActions() {
   const createClient = async (client: Client) => {
     try {
       setLoadingState('clients', true)
-      
+
       // حفظ في قاعدة البيانات
       const response = await api.clients.create(client);
       if (!response.success) {
         throw new Error(response.error || 'فشل حفظ العميل في قاعدة البيانات');
       }
-      
+
       // تحديث state
       dispatch({ type: "ADD_CLIENT", payload: response.data || client })
-      
+
       // حفظ في localStorage كنسخة احتياطية
       saveDataToStorage()
-      
+
       // إرسال تحديث فوري
       if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
-        (window as any).realtimeUpdates.sendClientUpdate({ 
-          action: 'create', 
-          client: response.data || client, 
-          userId: state.currentUser?.id, 
-          userName: state.currentUser?.name 
+        (window as any).realtimeUpdates.sendClientUpdate({
+          action: 'create',
+          client: response.data || client,
+          userId: state.currentUser?.id,
+          userName: state.currentUser?.name
         });
       }
-      
+
       showSuccessToast("تم إنشاء العميل بنجاح", `تم إنشاء عميل "${client.name}"`)
     } catch (error) {
       logger.error("خطأ في إنشاء العميل", { error }, 'CLIENTS');
@@ -1830,29 +1836,29 @@ export function useAppActions() {
   const updateClient = async (client: Client) => {
     try {
       setLoadingState('clients', true)
-      
+
       // تحديث في قاعدة البيانات
       const response = await api.clients.update(client.id, client);
       if (!response.success) {
         throw new Error(response.error || 'فشل تحديث العميل في قاعدة البيانات');
       }
-      
+
       // تحديث state
       dispatch({ type: "UPDATE_CLIENT", payload: response.data || client })
-      
+
       // حفظ في localStorage كنسخة احتياطية
       saveDataToStorage()
-      
+
       // إرسال تحديث فوري
       if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
-        (window as any).realtimeUpdates.sendClientUpdate({ 
-          action: 'update', 
-          client: response.data || client, 
-          userId: state.currentUser?.id, 
-          userName: state.currentUser?.name 
+        (window as any).realtimeUpdates.sendClientUpdate({
+          action: 'update',
+          client: response.data || client,
+          userId: state.currentUser?.id,
+          userName: state.currentUser?.name
         });
       }
-      
+
       showSuccessToast("تم تحديث العميل بنجاح", `تم تحديث عميل "${client.name}"`)
     } catch (error) {
       logger.error("خطأ في تحديث العميل", { error }, 'CLIENTS');
@@ -1899,17 +1905,17 @@ export function useAppActions() {
 
       dispatch({ type: "DELETE_CLIENT", payload: clientId })
       saveDataToStorage()
-      
+
       // إرسال تحديث فوري
       if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
-        (window as any).realtimeUpdates.sendClientUpdate({ 
-          action: 'delete', 
-          client: client, 
-          userId: state.currentUser?.id, 
-          userName: state.currentUser?.name 
+        (window as any).realtimeUpdates.sendClientUpdate({
+          action: 'delete',
+          client: client,
+          userId: state.currentUser?.id,
+          userName: state.currentUser?.name
         });
       }
-      
+
       showSuccessToast("تم حذف العميل بنجاح", `تم حذف عميل "${client.name}"`)
     } catch (error) {
       logger.error("خطأ في حذف العميل", { error }, 'CLIENTS');
@@ -2035,12 +2041,12 @@ export function useAppActions() {
     // Loading state management
     setLoading,
     setLoadingState,
-    
+
     // Toast notifications
     showSuccessToast,
     showErrorToast,
     showWarningToast,
-    
+
     // Enhanced CRUD operations
     createProjectWithFinancialTransaction,
     updateProjectWithFinancialTransaction,
@@ -2056,20 +2062,20 @@ export function useAppActions() {
     createTransaction,
     updateTransaction,
     deleteTransaction,
-    
+
     // Notification management
     addNotification,
     markNotificationAsRead,
     deleteNotification,
-    
+
     // User management
     setCurrentUser,
     logout,
     refreshCurrentUser,
-    
+
     // Data persistence
     saveDataToStorage,
-    
+
     // Realtime updates
     broadcastProjectUpdate,
     broadcastTaskUpdate,
