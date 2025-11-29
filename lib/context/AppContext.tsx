@@ -831,6 +831,28 @@ export function useAppActions() {
         }
     };
 
+    const createProjectWithFinancialTransaction = async (project: Project) => {
+        try {
+            setLoadingState('projects', true);
+            const response = await api.projects.create(project);
+            if (response && response.success) {
+                const newProject = response.data as Project;
+                dispatch({ type: "ADD_PROJECT", payload: newProject });
+                if (typeof window !== 'undefined' && window.realtimeUpdates && typeof window.realtimeUpdates === 'object' && typeof (window.realtimeUpdates as any).sendProjectUpdate === 'function') {
+                    (window.realtimeUpdates as any).sendProjectUpdate({ action: 'create', project: newProject });
+                }
+                await notifyProjectEngineers(newProject, 'update', state.currentUser?.name || 'مستخدم');
+                showSuccessToast("تم إنشاء المشروع بنجاح", `تم إنشاء مشروع "${newProject.name}"`);
+            } else {
+                showErrorToast("خطأ في إنشاء المشروع", response?.error || "فشل الإنشاء في الباكند");
+            }
+        } catch (error) {
+            showErrorToast("خطأ في إنشاء المشروع", "حدث خطأ أثناء إنشاء المشروع");
+        } finally {
+            setLoadingState('projects', false);
+        }
+    };
+
     const updateProjectWithFinancialTransaction = async (project: Project) => {
         try {
             setLoadingState('projects', true);

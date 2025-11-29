@@ -8,10 +8,13 @@ export class RealtimeUpdates {
   private listeners: Map<string, ((...args: any[]) => void)[]> = new Map();
 
   constructor() {
-    this.initialize();
+    if (typeof window !== 'undefined') {
+      this.initialize();
+    }
   }
 
   private initialize() {
+    if (typeof window === 'undefined') return;
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
       this.eventSource = new EventSource(`${apiUrl}/api/realtime`);
