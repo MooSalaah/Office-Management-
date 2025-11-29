@@ -47,17 +47,6 @@ router.delete('/clear', async (req, res) => {
     }
 
     await Notification.deleteMany({ userId });
-    res.json({ success: true, message: 'All notifications deleted' });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// Delete notification - search by id field instead of _id
-router.delete('/:id', async (req, res) => {
-  try {
-    const deletedNotification = await Notification.findOneAndDelete({ id: req.params.id }); // البحث بالـ id بدلاً من _id
-    if (!deletedNotification) return res.status(404).json({ success: false, error: 'Notification not found' });
     res.json({ success: true, message: 'Notification deleted' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
