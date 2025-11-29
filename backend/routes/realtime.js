@@ -7,6 +7,14 @@ const clients = new Set();
 const recentUpdates = [];
 const MAX_UPDATES = 100;
 
+// Helper to set CORS headers dynamically
+const setCorsHeaders = (req, res) => {
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Headers', 'Cache-Control, Content-Type, Authorization');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Credentials', 'true');
+};
+
 // SSE endpoint for real-time updates
 router.get('/', (req, res) => {
   // Set headers for SSE with proper CORS
@@ -14,7 +22,7 @@ router.get('/', (req, res) => {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     'Connection': 'keep-alive',
-    'Access-Control-Allow-Origin': 'https://theofficemanagemet.netlify.app',
+    'Access-Control-Allow-Origin': req.headers.origin || '*',
     'Access-Control-Allow-Headers': 'Cache-Control, Content-Type, Authorization',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Credentials': 'true'
@@ -41,17 +49,13 @@ router.get('/', (req, res) => {
 
 // Polling endpoint for updates since a specific timestamp
 router.get('/poll', (req, res) => {
-  // Set CORS headers for polling endpoint
-  res.header('Access-Control-Allow-Origin', 'https://theofficemanagemet.netlify.app');
-  res.header('Access-Control-Allow-Headers', 'Cache-Control, Content-Type, Authorization');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  
+  setCorsHeaders(req, res);
+
   const since = parseInt(req.query.since) || 0;
-  
+
   // Filter updates since the given timestamp
   const updates = recentUpdates.filter(update => update.timestamp > since);
-  
+
   res.json({
     success: true,
     updates: updates,
@@ -61,12 +65,8 @@ router.get('/poll', (req, res) => {
 
 // Broadcast endpoint for sending updates
 router.post('/broadcast', (req, res) => {
-  // Set CORS headers for broadcast endpoint
-  res.header('Access-Control-Allow-Origin', 'https://theofficemanagemet.netlify.app');
-  res.header('Access-Control-Allow-Headers', 'Cache-Control, Content-Type, Authorization');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  
+  setCorsHeaders(req, res);
+
   try {
     const update = req.body;
 
@@ -82,7 +82,7 @@ router.post('/broadcast', (req, res) => {
 
     // Store update in recent updates
     recentUpdates.push(update);
-    
+
     // Keep only recent updates
     if (recentUpdates.length > MAX_UPDATES) {
       recentUpdates.shift();
@@ -103,11 +103,11 @@ router.post('/broadcast', (req, res) => {
     });
 
     // Log broadcast for debugging
-    logger.info(`📡 Broadcasted ${update.type} ${update.action} to ${broadcastCount} clients`, { 
-      type: update.type, 
-      action: update.action, 
-      broadcastCount, 
-      clientsCount: clients.size 
+    logger.info(`📡 Broadcasted ${update.type} ${update.action} to ${broadcastCount} clients`, {
+      type: update.type,
+      action: update.action,
+      broadcastCount,
+      clientsCount: clients.size
     }, 'REALTIME');
 
     res.json({
@@ -128,12 +128,8 @@ router.post('/broadcast', (req, res) => {
 
 // Health check endpoint
 router.get('/health', (req, res) => {
-  // Set CORS headers for health endpoint
-  res.header('Access-Control-Allow-Origin', 'https://theofficemanagemet.netlify.app');
-  res.header('Access-Control-Allow-Headers', 'Cache-Control, Content-Type, Authorization');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  
+  setCorsHeaders(req, res);
+
   res.json({
     success: true,
     clientsCount: clients.size,
@@ -142,4 +138,4 @@ router.get('/health', (req, res) => {
   });
 });
 
-module.exports = router; 
+module.exports = router;
