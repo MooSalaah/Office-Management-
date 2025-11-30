@@ -2,7 +2,7 @@
 
 import { useMemo } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { BarChart } from "@/components/ui/chart"
+import { LineChart } from "@/components/ui/chart"
 import { Transaction } from "@/lib/types"
 import { TrendingUp, TrendingDown } from "lucide-react"
 
@@ -51,16 +51,20 @@ export function FinancialChart({ transactions }: FinancialChartProps) {
                 {
                     label: 'الدخل',
                     data: incomeData,
-                    backgroundColor: 'hsl(142, 76%, 36%)', // Green
+                    backgroundColor: 'hsla(142, 76%, 36%, 0.2)', // Green with opacity
                     borderColor: 'hsl(142, 76%, 36%)',
-                    borderWidth: 1,
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4,
                 },
                 {
                     label: 'المصروفات',
                     data: expenseData,
-                    backgroundColor: 'hsl(0, 84%, 60%)', // Red
+                    backgroundColor: 'hsla(0, 84%, 60%, 0.2)', // Red with opacity
                     borderColor: 'hsl(0, 84%, 60%)',
-                    borderWidth: 1,
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4,
                 }
             ]
         }
@@ -81,7 +85,7 @@ export function FinancialChart({ transactions }: FinancialChartProps) {
                 <CardDescription>مقارنة الدخل والمصروفات لآخر 6 أشهر</CardDescription>
             </CardHeader>
             <CardContent className="pl-2">
-                <BarChart
+                <LineChart
                     data={chartData}
                     height={350}
                     options={{

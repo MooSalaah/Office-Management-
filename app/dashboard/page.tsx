@@ -1237,34 +1237,6 @@ function DashboardPageContent() {
         </div>
       </div>
 
-      {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl font-extrabold mb-4">إجراءات سريعة</CardTitle>
-          <CardDescription>الإجراءات الأكثر استخداماً في النظام</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {quickActions.map((action, index) => {
-              const Icon = action.icon
-              return (
-                <Card key={index} className="hover:shadow-md transition-shadow cursor-pointer" onClick={action.onClick}>
-                  <CardContent className="p-6 text-center">
-                    <div
-                      className={`w-12 h-12 rounded-full ${action.color} flex items-center justify-center mx-auto mb-4`}
-                    >
-                      <Icon className="w-6 h-6 text-white" />
-                    </div>
-                    <h3 className="font-semibold text-foreground mb-2">{action.title}</h3>
-                    <p className="text-sm text-muted-foreground">{action.description}</p>
-                  </CardContent>
-                </Card>
-              )
-            })}
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Active Projects Overview */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
@@ -1310,6 +1282,34 @@ function DashboardPageContent() {
               <p>لا توجد مشاريع نشطة حالياً</p>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Quick Actions */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-2xl font-extrabold mb-4">إجراءات سريعة</CardTitle>
+          <CardDescription>الإجراءات الأكثر استخداماً في النظام</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {quickActions.map((action, index) => {
+              const Icon = action.icon
+              return (
+                <Card key={index} className="hover:shadow-md transition-shadow cursor-pointer" onClick={action.onClick}>
+                  <CardContent className="p-6 text-center">
+                    <div
+                      className={`w-12 h-12 rounded-full ${action.color} flex items-center justify-center mx-auto mb-4`}
+                    >
+                      <Icon className="w-6 h-6 text-white" />
+                    </div>
+                    <h3 className="font-semibold text-foreground mb-2">{action.title}</h3>
+                    <p className="text-sm text-muted-foreground">{action.description}</p>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
         </CardContent>
       </Card>
 
