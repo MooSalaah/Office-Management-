@@ -9,12 +9,9 @@ const port = process.env.PORT || 5000;
 
 // Enhanced CORS configuration
 app.use(cors({
-  origin: [
-    'https://theofficemanagemet.netlify.app',
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'http://localhost:3006'
-  ],
+  origin: process.env.NODE_ENV === 'production'
+    ? ['https://theofficemanagemet.netlify.app']
+    : true, // Allow all origins in development
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: [
@@ -109,7 +106,6 @@ const connectDB = async () => {
 };
 
 // Connect to MongoDB
-// Connect to MongoDB
 connectDB().then(() => {
   // Start background jobs
   require('./jobs/cleanupUsers').startCleanupJob();
@@ -188,4 +184,4 @@ process.on('SIGINT', () => {
 app.listen(port, () => {
   logger.info(`🚀 Server running on port ${port}`, { port, environment: process.env.NODE_ENV || 'development' }, 'SERVER');
   logger.info(`🔗 Health check: http://localhost:${port}/health`, undefined, 'SERVER');
-}); 
+});
