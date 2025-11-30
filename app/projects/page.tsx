@@ -32,7 +32,12 @@ import {
   CheckCircle,
   AlertCircle,
   X,
+  ChevronLeft,
+  ChevronRight,
+  Globe,
 } from "lucide-react"
+import { format, addMonths, subMonths, startOfMonth, endOfMonth, isSameMonth, isBefore, isAfter, parseISO } from "date-fns"
+import { arSA } from "date-fns/locale"
 import { useApp, useAppActions } from "@/lib/context/AppContext"
 import { realtimeUpdates, useRealtimeUpdatesByType } from "@/lib/realtime-updates"
 import { hasPermission } from "@/lib/auth"
@@ -171,6 +176,8 @@ function ProjectsPageContent() {
   const [filteredProjects, setFilteredProjects] = useState<Project[]>(projects)
   const [searchTerm, setSearchTerm] = useState("")
   const [filterStatus, setFilterStatus] = useState(filterParam || "in-progress")
+  const [viewDate, setViewDate] = useState(new Date())
+  const [searchScope, setSearchScope] = useState<'month' | 'global'>('month')
   const [isDialogOpen, setIsDialogOpen] = useState(actionParam === "create")
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false)
   const [editingProject, setEditingProject] = useState<Project | null>(null)
@@ -218,7 +225,36 @@ function ProjectsPageContent() {
       filtered = filtered.filter((project) => project.clientId === clientParam)
     }
 
-    // Filter by search term
+    // Global Search Scope
+    if (searchScope === 'global' && searchTerm) {
+      return filtered.filter(
+        (project) =>
+          project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          project.client.toLowerCase().includes(searchTerm.toLowerCase()),
+      )
+    }
+
+    // Date Filtering Logic
+    const monthStart = startOfMonth(viewDate)
+    const monthEnd = endOfMonth(viewDate)
+
+    filtered = filtered.filter(project => {
+      if (!project.startDate) return false
+      const projectDate = parseISO(project.startDate)
+
+      if (filterStatus === 'in-progress') {
+        // Cumulative: Show projects started on or before the current view month
+        // AND are not completed before this month (optional refinement, but user asked for "in progress from previous months")
+        // For now, we rely on the 'status' field being 'in-progress'.
+        // So we just check if it started on or before this month.
+        return isBefore(projectDate, monthEnd)
+      } else {
+        // Strict: Show projects belonging strictly to this month
+        return isSameMonth(projectDate, viewDate)
+      }
+    })
+
+    // Filter by search term (within scope)
     if (searchTerm) {
       filtered = filtered.filter(
         (project) =>
@@ -232,11 +268,8 @@ function ProjectsPageContent() {
       filtered = filtered.filter((project) => project.status === filterStatus)
     }
 
-    // Filter by user role - جميع المستخدمين يرون جميع المشاريع طالما لديهم صلاحية العرض
-    // لا يتم فلترة المشاريع حسب المستخدم، فقط حسب الصلاحيات
-
     return filtered
-  }, [projects, searchTerm, filterStatus, currentUser, clientParam])
+  }, [projects, searchTerm, filterStatus, currentUser, clientParam, viewDate, searchScope])
 
   useEffect(() => {
     setFilteredProjects(memoizedProjects)
@@ -1708,20 +1741,56 @@ function ProjectsPageContent() {
         )}
       </div>
 
-      {/* Filters and Search */}
+      {/* Smart Pagination and Filters */}
       <Card>
-        <CardContent className="p-4">
+        <CardContent className="p-4 space-y-4">
+          {/* Time Bar & Navigation */}
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-muted/30 p-3 rounded-lg">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setViewDate(subMonths(viewDate, 1))}
+              className="w-full md:w-auto"
+            >
+              <ChevronRight className="w-4 h-4 ml-2" />
+              الشهر السابق
+            </Button>
+
+            <div className="text-lg font-bold text-primary flex items-center gap-2">
+              <Calendar className="w-5 h-5" />
+              {format(viewDate, 'MMMM yyyy', { locale: arSA })}
+            </div>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setViewDate(addMonths(viewDate, 1))}
+              className="w-full md:w-auto"
+            >
+              الشهر التالي
+              <ChevronLeft className="w-4 h-4 mr-2" />
+            </Button>
+          </div>
+
           <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
+            <div className="flex-1 flex gap-2">
+              <div className="relative flex-1">
                 <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <Input
-                  placeholder="البحث في المشاريع..."
+                  placeholder={searchScope === 'global' ? "بحث شامل في كل المشاريع..." : "بحث في هذا الشهر..."}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pr-10"
                 />
               </div>
+              <Button
+                variant={searchScope === 'global' ? "default" : "outline"}
+                size="icon"
+                onClick={() => setSearchScope(prev => prev === 'month' ? 'global' : 'month')}
+                title={searchScope === 'global' ? "بحث شامل (مفعل)" : "بحث في الشهر الحالي فقط"}
+              >
+                <Globe className="w-4 h-4" />
+              </Button>
             </div>
             <Select value={filterStatus} onValueChange={setFilterStatus}>
               <SelectTrigger className="w-full sm:w-48">
