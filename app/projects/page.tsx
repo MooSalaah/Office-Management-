@@ -217,7 +217,20 @@ function ProjectsPageContent() {
     api.taskTypes.getAll().then((res) => {
       if (res.success && Array.isArray(res.data)) setTaskTypes(res.data);
     });
-  }, []);
+
+    // Fetch users to ensure we have the latest list for dropdowns
+    const fetchUsers = async () => {
+      try {
+        const res = await api.users.getAll();
+        if (res.success && Array.isArray(res.data)) {
+          dispatch({ type: "LOAD_USERS", payload: res.data });
+        }
+      } catch (error) {
+        console.error("Failed to fetch users", error);
+      }
+    };
+    fetchUsers();
+  }, [dispatch]);
 
   // Show loading skeleton if data is loading
   if (state.isLoading || state.loadingStates.projects) {
@@ -1732,62 +1745,76 @@ function ProjectsPageContent() {
 
       {/* Projects Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredProjects.map((project) => {
-          if (!project || !project.id) return null;
-          return (
-            <SwipeToDelete
-              key={project.id}
-              onDelete={() => handleDeleteProject(project.id)}
-            >
-              <Card
-                className="hover:shadow-lg transition-shadow bg-card text-card-foreground border border-border relative group"
+        {filteredProjects
+          .sort((a, b) => {
+            // Sort by importance (High > Medium > Low)
+            const importanceOrder = { high: 3, medium: 2, low: 1 };
+            const importanceA = importanceOrder[a.importance as keyof typeof importanceOrder] || 0;
+            const importanceB = importanceOrder[b.importance as keyof typeof importanceOrder] || 0;
+
+            if (importanceA !== importanceB) {
+              return importanceB - importanceA; // Descending order
+            }
+
+            // Secondary sort by date (Newest first)
+            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+          })
+          .map((project) => {
+            if (!project || !project.id) return null;
+            return (
+              <SwipeToDelete
+                key={project.id}
+                onDelete={() => handleDeleteProject(project.id)}
               >
-                <CardHeader className="pb-3">
-                  <div className="flex items-start space-x-3 space-x-reverse">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <CardTitle className="text-lg leading-tight truncate text-foreground">{project.name}</CardTitle>
-                        <Badge variant="secondary" className="text-xs">{project.type}</Badge>
-                        <Badge className={`text-xs ${getStatusColor(project.status)}`}>{getStatusText(project.status)}</Badge>
+                <Card
+                  className="hover:shadow-lg transition-shadow bg-card text-card-foreground border border-border relative group"
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start space-x-3 space-x-reverse">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <CardTitle className="text-lg leading-tight truncate text-foreground">{project.name}</CardTitle>
+                          <Badge variant="secondary" className="text-xs">{project.type}</Badge>
+                          <Badge className={`text-xs ${getStatusColor(project.status)}`}>{getStatusText(project.status)}</Badge>
+                        </div>
+                        <CardDescription className="truncate text-muted-foreground">{project.client}</CardDescription>
                       </div>
-                      <CardDescription className="truncate text-muted-foreground">{project.client}</CardDescription>
                     </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">التقدم</span>
-                    <span className="text-muted-foreground">{project.progress}%</span>
-                  </div>
-                  <Progress value={project.progress} className="h-2" />
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span className="flex items-center">
-                      <Calendar className="w-3 h-3 mr-1" />
-                      {project.startDate}
-                    </span>
-                    <span className="flex items-center">
-                      <span className="text-xs text-muted-foreground ml-1">ر.س</span>
-                      <span>{project.price.toLocaleString()}</span>
-                      <img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-4 h-4 opacity-80 mr-1 block dark:hidden" loading="lazy" />
-                      <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline w-4 h-4 opacity-80 hidden dark:block" loading="lazy" />
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>المهام: {tasks.filter(t => t.projectId === project.id).length}</span>
-                    <span>المهندس: {project.assignedEngineerName}</span>
-                  </div>
-                  {/* Click to view details */}
-                  <div
-                    className="absolute inset-0 cursor-pointer"
-                    onClick={() => openDetailsDialog(project)}
-                    title="عرض التفاصيل"
-                  />
-                </CardContent>
-              </Card>
-            </SwipeToDelete>
-          )
-        })}
-      </div>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">التقدم</span>
+                      <span className="text-muted-foreground">{project.progress}%</span>
+                    </div>
+                    <Progress value={project.progress} className="h-2" />
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span className="flex items-center">
+                        <Calendar className="w-3 h-3 mr-1" />
+                        {project.startDate}
+                      </span>
+                      <span className="flex items-center">
+                        <span className="text-xs text-muted-foreground ml-1">ر.س</span>
+                        <span>{project.price.toLocaleString()}</span>
+                        <img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-4 h-4 opacity-80 mr-1 block dark:hidden" loading="lazy" />
+                        <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline w-4 h-4 opacity-80 hidden dark:block" loading="lazy" />
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>المهام: {tasks.filter(t => t.projectId === project.id).length}</span>
+                      <span>المهندس: {project.assignedEngineerName}</span>
+                    </div>
+                    {/* Click to view details */}
+                    <div
+                      className="absolute inset-0 cursor-pointer"
+                      onClick={() => openDetailsDialog(project)}
+                      title="عرض التفاصيل"
+                    />
+                  </CardContent>
+                </Card>
+              </SwipeToDelete>
+            )
+          })}
+      </div >
 
       {/* Empty State */}
       {
