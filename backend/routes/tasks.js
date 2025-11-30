@@ -39,7 +39,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Create new task (public for testing)
+// Create new task
 router.post('/', async (req, res) => {
   try {
     const task = new Task(req.body);
@@ -60,20 +60,12 @@ router.post('/', async (req, res) => {
           updatedAt: new Date().toISOString()
         });
         await notification.save();
-        logger.info('Notification created for task assignment', {
-          taskId: newTask.id,
-          assigneeId: newTask.assigneeId,
-          notificationId: notification._id
-        }, 'TASKS');
       } catch (notificationError) {
-        logger.error('Failed to create notification for task assignment', {
-          error: notificationError.message,
-          taskId: newTask.id
-        }, 'TASKS');
+        logger.error('Failed to create notification', { error: notificationError.message }, 'TASKS');
       }
     }
 
-    // Broadcast update to all clients
+    // Broadcast
     try {
       const broadcastResponse = await fetch(`${req.protocol}://${req.get('host')}/api/realtime/broadcast`, {
         method: 'POST',
@@ -86,80 +78,74 @@ router.post('/', async (req, res) => {
           timestamp: Date.now()
         })
       });
-      logger.info('Broadcast response', { response: await broadcastResponse.json() }, 'TASKS');
     } catch (broadcastError) {
       logger.error('Broadcast error', { error: broadcastError.message }, 'TASKS');
     }
-    if (!deletedTask) return res.status(404).json({ success: false, error: 'Task not found' });
 
-    // Send notifications for task deletion
-    try {
-      const Notification = require('../models/Notification');
-      const User = require('../models/User');
+    res.json({ success: true, data: newTask });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
-      // Get user who deleted the task
-      const deletedBy = req.body.deletedBy || req.user?.id || 'system';
-      const deletedByName = req.body.deletedByName || req.user?.name || 'مستخدم';
+// Update task
+router.put('/:id', async (req, res) => {
+  try {
+    const updatedTask = await Task.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!updatedTask) return res.status(404).json({ success: false, error: 'Task not found' });
 
-      // Notify assignee about task deletion
-      if (deletedTask.assigneeId && deletedTask.assigneeId !== deletedBy) {
-        const assignee = await User.findOne({
-          $or: [{ id: deletedTask.assigneeId }, { _id: deletedTask.assigneeId }]
-        });
+    // Update Project Progress if task status changed
+    if (updatedTask.projectId) {
+      const Project = require('../models/Project');
+      const projectTasks = await Task.find({ projectId: updatedTask.projectId });
+      const totalTasks = projectTasks.length;
+      const completedTasks = projectTasks.filter(t => t.status === 'completed').length;
+      const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
-        if (assignee) {
-          const notification = new Notification({
-            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-            userId: assignee._id.toString(),
-            title: "تم حذف مهمة مسندة إليك",
-            message: `تم حذف مهمة "${deletedTask.title}" بواسطة ${deletedByName}`,
-            type: "task",
-            isRead: false,
-            actionUrl: `/tasks`,
-            triggeredBy: deletedBy,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          });
-          await notification.save();
-        }
-      }
-
-      // Notify task creator about task deletion
-      if (deletedTask.createdBy && deletedTask.createdBy !== deletedBy) {
-        const creator = await User.findOne({
-          $or: [{ id: deletedTask.createdBy }, { _id: deletedTask.createdBy }]
-        });
-
-        if (creator) {
-          const notification = new Notification({
-            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-            userId: creator._id.toString(),
-            title: "تم حذف مهمة أنشأتها",
-            message: `تم حذف مهمة "${deletedTask.title}" بواسطة ${deletedByName}`,
-            type: "task",
-            isRead: false,
-            actionUrl: `/tasks`,
-            triggeredBy: deletedBy,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          });
-          await notification.save();
-        }
-      }
-
-      logger.info('Notifications sent for task deletion', {
-        taskId: deletedTask.id,
-        taskTitle: deletedTask.title,
-        deletedBy: deletedByName
-      }, 'TASKS');
-    } catch (notificationError) {
-      logger.error('Failed to send task deletion notifications', {
-        error: notificationError.message,
-        taskId: deletedTask.id
-      }, 'TASKS');
+      await Project.findByIdAndUpdate(updatedTask.projectId, { progress });
     }
 
-    // Broadcast update to all clients
+    // Broadcast
+    try {
+      const broadcastResponse = await fetch(`${req.protocol}://${req.get('host')}/api/realtime/broadcast`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'task',
+          action: 'update',
+          data: updatedTask,
+          userId: req.user ? req.user.id : 'system',
+          timestamp: Date.now()
+        })
+      });
+    } catch (broadcastError) {
+      logger.error('Broadcast error', { error: broadcastError.message }, 'TASKS');
+    }
+
+    res.json({ success: true, data: updatedTask });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Delete task
+router.delete('/:id', async (req, res) => {
+  try {
+    const deletedTask = await Task.findByIdAndDelete(req.params.id);
+    if (!deletedTask) return res.status(404).json({ success: false, error: 'Task not found' });
+
+    // Update Project Progress
+    if (deletedTask.projectId) {
+      const Project = require('../models/Project');
+      const projectTasks = await Task.find({ projectId: deletedTask.projectId });
+      const totalTasks = projectTasks.length;
+      const completedTasks = projectTasks.filter(t => t.status === 'completed').length;
+      const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+      await Project.findByIdAndUpdate(deletedTask.projectId, { progress });
+    }
+
+    // Broadcast
     try {
       const broadcastResponse = await fetch(`${req.protocol}://${req.get('host')}/api/realtime/broadcast`, {
         method: 'POST',
@@ -172,14 +158,14 @@ router.post('/', async (req, res) => {
           timestamp: Date.now()
         })
       });
-      console.log('Broadcast response:', await broadcastResponse.json());
     } catch (broadcastError) {
-      console.error('Broadcast error:', broadcastError);
+      logger.error('Broadcast error', { error: broadcastError.message }, 'TASKS');
     }
+
     res.json({ success: true, message: 'Task deleted' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-module.exports = router; 
+module.exports = router;

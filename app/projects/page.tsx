@@ -2118,7 +2118,7 @@ function ProjectsPageContent() {
                                   const updatedTask = { ...task, status: "completed" as const };
                                   try {
                                     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
-                                    const response = await fetch(`${apiUrl}/api/tasks?id=${task.id}`, {
+                                    const response = await fetch(`${apiUrl}/api/tasks/${task.id}`, {
                                       method: 'PUT',
                                       headers: {
                                         'Content-Type': 'application/json',

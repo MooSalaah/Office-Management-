@@ -23,18 +23,25 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Update notification - search by id field instead of _id
+// Update notification - search by id or _id
 router.put('/:id', async (req, res) => {
   try {
     const updatedNotification = await Notification.findOneAndUpdate(
-      { id: req.params.id }, // البحث بالـ id بدلاً من _id
+      { $or: [{ id: req.params.id }, { _id: req.params.id }] },
       req.body,
       { new: true }
     );
     if (!updatedNotification) return res.status(404).json({ success: false, error: 'Notification not found' });
     res.json({ success: true, data: updatedNotification });
   } catch (err) {
-    res.status(400).json({ success: false, error: err.message });
+    // Try finding by _id if the first attempt failed (in case of cast error for _id)
+    try {
+      const updatedNotification = await Notification.findByIdAndUpdate(req.params.id, req.body, { new: true });
+      if (!updatedNotification) return res.status(404).json({ success: false, error: 'Notification not found' });
+      res.json({ success: true, data: updatedNotification });
+    } catch (retryErr) {
+      res.status(400).json({ success: false, error: err.message });
+    }
   }
 });
 
@@ -56,11 +63,31 @@ router.delete('/clear', async (req, res) => {
 // Delete single notification
 router.delete('/:id', async (req, res) => {
   try {
-    const deletedNotification = await Notification.findOneAndDelete({ id: req.params.id });
-    if (!deletedNotification) return res.status(404).json({ success: false, error: 'Notification not found' });
+    const deletedNotification = await Notification.findOneAndDelete({
+      $or: [{ id: req.params.id }, { _id: req.params.id }]
+    });
+
+    if (!deletedNotification) {
+      // Try finding by _id directly
+      try {
+        const deletedById = await Notification.findByIdAndDelete(req.params.id);
+        if (!deletedById) return res.status(404).json({ success: false, error: 'Notification not found' });
+        return res.json({ success: true, message: 'Notification deleted' });
+      } catch (e) {
+        return res.status(404).json({ success: false, error: 'Notification not found' });
+      }
+    }
+
     res.json({ success: true, message: 'Notification deleted' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    // Try finding by _id directly as fallback
+    try {
+      const deletedById = await Notification.findByIdAndDelete(req.params.id);
+      if (!deletedById) return res.status(404).json({ success: false, error: 'Notification not found' });
+      return res.json({ success: true, message: 'Notification deleted' });
+    } catch (e) {
+      res.status(500).json({ success: false, error: err.message });
+    }
   }
 });
 
