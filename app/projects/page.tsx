@@ -2048,21 +2048,50 @@ function ProjectsPageContent() {
                                 onClick={async () => {
                                   const updatedTask = { ...task, status: "completed" as const };
                                   try {
-                                    const response = await fetch(`/api/tasks?id=${task.id}`, {
+                                    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
+                                    const response = await fetch(`${apiUrl}/api/tasks?id=${task.id}`, {
                                       method: 'PUT',
-                                      headers: { 'Content-Type': 'application/json' },
+                                      headers: {
+                                        'Content-Type': 'application/json',
+                                        'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+                                      },
                                       body: JSON.stringify(updatedTask),
                                     });
+
                                     if (response.ok) {
                                       dispatch({ type: "UPDATE_TASK", payload: updatedTask });
 
                                       // Update project progress
+                                      // We use map to create the updated list because 'tasks' from closure is stale
                                       const projectTasks = tasks.filter(t => t.projectId === selectedProject.id);
-                                      const completedTasks = projectTasks.filter(t => t.status === "completed").length;
-                                      const newProgress = projectTasks.length > 0 ? Math.round((completedTasks / projectTasks.length) * 100) : 0;
-                                      const updatedProject = { ...selectedProject, progress: newProgress };
+                                      const updatedProjectTasks = projectTasks.map(t => t.id === task.id ? updatedTask : t);
+
+                                      const completedTasksCount = updatedProjectTasks.filter(t => t.status === "completed").length;
+                                      const newProgress = updatedProjectTasks.length > 0 ? Math.round((completedTasksCount / updatedProjectTasks.length) * 100) : 0;
+
+                                      let newStatus = selectedProject.status;
+                                      if (newProgress === 100 && selectedProject.status !== "completed") {
+                                        newStatus = "completed";
+                                      }
+
+                                      const updatedProject = { ...selectedProject, progress: newProgress, status: newStatus };
                                       setSelectedProject(updatedProject);
                                       dispatch({ type: "UPDATE_PROJECT", payload: updatedProject });
+
+                                      // Persist project progress to backend
+                                      await fetch(`${apiUrl}/api/projects/${selectedProject.id}`, {
+                                        method: 'PUT',
+                                        headers: {
+                                          'Content-Type': 'application/json',
+                                          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+                                        },
+                                        body: JSON.stringify({
+                                          progress: newProgress,
+                                          status: newStatus,
+                                          updatedBy: currentUser?.id,
+                                          updatedByName: currentUser?.name
+                                        })
+                                      });
 
                                       // إرسال إشعار للمديرين عند إكمال المهمة من قبل المهندس
                                       if (currentUser?.role !== "admin") {
@@ -2082,6 +2111,7 @@ function ProjectsPageContent() {
 
                                         // إشعار إضافي إذا اكتمل المشروع بالكامل
                                         if (newProgress === 100) {
+                                          // Notify Admins
                                           adminUsers.forEach(admin => {
                                             addNotification({
                                               userId: admin.id,
@@ -2093,6 +2123,25 @@ function ProjectsPageContent() {
                                               isRead: false,
                                             });
                                           });
+
+                                          // Notify Team Members
+                                          if (selectedProject.team && selectedProject.team.length > 0) {
+                                            selectedProject.team.forEach(memberId => {
+                                              // Avoid duplicate notification if member is also an admin (already notified above)
+                                              const isMemberAdmin = adminUsers.some(admin => admin.id === memberId);
+                                              if (!isMemberAdmin && memberId !== currentUser?.id) {
+                                                addNotification({
+                                                  userId: memberId,
+                                                  title: "مشروع مكتمل",
+                                                  message: `تم إكمال جميع مهام مشروع "${selectedProject.name}" بنسبة 100%`,
+                                                  type: "project",
+                                                  actionUrl: `/projects?highlight=${selectedProject.id}`,
+                                                  triggeredBy: currentUser?.id || "",
+                                                  isRead: false,
+                                                });
+                                              }
+                                            });
+                                          }
                                         }
                                       }
 
@@ -2134,11 +2183,7 @@ function ProjectsPageContent() {
                           type="number"
                           min="0"
                           max="100"
-                          value={(() => {
-                            const projectTasks = tasks.filter(t => t.projectId === selectedProject.id);
-                            const completedTasks = projectTasks.filter(t => t.status === "completed").length;
-                            return projectTasks.length > 0 ? Math.round((completedTasks / projectTasks.length) * 100) : 0;
-                          })()}
+                          value={selectedProject.progress}
                           onChange={(e) => {
                             const newProgress = Math.min(100, Math.max(0, parseInt(e.target.value) || 0))
                             let newStatus = selectedProject.status
@@ -2159,11 +2204,7 @@ function ProjectsPageContent() {
                         type="range"
                         min="0"
                         max="100"
-                        value={(() => {
-                          const projectTasks = tasks.filter(t => t.projectId === selectedProject.id);
-                          const completedTasks = projectTasks.filter(t => t.status === "completed").length;
-                          return projectTasks.length > 0 ? Math.round((completedTasks / projectTasks.length) * 100) : 0;
-                        })()}
+                        value={selectedProject.progress}
                         onChange={e => {
                           const newProgress = Math.min(100, Math.max(0, parseInt(e.target.value) || 0))
                           let newStatus = selectedProject.status

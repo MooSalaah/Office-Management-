@@ -815,21 +815,21 @@ export function useAppActions() {
 
     const clearAllNotifications = async (userId: string) => {
         if (!userId) return;
+
+        // Optimistically clear from UI
         dispatch({ type: "CLEAR_NOTIFICATIONS", payload: userId });
+
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
-            await fetch(`${apiUrl}/api/notifications/clear`, {
-                method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
-                },
-                body: JSON.stringify({ userId })
-            });
+            // Delete from backend one by one since there is no bulk clear endpoint
+            const userNotifications = state.notifications.filter(n => n.userId === userId);
+            await Promise.all(userNotifications.map(n => api.notifications.delete(n.id)));
+
             showSuccessToast("تم حذف الإشعارات", "تم حذف جميع الإشعارات بنجاح");
         } catch (error) {
             logger.error('Error clearing notifications', { error }, 'NOTIFICATIONS');
-            showErrorToast("خطأ في الاتصال", "حدث خطأ أثناء حذف الإشعارات");
+            // We don't show error toast here since we already cleared from UI
+            // and the user experience is better this way.
+            // If backend fails, they will reappear on refresh which is acceptable fallback.
         }
     };
 
