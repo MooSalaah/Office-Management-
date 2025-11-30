@@ -46,25 +46,25 @@ router.post('/', async (req, res) => {
   try {
     console.log('=== PROJECT CREATION REQUEST ===');
     console.log('Request body:', JSON.stringify(req.body, null, 2));
-    
+
     const { project, tasks, createdByName } = req.body;
     const projectData = project || req.body; // Fallback for backward compatibility
-    
+
     console.log('Project data:', JSON.stringify(projectData, null, 2));
     console.log('Tasks data:', JSON.stringify(tasks, null, 2));
     console.log('Created by name:', createdByName);
-    
+
     const newProject = await new Project(projectData).save();
     console.log('Project saved successfully:', newProject.id);
-    
+
     // Create tasks for the project
     let createdTasks = [];
     if (Array.isArray(tasks) && tasks.length > 0) {
       console.log(`Creating ${tasks.length} tasks for project ${newProject.id}`);
-      
+
       for (const t of tasks) {
         console.log('Processing task:', JSON.stringify(t, null, 2));
-        
+
         // Get task type info
         const type = await TaskType.findById(t.typeId);
         if (!type) {
@@ -72,10 +72,10 @@ router.post('/', async (req, res) => {
           continue;
         }
         console.log('Found task type:', type.name);
-        
+
         // Create task
         const task = new Task({
-          id: Date.now().toString() + Math.floor(Math.random()*10000),
+          id: Date.now().toString() + Math.floor(Math.random() * 10000),
           title: type.name,
           description: type.description,
           assigneeId: t.assigneeId,
@@ -93,7 +93,7 @@ router.post('/', async (req, res) => {
         const savedTask = await task.save();
         createdTasks.push(savedTask);
         console.log('Task created successfully:', savedTask.id);
-        
+
         // Send notification to assignee
         if (t.assigneeId) {
           try {
@@ -121,7 +121,39 @@ router.post('/', async (req, res) => {
     } else {
       console.log('No tasks to create');
     }
-    
+
+    // Notify all team members about new project
+    if (newProject.team && Array.isArray(newProject.team)) {
+      try {
+        const Notification = require('../models/Notification');
+        const User = require('../models/User');
+
+        for (const teamMemberId of newProject.team) {
+          if (teamMemberId !== newProject.createdBy) {
+            const teamMember = await User.findOne({
+              $or: [{ id: teamMemberId }, { _id: teamMemberId }]
+            });
+
+            if (teamMember) {
+              const notification = new Notification({
+                userId: teamMember._id.toString(),
+                title: "مشروع جديد",
+                message: `تم إضافتك لمشروع جديد: "${newProject.name}"`,
+                type: "project",
+                isRead: false,
+                actionUrl: `/projects`,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+              });
+              await notification.save();
+            }
+          }
+        }
+      } catch (notificationError) {
+        logger.error('Failed to send new project notifications', { error: notificationError.message }, 'PROJECTS');
+      }
+    }
+
     console.log(`Project creation completed. Created ${createdTasks.length} tasks.`);
     res.status(201).json({ success: true, data: newProject, tasks: createdTasks });
   } catch (err) {
@@ -134,31 +166,85 @@ router.post('/', async (req, res) => {
 // Update project (public for testing)
 router.put('/:id', async (req, res) => {
   try {
-    // Get the original project to compare assigned engineer
+    // Get the original project to compare assigned engineer and down payment
     const originalProject = await Project.findOne({ id: req.params.id });
     if (!originalProject) return res.status(404).json({ success: false, error: 'Project not found' });
-    
+
     const updatedProject = await Project.findOneAndUpdate(
       { id: req.params.id },
       req.body,
       { new: true }
     );
-    
+
+    // Check if down payment changed
+    if (originalProject.downPayment !== updatedProject.downPayment) {
+      try {
+        const Transaction = require('../models/Transaction');
+
+        // Find existing down payment transaction
+        const transaction = await Transaction.findOne({
+          projectId: updatedProject.id,
+          type: 'income',
+          category: 'دفعة مقدمة'
+        });
+
+        if (transaction) {
+          // Update existing transaction
+          await Transaction.findByIdAndUpdate(transaction._id, {
+            amount: updatedProject.downPayment,
+            updatedAt: new Date().toISOString()
+          });
+          logger.info('Updated down payment transaction', {
+            projectId: updatedProject.id,
+            transactionId: transaction._id,
+            newAmount: updatedProject.downPayment
+          }, 'PROJECTS');
+        } else if (updatedProject.downPayment > 0) {
+          // Create new transaction if it doesn't exist and amount > 0
+          const newTransaction = new Transaction({
+            id: Date.now().toString() + "_dp",
+            type: "income",
+            amount: updatedProject.downPayment,
+            description: `دفعة مقدمة - مشروع ${updatedProject.name}`,
+            clientId: updatedProject.clientId,
+            clientName: updatedProject.client,
+            projectId: updatedProject.id,
+            projectName: updatedProject.name,
+            category: "دفعة مقدمة",
+            transactionType: "design",
+            importance: updatedProject.importance,
+            paymentMethod: "transfer",
+            date: updatedProject.startDate,
+            status: "completed",
+            createdBy: req.user ? req.user.id : 'system',
+            createdAt: new Date().toISOString()
+          });
+          await newTransaction.save();
+          logger.info('Created new down payment transaction', {
+            projectId: updatedProject.id,
+            amount: updatedProject.downPayment
+          }, 'PROJECTS');
+        }
+      } catch (err) {
+        logger.error('Error updating financial records', { error: err.message }, 'PROJECTS');
+      }
+    }
+
     // Send notifications for various project updates
     try {
       const Notification = require('../models/Notification');
       const User = require('../models/User');
-      
+
       // Get user who updated the project
       const updatedBy = req.body.updatedBy || req.user?.id || 'system';
       const updatedByName = req.body.updatedByName || req.user?.name || 'مستخدم';
-      
+
       // 1. Notification for assigned engineer change
       if (originalProject.assignedEngineerId !== updatedProject.assignedEngineerId && updatedProject.assignedEngineerId) {
-        const engineer = await User.findOne({ 
-          $or: [{ id: updatedProject.assignedEngineerId }, { _id: updatedProject.assignedEngineerId }] 
+        const engineer = await User.findOne({
+          $or: [{ id: updatedProject.assignedEngineerId }, { _id: updatedProject.assignedEngineerId }]
         });
-        
+
         if (engineer) {
           const notification = new Notification({
             id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
@@ -173,16 +259,16 @@ router.put('/:id', async (req, res) => {
             updatedAt: new Date().toISOString()
           });
           await notification.save();
-          
-          logger.info('Notification sent for project reassignment', { 
-            projectId: updatedProject.id, 
+
+          logger.info('Notification sent for project reassignment', {
+            projectId: updatedProject.id,
             engineerId: updatedProject.assignedEngineerId,
             engineerName: engineer.name,
-            notificationId: notification._id 
+            notificationId: notification._id
           }, 'PROJECTS');
         }
       }
-      
+
       // 2. Notification for status change
       if (originalProject.status !== updatedProject.status) {
         const statusText = {
@@ -191,15 +277,15 @@ router.put('/:id', async (req, res) => {
           'on-hold': 'معلق',
           'cancelled': 'ملغي'
         };
-        
+
         // Notify all team members about status change
         if (updatedProject.team && Array.isArray(updatedProject.team)) {
           for (const teamMemberId of updatedProject.team) {
             if (teamMemberId !== updatedBy) {
-              const teamMember = await User.findOne({ 
-                $or: [{ id: teamMemberId }, { _id: teamMemberId }] 
+              const teamMember = await User.findOne({
+                $or: [{ id: teamMemberId }, { _id: teamMemberId }]
               });
-              
+
               if (teamMember) {
                 const notification = new Notification({
                   id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
@@ -219,20 +305,20 @@ router.put('/:id', async (req, res) => {
           }
         }
       }
-      
+
       // 3. Notification for team changes
       const originalTeam = originalProject.team || [];
       const updatedTeam = updatedProject.team || [];
       const newTeamMembers = updatedTeam.filter(id => !originalTeam.includes(id));
       const removedTeamMembers = originalTeam.filter(id => !updatedTeam.includes(id));
-      
+
       // Notify new team members
       for (const newMemberId of newTeamMembers) {
         if (newMemberId !== updatedBy) {
-          const newMember = await User.findOne({ 
-            $or: [{ id: newMemberId }, { _id: newMemberId }] 
+          const newMember = await User.findOne({
+            $or: [{ id: newMemberId }, { _id: newMemberId }]
           });
-          
+
           if (newMember) {
             const notification = new Notification({
               id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
@@ -250,14 +336,14 @@ router.put('/:id', async (req, res) => {
           }
         }
       }
-      
+
       // Notify removed team members
       for (const removedMemberId of removedTeamMembers) {
         if (removedMemberId !== updatedBy) {
-          const removedMember = await User.findOne({ 
-            $or: [{ id: removedMemberId }, { _id: removedMemberId }] 
+          const removedMember = await User.findOne({
+            $or: [{ id: removedMemberId }, { _id: removedMemberId }]
           });
-          
+
           if (removedMember) {
             const notification = new Notification({
               id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
@@ -275,14 +361,14 @@ router.put('/:id', async (req, res) => {
           }
         }
       }
-      
+
     } catch (notificationError) {
-      logger.error('Failed to send project update notifications', { 
+      logger.error('Failed to send project update notifications', {
         error: notificationError.message,
-        projectId: updatedProject.id 
+        projectId: updatedProject.id
       }, 'PROJECTS');
     }
-    
+
     res.json({ success: true, data: updatedProject });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
@@ -294,23 +380,23 @@ router.delete('/:id', async (req, res) => {
   try {
     const deletedProject = await Project.findOneAndDelete({ id: req.params.id });
     if (!deletedProject) return res.status(404).json({ success: false, error: 'Project not found' });
-    
+
     // Send notifications to all team members about project deletion
     if (deletedProject.team && Array.isArray(deletedProject.team)) {
       try {
         const Notification = require('../models/Notification');
         const User = require('../models/User');
-        
+
         // Get user who deleted the project (from request or default to system)
         const deletedBy = req.body.deletedBy || req.user?.id || 'system';
         const deletedByName = req.body.deletedByName || req.user?.name || 'مستخدم';
-        
+
         for (const teamMemberId of deletedProject.team) {
           if (teamMemberId !== deletedBy) { // Don't notify the person who deleted
-            const teamMember = await User.findOne({ 
-              $or: [{ id: teamMemberId }, { _id: teamMemberId }] 
+            const teamMember = await User.findOne({
+              $or: [{ id: teamMemberId }, { _id: teamMemberId }]
             });
-            
+
             if (teamMember) {
               const notification = new Notification({
                 id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
@@ -325,7 +411,7 @@ router.delete('/:id', async (req, res) => {
                 updatedAt: new Date().toISOString()
               });
               await notification.save();
-              
+
               logger.info(`Notification sent to ${teamMember.name} about project deletion`, {
                 projectId: deletedProject.id,
                 projectName: deletedProject.name,
@@ -342,11 +428,11 @@ router.delete('/:id', async (req, res) => {
         }, 'PROJECTS');
       }
     }
-    
+
     res.json({ success: true, message: 'Project deleted' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-module.exports = router; 
+module.exports = router;
