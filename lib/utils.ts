@@ -10,6 +10,7 @@ export const SAR_SYMBOL = "﷼";
 
 // Convert standard numbers to Arabic numerals
 export function toArabicNumerals(input: string | number): string {
+	if (input === null || input === undefined) return "";
 	const arabicDigits = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"];
 	return input.toString().replace(/[0-9]/g, (d) => arabicDigits[parseInt(d)]);
 }

@@ -57,7 +57,7 @@ export function Navbar() {
   const { state, dispatch } = useApp()
   const { currentUser, companySettings, notifications } = state
   const { theme, setTheme } = useTheme()
-  const { markNotificationAsRead, deleteNotification } = useAppActions()
+  const { markNotificationAsRead, deleteNotification, clearAllNotifications } = useAppActions()
 
   // Get user's allowed modules
   const userModules = currentUser ? getUserModules(currentUser.role) : []
@@ -240,11 +240,9 @@ export function Navbar() {
                       size="sm"
                       className="w-11/12 flex items-center gap-2 rounded-md"
                       onClick={() => {
-                        notifications.filter((n) => n.userId === currentUser?.id).forEach(n => {
-                          if (n.id) {
-                            deleteNotification(n.id)
-                          }
-                        })
+                        if (currentUser?.id) {
+                          clearAllNotifications(currentUser.id)
+                        }
                       }}
                     >
                       <Trash2 className="w-4 h-4" />

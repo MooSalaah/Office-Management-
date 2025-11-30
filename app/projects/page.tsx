@@ -232,50 +232,17 @@ function ProjectsPageContent() {
     fetchUsers();
   }, [dispatch]);
 
-  // Show loading skeleton if data is loading
-  if (state.isLoading || state.loadingStates.projects) {
-    return LoadingStates.projects(9)
-  }
-
-  // تحديث getStatusColor لإرجاع variant أو className مخصص
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "in-progress":
-        return "bg-blue-100 text-blue-800 border-blue-200"
-      case "completed":
-        return "bg-green-100 text-green-800 border-green-200"
-      case "draft":
-        return "bg-gray-100 text-gray-800 border-gray-200"
-      case "canceled":
-        return "bg-red-100 text-red-800 border-red-200"
-      case "new":
-        return "bg-yellow-100 text-yellow-800 border-yellow-200"
-      default:
-        return "bg-gray-100 text-gray-800 border-gray-200"
-    }
-  }
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case "in-progress":
-        return "قيد التنفيذ"
-      case "completed":
-        return "مكتمل"
-      case "draft":
-        return "مسودة"
-      case "canceled":
-        return "ملغي"
-      default:
-        return status
-    }
-  }
-
   // Initialize default team with current user when dialog opens
   useEffect(() => {
     if (isDialogOpen && !editingProject && formData.team.length === 0 && currentUser) {
       setFormData(prev => ({ ...prev, team: [currentUser.id] }));
     }
   }, [isDialogOpen, editingProject, currentUser]);
+
+  // Show loading skeleton if data is loading
+  if (state.isLoading || state.loadingStates.projects) {
+    return LoadingStates.projects(9)
+  }
 
   const handleCreateProject = async () => {
     if (showNewClientInput || showNewTypeInput || showNewEngineerInput) {
@@ -2255,3 +2222,56 @@ function ProjectsPageContent() {
     </div >
   )
 }
+
+// Helper function to notify project team
+const notifyProjectTeam = ({
+  team,
+  currentUser,
+  users,
+  addNotification,
+  projectName,
+  projectId,
+  action,
+  actorName
+}: {
+  team: string[],
+  currentUser: any,
+  users: any[],
+  addNotification: any,
+  projectName: string,
+  projectId: string,
+  action: 'create' | 'update' | 'delete',
+  actorName: string
+}) => {
+  // Notify team members
+  team.forEach(memberId => {
+    if (memberId !== currentUser?.id) {
+      const member = users.find(u => u.id === memberId);
+      if (member) {
+        let title = "";
+        let message = "";
+
+        if (action === 'create') {
+          title = "مشروع جديد";
+          message = `تم إضافتك لفريق عمل مشروع "${projectName}" بواسطة ${actorName}`;
+        } else if (action === 'update') {
+          title = "تحديث مشروع";
+          message = `تم تحديث مشروع "${projectName}" الذي تعمل عليه بواسطة ${actorName}`;
+        } else if (action === 'delete') {
+          title = "حذف مشروع";
+          message = `تم حذف مشروع "${projectName}" الذي كنت تعمل عليه بواسطة ${actorName}`;
+        }
+
+        addNotification({
+          userId: member.id,
+          title,
+          message,
+          type: "project",
+          actionUrl: action !== 'delete' ? `/projects?highlight=${projectId}` : undefined,
+          triggeredBy: currentUser?.id || "",
+          isRead: false,
+        });
+      }
+    }
+  });
+};
