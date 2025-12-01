@@ -1,6 +1,6 @@
 {
   "name": "engineering-office-backend",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Backend server for Engineering Office Management System",
   "main": "server.js",
   "scripts": {

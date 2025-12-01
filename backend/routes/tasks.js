@@ -104,8 +104,12 @@ router.put('/:id', async (req, res) => {
     let updatedTask;
 
     if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+      console.log(`DEBUG: Updating task with ObjectId: ${req.params.id}`);
+      res.setHeader('X-Debug-Lookup-Type', 'ObjectId');
       updatedTask = await Task.findByIdAndUpdate(req.params.id, req.body, { new: true });
     } else {
+      console.log(`DEBUG: Updating task with Custom ID: ${req.params.id}`);
+      res.setHeader('X-Debug-Lookup-Type', 'CustomID');
       updatedTask = await Task.findOneAndUpdate({ id: req.params.id }, req.body, { new: true });
     }
 
