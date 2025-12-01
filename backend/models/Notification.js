@@ -4,6 +4,30 @@ const NotificationSchema = new mongoose.Schema({
   id: { type: String },
   userId: { type: String, required: true, index: true }, // إضافة index للبحث السريع
   title: { type: String, required: true },
+  message: { type: String, required: true },
+  type: { type: String, enum: ['task', 'project', 'finance', 'system', 'attendance', 'client'], required: true },
+  isRead: { type: Boolean, default: false, index: true }, // إضافة index للبحث السريع
+  actionUrl: { type: String },
+  triggeredBy: { type: String },
+  createdAt: { type: String, default: () => new Date().toISOString() },
+  updatedAt: { type: String, default: () => new Date().toISOString() }
+}, {
+  toJSON: {
+    virtuals: true,
+    transform: function (doc, ret) {
+      ret.id = ret._id;
+      delete ret._id;
+      delete ret.__v;
+    }
+  },
+  toObject: {
+    virtuals: true,
+    transform: function (doc, ret) {
+      ret.id = ret._id;
+      delete ret._id;
+      delete ret.__v;
+    }
+  }
 });
 
 // إضافة middleware للتحديث التلقائي لـ updatedAt عند update
@@ -12,4 +36,4 @@ NotificationSchema.pre('findOneAndUpdate', function (next) {
   next();
 });
 
-module.exports = mongoose.model('Notification', NotificationSchema); 
+module.exports = mongoose.model('Notification', NotificationSchema);

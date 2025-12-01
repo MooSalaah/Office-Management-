@@ -82,7 +82,7 @@ router.post('/', async (req, res) => {
       logger.error('Broadcast error', { error: broadcastError.message }, 'TASKS');
     }
 
-    res.json({ success: true, data: newTask });
+    res.status(201).json({ success: true, data: newTask });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -102,10 +102,73 @@ router.put('/:id', async (req, res) => {
       const completedTasks = projectTasks.filter(t => t.status === 'completed').length;
       const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
-      await Project.findByIdAndUpdate(updatedTask.projectId, { progress });
+      // Update project status based on progress
+      let statusUpdate = {};
+      if (progress === 100 && totalTasks > 0) {
+        statusUpdate = { progress, status: 'completed' };
+      } else {
+        statusUpdate = { progress, status: 'in-progress' };
+      }
+
+      const updatedProject = await Project.findByIdAndUpdate(updatedTask.projectId, statusUpdate, { new: true });
+
+      // Broadcast Project Update
+      if (updatedProject) {
+        try {
+          await fetch(`${req.protocol}://${req.get('host')}/api/realtime/broadcast`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'project',
+              action: 'update',
+              data: updatedProject,
+              userId: req.user ? req.user.id : 'system',
+              timestamp: Date.now()
+            })
+          });
+        } catch (broadcastError) {
+          logger.error('Project broadcast error', { error: broadcastError.message }, 'TASKS');
+        }
+
+        // Notify Project Manager if task is completed
+        if (req.body.status === 'completed') {
+          try {
+            const Notification = require('../models/Notification');
+            // Notify assigned engineer (Project Manager)
+            if (updatedProject.assignedEngineerId && updatedProject.assignedEngineerId !== req.user.id) {
+              const notification = new Notification({
+                userId: updatedProject.assignedEngineerId,
+                title: "تم إكمال مهمة",
+                message: `تم إكمال المهمة "${updatedTask.title}" في مشروع "${updatedProject.name}"`,
+                type: "task_completed",
+                isRead: false,
+                actionUrl: `/projects`,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+              });
+              await notification.save();
+
+              // Broadcast notification
+              await fetch(`${req.protocol}://${req.get('host')}/api/realtime/broadcast`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  type: 'notification',
+                  action: 'create',
+                  data: notification,
+                  userId: 'system',
+                  timestamp: Date.now()
+                })
+              });
+            }
+          } catch (notificationError) {
+            logger.error('Failed to create completion notification', { error: notificationError.message }, 'TASKS');
+          }
+        }
+      }
     }
 
-    // Broadcast
+    // Broadcast Task Update
     try {
       const broadcastResponse = await fetch(`${req.protocol}://${req.get('host')}/api/realtime/broadcast`, {
         method: 'POST',
@@ -142,10 +205,37 @@ router.delete('/:id', async (req, res) => {
       const completedTasks = projectTasks.filter(t => t.status === 'completed').length;
       const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
-      await Project.findByIdAndUpdate(deletedTask.projectId, { progress });
+      // Update project status based on progress
+      let statusUpdate = {};
+      if (progress === 100 && totalTasks > 0) {
+        statusUpdate = { progress, status: 'completed' };
+      } else {
+        statusUpdate = { progress, status: 'in-progress' };
+      }
+
+      const updatedProject = await Project.findByIdAndUpdate(deletedTask.projectId, statusUpdate, { new: true });
+
+      // Broadcast Project Update
+      if (updatedProject) {
+        try {
+          await fetch(`${req.protocol}://${req.get('host')}/api/realtime/broadcast`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'project',
+              action: 'update',
+              data: updatedProject,
+              userId: req.user ? req.user.id : 'system',
+              timestamp: Date.now()
+            })
+          });
+        } catch (broadcastError) {
+          logger.error('Project broadcast error', { error: broadcastError.message }, 'TASKS');
+        }
+      }
     }
 
-    // Broadcast
+    // Broadcast Task Delete
     try {
       const broadcastResponse = await fetch(`${req.protocol}://${req.get('host')}/api/realtime/broadcast`, {
         method: 'POST',
