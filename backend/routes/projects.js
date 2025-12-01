@@ -7,6 +7,7 @@ const fetch = require('node-fetch');
 const Task = require('../models/Task');
 const TaskType = require('../models/TaskType');
 require('dotenv').config();
+const mongoose = require('mongoose');
 
 // JWT middleware
 function authenticateToken(req, res, next) {
@@ -18,6 +19,15 @@ function authenticateToken(req, res, next) {
     req.user = user;
     next();
   });
+}
+
+// Helper to find project by ID (ObjectId or custom String ID)
+async function findProject(id) {
+  if (mongoose.Types.ObjectId.isValid(id)) {
+    return await Project.findById(id);
+  } else {
+    return await Project.findOne({ id: id });
+  }
 }
 
 // Get all projects (public for testing)
@@ -33,7 +43,7 @@ router.get('/', async (req, res) => {
 // Get project by ID (public for testing)
 router.get('/:id', async (req, res) => {
   try {
-    const project = await Project.findOne({ id: req.params.id });
+    const project = await findProject(req.params.id);
     if (!project) return res.status(404).json({ success: false, error: 'Project not found' });
     res.json({ success: true, data: project });
   } catch (err) {
@@ -167,14 +177,15 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     // Get the original project to compare assigned engineer and down payment
-    const originalProject = await Project.findOne({ id: req.params.id });
+    const originalProject = await findProject(req.params.id);
     if (!originalProject) return res.status(404).json({ success: false, error: 'Project not found' });
 
-    const updatedProject = await Project.findOneAndUpdate(
-      { id: req.params.id },
-      req.body,
-      { new: true }
-    );
+    let updatedProject;
+    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+      updatedProject = await Project.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    } else {
+      updatedProject = await Project.findOneAndUpdate({ id: req.params.id }, req.body, { new: true });
+    }
 
     // Check if down payment changed
     if (originalProject.downPayment !== updatedProject.downPayment) {
@@ -378,7 +389,13 @@ router.put('/:id', async (req, res) => {
 // Delete project (public for testing)
 router.delete('/:id', async (req, res) => {
   try {
-    const deletedProject = await Project.findOneAndDelete({ id: req.params.id });
+    let deletedProject;
+    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+      deletedProject = await Project.findByIdAndDelete(req.params.id);
+    } else {
+      deletedProject = await Project.findOneAndDelete({ id: req.params.id });
+    }
+
     if (!deletedProject) return res.status(404).json({ success: false, error: 'Project not found' });
 
     // Send notifications to all team members about project deletion
