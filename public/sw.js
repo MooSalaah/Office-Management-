@@ -89,6 +89,11 @@ async function handleApiRequest(request) {
 }
 
 async function handleStaticFile(request) {
+  // Skip unsupported schemes (chrome-extension, etc.)
+  if (!request.url.startsWith('http')) {
+    return fetch(request);
+  }
+
   const cachedResponse = await caches.match(request)
   if (cachedResponse) {
     return cachedResponse
