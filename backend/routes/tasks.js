@@ -21,7 +21,8 @@ function authenticateToken(req, res, next) {
 
 // Helper to find task by ID (ObjectId or custom String ID)
 async function findTask(id) {
-  if (mongoose.Types.ObjectId.isValid(id)) {
+  const isObjectId = mongoose.Types.ObjectId.isValid(id) && /^[0-9a-fA-F]{24}$/.test(id);
+  if (isObjectId) {
     return await Task.findById(id);
   } else {
     return await Task.findOne({ id: id });
@@ -103,10 +104,19 @@ router.put('/:id', async (req, res) => {
   try {
     let updatedTask;
 
-    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
-      console.log(`DEBUG: Updating task with ObjectId: ${req.params.id}`);
-      res.setHeader('X-Debug-Lookup-Type', 'ObjectId');
-      updatedTask = await Task.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    // Strict check for MongoDB ObjectId (24 hex characters)
+    const isObjectId = mongoose.Types.ObjectId.isValid(req.params.id) && /^[0-9a-fA-F]{24}$/.test(req.params.id);
+
+    if (isObjectId) {
+      try {
+        console.log(`DEBUG: Updating task with ObjectId: ${req.params.id}`);
+        res.setHeader('X-Debug-Lookup-Type', 'ObjectId');
+        updatedTask = await Task.findByIdAndUpdate(req.params.id, req.body, { new: true });
+      } catch (error) {
+        console.log(`DEBUG: CastError caught, falling back to Custom ID: ${req.params.id}`);
+        // If cast failed, try custom ID
+        updatedTask = await Task.findOneAndUpdate({ id: req.params.id }, req.body, { new: true });
+      }
     } else {
       console.log(`DEBUG: Updating task with Custom ID: ${req.params.id}`);
       res.setHeader('X-Debug-Lookup-Type', 'CustomID');
@@ -217,7 +227,10 @@ router.delete('/:id', async (req, res) => {
   try {
     let deletedTask;
 
-    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+    // Strict check for MongoDB ObjectId (24 hex characters)
+    const isObjectId = mongoose.Types.ObjectId.isValid(req.params.id) && /^[0-9a-fA-F]{24}$/.test(req.params.id);
+
+    if (isObjectId) {
       deletedTask = await Task.findByIdAndDelete(req.params.id);
     } else {
       deletedTask = await Task.findOneAndDelete({ id: req.params.id });

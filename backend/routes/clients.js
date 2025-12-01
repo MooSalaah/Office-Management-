@@ -21,14 +21,15 @@ function authenticateToken(req, res, next) {
 
 // Helper to find client by ID (ObjectId or custom String ID)
 async function findClient(id) {
-  if (mongoose.Types.ObjectId.isValid(id)) {
+  const isObjectId = mongoose.Types.ObjectId.isValid(id) && /^[0-9a-fA-F]{24}$/.test(id);
+  if (isObjectId) {
     return await Client.findById(id);
   } else {
     return await Client.findOne({ id: id });
   }
 }
 
-// Get all clients (public for testing)
+// Get all clients
 router.get('/', async (req, res) => {
   try {
     const clients = await Client.find();
@@ -38,7 +39,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Get client by ID (public for testing)
+// Get client by ID
 router.get('/:id', async (req, res) => {
   try {
     const client = await findClient(req.params.id);
@@ -49,49 +50,13 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Create new client (public for testing)
+// Create new client
 router.post('/', async (req, res) => {
   try {
     const client = new Client(req.body);
     const newClient = await client.save();
 
-    // Create notification for new client (notify admin and sales team)
-    try {
-      const Notification = require('../models/Notification');
-      const User = require('../models/User');
-
-      // Get admin and sales users
-      const adminUsers = await User.find({ role: 'admin' });
-      const salesUsers = await User.find({ role: 'engineer' }); // Engineers might handle client relations
-
-      const usersToNotify = [...adminUsers, ...salesUsers];
-
-      for (const user of usersToNotify) {
-        const notification = new Notification({
-          userId: user.id,
-          title: "عميل جديد",
-          message: `تم إضافة عميل جديد: "${newClient.name}"`,
-          type: "system",
-          isRead: false,
-          actionUrl: `/clients`,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        });
-        await notification.save();
-      }
-
-      logger.info('Notifications created for new client', {
-        clientId: newClient.id,
-        notificationsCount: usersToNotify.length
-      }, 'CLIENTS');
-    } catch (notificationError) {
-      logger.error('Failed to create notifications for new client', {
-        error: notificationError.message,
-        clientId: newClient.id
-      }, 'CLIENTS');
-    }
-
-    // Broadcast update to all clients
+    // Broadcast
     try {
       const broadcastResponse = await fetch(`${req.protocol}://${req.get('host')}/api/realtime/broadcast`, {
         method: 'POST',
@@ -104,72 +69,32 @@ router.post('/', async (req, res) => {
           timestamp: Date.now()
         })
       });
-      logger.info('Broadcast response', { response: await broadcastResponse.json() }, 'CLIENTS');
     } catch (broadcastError) {
       logger.error('Broadcast error', { error: broadcastError.message }, 'CLIENTS');
     }
+
     res.status(201).json({ success: true, data: newClient });
   } catch (err) {
-    res.status(400).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// Update client (public for testing)
+// Update client
 router.put('/:id', async (req, res) => {
   try {
-    const originalClient = await findClient(req.params.id);
-    if (!originalClient) return res.status(404).json({ success: false, error: 'Client not found' });
-
     let updatedClient;
-    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+
+    const isObjectId = mongoose.Types.ObjectId.isValid(req.params.id) && /^[0-9a-fA-F]{24}$/.test(req.params.id);
+
+    if (isObjectId) {
       updatedClient = await Client.findByIdAndUpdate(req.params.id, req.body, { new: true });
     } else {
       updatedClient = await Client.findOneAndUpdate({ id: req.params.id }, req.body, { new: true });
     }
 
-    // Send notifications for client updates
-    try {
-      const Notification = require('../models/Notification');
-      const User = require('../models/User');
+    if (!updatedClient) return res.status(404).json({ success: false, error: 'Client not found' });
 
-      // Get user who updated the client
-      const updatedBy = req.body.updatedBy || req.user?.id || 'system';
-      const updatedByName = req.body.updatedByName || req.user?.name || 'مستخدم';
-
-      // Notify admin users about client updates
-      const adminUsers = await User.find({ role: 'admin' });
-
-      for (const admin of adminUsers) {
-        if (admin._id.toString() !== updatedBy) {
-          const notification = new Notification({
-            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-            userId: admin._id.toString(),
-            title: "تحديث بيانات عميل",
-            message: `تم تحديث بيانات العميل "${updatedClient.name}" بواسطة ${updatedByName}`,
-            type: "client",
-            isRead: false,
-            actionUrl: `/clients`,
-            triggeredBy: updatedBy,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          });
-          await notification.save();
-        }
-      }
-
-      logger.info('Notifications sent for client update', {
-        clientId: updatedClient.id,
-        clientName: updatedClient.name,
-        updatedBy: updatedByName
-      }, 'CLIENTS');
-    } catch (notificationError) {
-      logger.error('Failed to send client update notifications', {
-        error: notificationError.message,
-        clientId: updatedClient.id
-      }, 'CLIENTS');
-    }
-
-    // Broadcast update to all clients
+    // Broadcast
     try {
       const broadcastResponse = await fetch(`${req.protocol}://${req.get('host')}/api/realtime/broadcast`, {
         method: 'POST',
@@ -182,21 +107,24 @@ router.put('/:id', async (req, res) => {
           timestamp: Date.now()
         })
       });
-      logger.info('Broadcast response', { response: await broadcastResponse.json() }, 'CLIENTS');
     } catch (broadcastError) {
       logger.error('Broadcast error', { error: broadcastError.message }, 'CLIENTS');
     }
+
     res.json({ success: true, data: updatedClient });
   } catch (err) {
-    res.status(400).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// Delete client (public for testing)
+// Delete client
 router.delete('/:id', async (req, res) => {
   try {
     let deletedClient;
-    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+
+    const isObjectId = mongoose.Types.ObjectId.isValid(req.params.id) && /^[0-9a-fA-F]{24}$/.test(req.params.id);
+
+    if (isObjectId) {
       deletedClient = await Client.findByIdAndDelete(req.params.id);
     } else {
       deletedClient = await Client.findOneAndDelete({ id: req.params.id });
@@ -204,49 +132,7 @@ router.delete('/:id', async (req, res) => {
 
     if (!deletedClient) return res.status(404).json({ success: false, error: 'Client not found' });
 
-    // Send notifications for client deletion
-    try {
-      const Notification = require('../models/Notification');
-      const User = require('../models/User');
-
-      // Get user who deleted the client
-      const deletedBy = req.body.deletedBy || req.user?.id || 'system';
-      const deletedByName = req.body.deletedByName || req.user?.name || 'مستخدم';
-
-      // Notify admin users about client deletion
-      const adminUsers = await User.find({ role: 'admin' });
-
-      for (const admin of adminUsers) {
-        if (admin._id.toString() !== deletedBy) {
-          const notification = new Notification({
-            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-            userId: admin._id.toString(),
-            title: "تم حذف عميل",
-            message: `تم حذف العميل "${deletedClient.name}" بواسطة ${deletedByName}`,
-            type: "client",
-            isRead: false,
-            actionUrl: `/clients`,
-            triggeredBy: deletedBy,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          });
-          await notification.save();
-        }
-      }
-
-      logger.info('Notifications sent for client deletion', {
-        clientId: deletedClient.id,
-        clientName: deletedClient.name,
-        deletedBy: deletedByName
-      }, 'CLIENTS');
-    } catch (notificationError) {
-      logger.error('Failed to send client deletion notifications', {
-        error: notificationError.message,
-        clientId: deletedClient.id
-      }, 'CLIENTS');
-    }
-
-    // Broadcast update to all clients
+    // Broadcast
     try {
       const broadcastResponse = await fetch(`${req.protocol}://${req.get('host')}/api/realtime/broadcast`, {
         method: 'POST',
@@ -259,10 +145,10 @@ router.delete('/:id', async (req, res) => {
           timestamp: Date.now()
         })
       });
-      logger.info('Broadcast response', { response: await broadcastResponse.json() }, 'CLIENTS');
     } catch (broadcastError) {
       logger.error('Broadcast error', { error: broadcastError.message }, 'CLIENTS');
     }
+
     res.json({ success: true, message: 'Client deleted' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
