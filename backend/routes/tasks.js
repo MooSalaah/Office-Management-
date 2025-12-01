@@ -122,104 +122,78 @@ router.put('/:id', async (req, res) => {
       res.setHeader('X-Debug-Lookup-Type', 'CustomID');
       updatedTask = await Task.findOneAndUpdate({ id: req.params.id }, req.body, { new: true });
     }
-
-    if (!updatedTask) return res.status(404).json({ success: false, error: 'Task not found' });
-
-    // Update Project Progress if task status changed
-    if (updatedTask.projectId) {
-      const Project = require('../models/Project');
-      const projectTasks = await Task.find({ projectId: updatedTask.projectId });
-      const totalTasks = projectTasks.length;
-      const completedTasks = projectTasks.filter(t => t.status === 'completed').length;
-      const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-
-      // Update project status based on progress
-      let statusUpdate = {};
-      if (progress === 100 && totalTasks > 0) {
-        statusUpdate = { progress, status: 'completed' };
-      } else {
-        statusUpdate = { progress, status: 'in-progress' };
-      }
-
-      const updatedProject = await Project.findByIdAndUpdate(updatedTask.projectId, statusUpdate, { new: true });
-
-      // Broadcast Project Update
-      if (updatedProject) {
-        try {
-          await fetch(`${req.protocol}://${req.get('host')}/api/realtime/broadcast`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              type: 'project',
-              action: 'update',
-              data: updatedProject,
-              userId: req.user ? req.user.id : 'system',
-              timestamp: Date.now()
-            })
-          });
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      type: 'project',
+      action: 'update',
+      data: updatedProject,
+      userId: req.user ? req.user.id : 'system',
+      timestamp: Date.now()
+    })
+  });
         } catch (broadcastError) {
-          logger.error('Project broadcast error', { error: broadcastError.message }, 'TASKS');
-        }
+  logger.error('Project broadcast error', { error: broadcastError.message }, 'TASKS');
+}
 
-        // Notify Project Manager if task is completed
-        if (req.body.status === 'completed') {
-          try {
-            const Notification = require('../models/Notification');
-            // Notify assigned engineer (Project Manager)
-            if (updatedProject.assignedEngineerId && updatedProject.assignedEngineerId !== req.user.id) {
-              const notification = new Notification({
-                userId: updatedProject.assignedEngineerId,
-                title: "تم إكمال مهمة",
-                message: `تم إكمال المهمة "${updatedTask.title}" في مشروع "${updatedProject.name}"`,
-                type: "task_completed",
-                isRead: false,
-                actionUrl: `/projects`,
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-              });
-              await notification.save();
+// Notify Project Manager if task is completed
+if (req.body.status === 'completed') {
+  try {
+    const Notification = require('../models/Notification');
+    // Notify assigned engineer (Project Manager)
+    if (updatedProject.assignedEngineerId && updatedProject.assignedEngineerId !== req.user.id) {
+      const notification = new Notification({
+        userId: updatedProject.assignedEngineerId,
+        title: "تم إكمال مهمة",
+        message: `تم إكمال المهمة "${updatedTask.title}" في مشروع "${updatedProject.name}"`,
+        type: "task_completed",
+        isRead: false,
+        actionUrl: `/projects`,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+      await notification.save();
 
-              // Broadcast notification
-              await fetch(`${req.protocol}://${req.get('host')}/api/realtime/broadcast`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  type: 'notification',
-                  action: 'create',
-                  data: notification,
-                  userId: 'system',
-                  timestamp: Date.now()
-                })
-              });
-            }
-          } catch (notificationError) {
-            logger.error('Failed to create completion notification', { error: notificationError.message }, 'TASKS');
-          }
-        }
-      }
-    }
-
-    // Broadcast Task Update
-    try {
-      const broadcastResponse = await fetch(`${req.protocol}://${req.get('host')}/api/realtime/broadcast`, {
+      // Broadcast notification
+      await fetch(`${req.protocol}://${req.get('host')}/api/realtime/broadcast`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          type: 'task',
-          action: 'update',
-          data: updatedTask,
-          userId: req.user ? req.user.id : 'system',
+          type: 'notification',
+          action: 'create',
+          data: notification,
+          userId: 'system',
           timestamp: Date.now()
         })
       });
-    } catch (broadcastError) {
-      logger.error('Broadcast error', { error: broadcastError.message }, 'TASKS');
+    }
+  } catch (notificationError) {
+    logger.error('Failed to create completion notification', { error: notificationError.message }, 'TASKS');
+  }
+}
+      }
     }
 
-    res.json({ success: true, data: updatedTask });
+// Broadcast Task Update
+try {
+  const broadcastResponse = await fetch(`${req.protocol}://${req.get('host')}/api/realtime/broadcast`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      type: 'task',
+      action: 'update',
+      data: updatedTask,
+      userId: req.user ? req.user.id : 'system',
+      timestamp: Date.now()
+    })
+  });
+} catch (broadcastError) {
+  logger.error('Broadcast error', { error: broadcastError.message }, 'TASKS');
+}
+
+res.json({ success: true, data: updatedTask });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
+  res.status(500).json({ success: false, error: err.message });
+}
 });
 
 // Delete task
