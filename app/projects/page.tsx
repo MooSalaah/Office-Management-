@@ -2115,7 +2115,6 @@ function ProjectsPageContent() {
                                 variant="default"
                                 size="sm"
                                 onClick={async () => {
-                                  const updatedTask = { ...task, status: "completed" as const };
                                   try {
                                     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
                                     const response = await fetch(`${apiUrl}/api/tasks/${task.id}`, {
@@ -2124,101 +2123,30 @@ function ProjectsPageContent() {
                                         'Content-Type': 'application/json',
                                         'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
                                       },
-                                      body: JSON.stringify(updatedTask),
+                                      body: JSON.stringify({
+                                        status: "completed",
+                                        updatedBy: currentUser?.id,
+                                        updatedByName: currentUser?.name
+                                      }),
                                     });
 
                                     if (response.ok) {
-                                      dispatch({ type: "UPDATE_TASK", payload: updatedTask });
+                                      const updatedTaskData = await response.json();
+                                      if (updatedTaskData.success) {
+                                        dispatch({ type: "UPDATE_TASK", payload: updatedTaskData.data });
 
-                                      // Update project progress
-                                      // We use map to create the updated list because 'tasks' from closure is stale
-                                      const projectTasks = tasks.filter(t => t.projectId === selectedProject.id);
-                                      const updatedProjectTasks = projectTasks.map(t => t.id === task.id ? updatedTask : t);
+                                        // إظهار رسالة نجاح
+                                        showSuccessToast(
+                                          "تم إكمال المهمة بنجاح",
+                                          `تم إكمال مهمة "${task.title}"`
+                                        );
 
-                                      const completedTasksCount = updatedProjectTasks.filter(t => t.status === "completed").length;
-                                      const newProgress = updatedProjectTasks.length > 0 ? Math.round((completedTasksCount / updatedProjectTasks.length) * 100) : 0;
-
-                                      let newStatus = selectedProject.status;
-                                      if (newProgress === 100 && selectedProject.status !== "completed") {
-                                        newStatus = "completed";
+                                        // Note: Project progress will be updated via real-time broadcast from the backend
                                       }
-
-                                      const updatedProject = { ...selectedProject, progress: newProgress, status: newStatus };
-                                      setSelectedProject(updatedProject);
-                                      dispatch({ type: "UPDATE_PROJECT", payload: updatedProject });
-
-                                      // Persist project progress to backend
-                                      await fetch(`${apiUrl}/api/projects/${selectedProject.id}`, {
-                                        method: 'PUT',
-                                        headers: {
-                                          'Content-Type': 'application/json',
-                                          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
-                                        },
-                                        body: JSON.stringify({
-                                          progress: newProgress,
-                                          status: newStatus,
-                                          updatedBy: currentUser?.id,
-                                          updatedByName: currentUser?.name
-                                        })
-                                      });
-
-                                      // إرسال إشعار للمديرين عند إكمال المهمة من قبل المهندس
-                                      if (currentUser?.role !== "admin") {
-                                        // إرسال إشعار لجميع المديرين
-                                        const adminUsers = users.filter(user => user.role === "admin");
-                                        adminUsers.forEach(admin => {
-                                          addNotification({
-                                            userId: admin.id,
-                                            title: "مهمة مكتملة",
-                                            message: `تم إنجاز مهمة "${task.title}" في مشروع "${selectedProject.name}" بواسطة ${currentUser?.name}`,
-                                            type: "task",
-                                            actionUrl: `/projects?highlight=${selectedProject.id}`,
-                                            triggeredBy: currentUser?.id || "",
-                                            isRead: false,
-                                          });
-                                        });
-
-                                        // إشعار إضافي إذا اكتمل المشروع بالكامل
-                                        if (newProgress === 100) {
-                                          // Notify Admins
-                                          adminUsers.forEach(admin => {
-                                            addNotification({
-                                              userId: admin.id,
-                                              title: "مشروع مكتمل",
-                                              message: `تم إكمال جميع مهام مشروع "${selectedProject.name}" بنسبة 100%`,
-                                              type: "project",
-                                              actionUrl: `/projects?highlight=${selectedProject.id}`,
-                                              triggeredBy: currentUser?.id || "",
-                                              isRead: false,
-                                            });
-                                          });
-
-                                          // Notify Team Members
-                                          if (selectedProject.team && selectedProject.team.length > 0) {
-                                            selectedProject.team.forEach(memberId => {
-                                              // Avoid duplicate notification if member is also an admin (already notified above)
-                                              const isMemberAdmin = adminUsers.some(admin => admin.id === memberId);
-                                              if (!isMemberAdmin && memberId !== currentUser?.id) {
-                                                addNotification({
-                                                  userId: memberId,
-                                                  title: "مشروع مكتمل",
-                                                  message: `تم إكمال جميع مهام مشروع "${selectedProject.name}" بنسبة 100%`,
-                                                  type: "project",
-                                                  actionUrl: `/projects?highlight=${selectedProject.id}`,
-                                                  triggeredBy: currentUser?.id || "",
-                                                  isRead: false,
-                                                });
-                                              }
-                                            });
-                                          }
-                                        }
-                                      }
-
-                                      // إظهار رسالة نجاح
-                                      showSuccessToast(
-                                        "تم إكمال المهمة بنجاح",
-                                        `تم إكمال مهمة "${task.title}" وتحديث تقدم المشروع إلى ${newProgress}%`
-                                      );
+                                    } else {
+                                      const errorData = await response.json();
+                                      console.error('Error updating task:', errorData);
+                                      setAlert({ type: "error", message: errorData.error || "فشل تحديث حالة المهمة" });
                                     }
                                   } catch (error) {
                                     console.error('Error updating task:', error);
