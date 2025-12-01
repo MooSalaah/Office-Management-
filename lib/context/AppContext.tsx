@@ -820,9 +820,8 @@ export function useAppActions() {
         dispatch({ type: "CLEAR_NOTIFICATIONS", payload: userId });
 
         try {
-            // Delete from backend one by one since there is no bulk clear endpoint
-            const userNotifications = state.notifications.filter(n => n.userId === userId);
-            await Promise.all(userNotifications.map(n => api.notifications.delete(n.id)));
+            // Use the bulk clear endpoint
+            await api.notifications.clear(userId);
 
             showSuccessToast("تم حذف الإشعارات", "تم حذف جميع الإشعارات بنجاح");
         } catch (error) {

@@ -256,6 +256,13 @@ class ApiClient {
 		});
 	}
 
+	async clearNotifications(userId: string) {
+		return this.request("/api/notifications/clear", {
+			method: "DELETE",
+			body: JSON.stringify({ userId }),
+		});
+	}
+
 	// Auth API
 	async login(credentials: { email: string; password: string }) {
 		return this.request("/api/users/login", {
@@ -341,6 +348,7 @@ export const api = {
 		create: (data: any) => apiClient.createNotification(data),
 		update: (id: string, data: any) => apiClient.updateNotification(id, data),
 		delete: (id: string) => apiClient.deleteNotification(id),
+		clear: (userId: string) => apiClient.clearNotifications(userId),
 	},
 	roles: {
 		getAll: () => apiClient.getRoles(),
