@@ -155,6 +155,8 @@ function TasksPageContent() {
   const [deleteError, setDeleteError] = useState<string>("")
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+  const [missingFields, setMissingFields] = useState<string[]>([])
+  const [showValidationErrors, setShowValidationErrors] = useState(false)
 
   const [formData, setFormData] = useState({
     title: "",
@@ -1340,81 +1342,6 @@ function TasksPageContent() {
                   onChange={(e) => setFormData((prev) => ({ ...prev, dueDate: e.target.value }))}
                 />
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-project">المشروع</Label>
-              {!showNewProjectInput ? (
-                <div className="flex space-x-2 space-x-reverse">
-                  <Select
-                    value={formData.projectId}
-                    onValueChange={(value) => setFormData((prev) => ({ ...prev, projectId: value }))}
-                  >
-                    <SelectTrigger className="flex-1">
-                      <SelectValue placeholder="اختر المشروع" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {projects.map((project) => (
-                        <SelectItem key={project.id} value={project.id}>
-                          <div className="flex items-center space-x-2 space-x-reverse">
-                            <span>{project.name}</span>
-                            <Badge variant="outline" className="text-xs">
-                              {project.status === "in-progress" ? "قيد التنفيذ" :
-                                project.status === "completed" ? "مكتمل" :
-                                  project.status === "canceled" ? "ملغي" : "مسودة"}
-                            </Badge>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setShowNewProjectInput(true)}
-                    className="shrink-0"
-                    title="إضافة مشروع جديد"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <div className="flex space-x-2 space-x-reverse">
-                    <Input
-                      placeholder="اسم المشروع الجديد"
-                      value={newProjectName}
-                      onChange={(e) => setNewProjectName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && newProjectName.trim()) {
-                          handleAddNewProject()
-                        }
-                      }}
-                    />
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={handleAddNewProject}
-                      disabled={!newProjectName.trim()}
-                      className="shrink-0"
-                      title="حفظ المشروع"
-                    >
-                      <CheckCircle className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => {
-                        setShowNewProjectInput(false)
-                        setNewProjectName("")
-                      }}
-                      className="shrink-0"
-                      title="إلغاء"
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              )}
             </div>
             <div className="flex justify-end space-x-2 space-x-reverse">
               <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
