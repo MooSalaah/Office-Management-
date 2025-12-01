@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const logger = require('../logger');
 require('dotenv').config();
 const fetch = require('node-fetch');
+const mongoose = require('mongoose');
 
 // JWT middleware
 function authenticateToken(req, res, next) {
@@ -16,6 +17,15 @@ function authenticateToken(req, res, next) {
     req.user = user;
     next();
   });
+}
+
+// Helper to find task by ID (ObjectId or custom String ID)
+async function findTask(id) {
+  if (mongoose.Types.ObjectId.isValid(id)) {
+    return await Task.findById(id);
+  } else {
+    return await Task.findOne({ id: id });
+  }
 }
 
 // Get all tasks (public for testing)
@@ -31,7 +41,7 @@ router.get('/', async (req, res) => {
 // Get task by ID (public for testing)
 router.get('/:id', async (req, res) => {
   try {
-    const task = await Task.findById(req.params.id);
+    const task = await findTask(req.params.id);
     if (!task) return res.status(404).json({ success: false, error: 'Task not found' });
     res.json({ success: true, data: task });
   } catch (err) {
@@ -91,7 +101,14 @@ router.post('/', async (req, res) => {
 // Update task
 router.put('/:id', async (req, res) => {
   try {
-    const updatedTask = await Task.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    let updatedTask;
+
+    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+      updatedTask = await Task.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    } else {
+      updatedTask = await Task.findOneAndUpdate({ id: req.params.id }, req.body, { new: true });
+    }
+
     if (!updatedTask) return res.status(404).json({ success: false, error: 'Task not found' });
 
     // Update Project Progress if task status changed
@@ -194,7 +211,14 @@ router.put('/:id', async (req, res) => {
 // Delete task
 router.delete('/:id', async (req, res) => {
   try {
-    const deletedTask = await Task.findByIdAndDelete(req.params.id);
+    let deletedTask;
+
+    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+      deletedTask = await Task.findByIdAndDelete(req.params.id);
+    } else {
+      deletedTask = await Task.findOneAndDelete({ id: req.params.id });
+    }
+
     if (!deletedTask) return res.status(404).json({ success: false, error: 'Task not found' });
 
     // Update Project Progress
