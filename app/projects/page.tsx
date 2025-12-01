@@ -2110,53 +2110,6 @@ function ProjectsPageContent() {
                             >
                               عرض
                             </Button>
-                            {task.status !== "completed" && (
-                              <Button
-                                variant="default"
-                                size="sm"
-                                onClick={async () => {
-                                  try {
-                                    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
-                                    const response = await fetch(`${apiUrl}/api/tasks/${task.id}`, {
-                                      method: 'PUT',
-                                      headers: {
-                                        'Content-Type': 'application/json',
-                                        'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
-                                      },
-                                      body: JSON.stringify({
-                                        status: "completed",
-                                        updatedBy: currentUser?.id,
-                                        updatedByName: currentUser?.name
-                                      }),
-                                    });
-
-                                    if (response.ok) {
-                                      const updatedTaskData = await response.json();
-                                      if (updatedTaskData.success) {
-                                        dispatch({ type: "UPDATE_TASK", payload: updatedTaskData.data });
-
-                                        // إظهار رسالة نجاح
-                                        showSuccessToast(
-                                          "تم إكمال المهمة بنجاح",
-                                          `تم إكمال مهمة "${task.title}"`
-                                        );
-
-                                        // Note: Project progress will be updated via real-time broadcast from the backend
-                                      }
-                                    } else {
-                                      const errorData = await response.json();
-                                      console.error('Error updating task:', errorData);
-                                      setAlert({ type: "error", message: errorData.error || "فشل تحديث حالة المهمة" });
-                                    }
-                                  } catch (error) {
-                                    console.error('Error updating task:', error);
-                                    setAlert({ type: "error", message: "حدث خطأ أثناء إكمال المهمة" });
-                                  }
-                                }}
-                              >
-                                إكمال
-                              </Button>
-                            )}
                           </div>
                         </div>
                       ))
