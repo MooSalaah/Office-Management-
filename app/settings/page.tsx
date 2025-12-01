@@ -765,7 +765,7 @@ function SettingsPageContent() {
   }, []);
 
   // أضف متغير API_BASE_URL إذا لم يكن موجودًا
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://office-management-fsy7.onrender.com";
 
   // حفظ إعدادات المكتب في backend مع تحديث فوري
   const handleOfficeUpdate = async () => {

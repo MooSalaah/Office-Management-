@@ -50,7 +50,7 @@ import { DeleteDialog } from "@/components/ui/delete-dialog"
 import { useSearchParams } from "next/navigation"
 
 // أضف متغير API_BASE_URL
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://office-management-fsy7.onrender.com";
 
 export default function FinancePage() {
   return (

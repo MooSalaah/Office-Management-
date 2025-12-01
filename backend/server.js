@@ -10,7 +10,7 @@ const port = process.env.PORT || 5000;
 // Enhanced CORS configuration
 app.use(cors({
   origin: process.env.NODE_ENV === 'production'
-    ? ['https://theofficemanagemet.netlify.app']
+    ? ['https://theofficemanagement.netlify.app']
     : true, // Allow all origins in development
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
