@@ -113,6 +113,17 @@ function ProjectsPageContent() {
 
   const handledProjectUpdateIdsRef = useRef<Set<string>>(new Set());
 
+  const fetchProjects = async () => {
+    try {
+      const response = await api.projects.getProjects();
+      if (response.success && response.data) {
+        dispatch({ type: "LOAD_PROJECTS", payload: response.data });
+      }
+    } catch (error) {
+      console.error('Failed to fetch projects', error);
+    }
+  };
+
   // تحديث البيانات عند استقبال تحديثات حية
   useEffect(() => {
     if (projectUpdates.length > 0) {
@@ -1977,7 +1988,7 @@ function ProjectsPageContent() {
                           if (response.ok) {
                             const updatedProject = await response.json();
                             // Update local state
-                            setProjects(prev => prev.map(p => p.id === updatedProject.data.id ? updatedProject.data : p));
+                            dispatch({ type: "UPDATE_PROJECT", payload: updatedProject.data });
                             setSelectedProject(updatedProject.data);
 
                             // Also update tasks locally if possible, or trigger a refetch
