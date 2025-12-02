@@ -126,7 +126,7 @@ function ProjectsPageContent() {
 
   const fetchProjects = async () => {
     try {
-      const response = await api.projects.getProjects();
+      const response = await api.projects.getAll();
       if (response.success && response.data) {
         dispatch({ type: "LOAD_PROJECTS", payload: response.data });
       }
