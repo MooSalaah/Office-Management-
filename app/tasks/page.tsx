@@ -54,6 +54,7 @@ function TasksPageContent() {
   // Project filter state
   const [projectFilter, setProjectFilter] = useState<string>("all")
   const [viewMode, setViewMode] = useState<'list' | 'board'>('list')
+  const [showCompleted, setShowCompleted] = useState(false)
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -611,7 +612,10 @@ function TasksPageContent() {
 
     const result = userFilter && projectFilterResult;
 
-
+    // Filter out completed tasks unless showCompleted is true
+    if (!showCompleted && task.status === 'completed') {
+      return false;
+    }
 
     return result;
   })
@@ -1122,6 +1126,15 @@ function TasksPageContent() {
                 إزالة التمييز
               </Button>
             )}
+            <Button
+              variant={showCompleted ? "secondary" : "outline"}
+              size="sm"
+              onClick={() => setShowCompleted(!showCompleted)}
+              className={showCompleted ? "bg-green-100 text-green-700 hover:bg-green-200" : ""}
+            >
+              <CheckCircle className="w-4 h-4 mr-2" />
+              {showCompleted ? "إخفاء المكتملة" : "عرض المكتملة"}
+            </Button>
             <div className="flex items-center border rounded-md bg-background">
               <Button
                 variant={viewMode === 'list' ? 'secondary' : 'ghost'}
@@ -1291,6 +1304,17 @@ function TasksPageContent() {
                         </td>
                         <td className="p-4">
                           <div className="flex items-center gap-2">
+                            {task.status !== 'completed' && canEditTask(task) && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleCompleteTask(task)}
+                                className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                                title="إكمال المهمة"
+                              >
+                                <CheckCircle className="w-4 h-4" />
+                              </Button>
+                            )}
                             {canEditTask(task) && (
                               <Button variant="ghost" size="icon" onClick={() => openEditDialog(task)}>
                                 <Edit2 className="w-4 h-4" />
