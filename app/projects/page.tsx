@@ -1971,26 +1971,106 @@ function ProjectsPageContent() {
           <DialogHeader>
             <div className="flex items-center justify-between">
               <div>
-                setIsDetailsDialogOpen(false)
-                openEditDialog(selectedProject!)
+                <DialogTitle>تفاصيل المشروع</DialogTitle>
+                <DialogDescription>معلومات شاملة عن المشروع</DialogDescription>
+              </div>
+              <div className="flex items-center space-x-2 space-x-reverse">
+                {selectedProject?.status !== 'completed' && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex items-center space-x-1 space-x-reverse text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/20 border-green-200 dark:border-green-800"
+                      >
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>إكمال المشروع</span>
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>تأكيد إكمال المشروع</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          هل أنت متأكد من إكمال هذا المشروع؟ سيتم وضع علامة "مكتمل" على جميع المهام المرتبطة به.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={async () => {
+                            try {
+                              const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
+                              const response = await fetch(`${apiUrl}/api/projects/${selectedProject!.id}`, {
+                                method: 'PUT',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                  'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+                                },
+                                body: JSON.stringify({
+                                  status: 'completed',
+                                  progress: 100,
+                                  updatedBy: currentUser?.id
+                                })
+                              });
+
+                              if (response.ok) {
+                                const updatedProject = await response.json();
+                                // Update local state
+                                dispatch({ type: "UPDATE_PROJECT", payload: updatedProject.data });
+
+                                // Close the details dialog
+                                setIsDetailsDialogOpen(false);
+
+                                toast({
+                                  title: "تم إكمال المشروع",
+                                  description: "تم تغيير حالة المشروع والمهام إلى مكتمل",
+                                });
+
+                                // Refresh projects to ensure everything is synced
+                                fetchProjects();
+                              }
+                            } catch (error) {
+                              console.error('Error completing project:', error);
+                              toast({
+                                title: "خطأ",
+                                description: "فشل إكمال المشروع",
+                                variant: "destructive"
+                              });
+                            }
+                          }}
+                          className="bg-green-600 hover:bg-green-700"
+                        >
+                          تأكيد الإكمال
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setIsDetailsDialogOpen(false)
+                    openEditDialog(selectedProject!)
                   }}
-                className="flex items-center space-x-1 space-x-reverse hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                  className="flex items-center space-x-1 space-x-reverse hover:bg-blue-50 dark:hover:bg-blue-900/20"
                 >
-                <Edit className="w-4 h-4 text-blue-600" />
-                <span>تعديل</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setIsDetailsDialogOpen(false)
-                  handleDeleteProject(selectedProject!.id)
-                }}
-                className="flex items-center space-x-1 space-x-reverse text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 border-red-200 dark:border-red-800"
-              >
-                <Trash2 className="w-4 h-4" />
-                <span>حذف</span>
-              </Button>
+                  <Edit className="w-4 h-4 text-blue-600" />
+                  <span>تعديل</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setIsDetailsDialogOpen(false)
+                    handleDeleteProject(selectedProject!.id)
+                  }}
+                  className="flex items-center space-x-1 space-x-reverse text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 border-red-200 dark:border-red-800"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>حذف</span>
+                </Button>
+              </div>
             </div>
           </div>
         </DialogHeader>
