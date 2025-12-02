@@ -46,7 +46,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // Delete all notifications for a user
-router.delete('/clear', async (req, res) => {
+router.post('/clear', async (req, res) => {
   try {
     const { userId } = req.body;
     if (!userId) {
