@@ -258,7 +258,7 @@ class ApiClient {
 
 	async clearNotifications(userId: string) {
 		return this.request("/api/notifications/clear", {
-			method: "DELETE",
+			method: "POST",
 			body: JSON.stringify({ userId }),
 		});
 	}
