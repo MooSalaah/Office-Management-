@@ -15,6 +15,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -1960,299 +1971,220 @@ function ProjectsPageContent() {
           <DialogHeader>
             <div className="flex items-center justify-between">
               <div>
-                <DialogTitle>تفاصيل المشروع</DialogTitle>
-                <DialogDescription>معلومات شاملة عن المشروع</DialogDescription>
+                setIsDetailsDialogOpen(false)
+                openEditDialog(selectedProject!)
+                  }}
+                className="flex items-center space-x-1 space-x-reverse hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                >
+                <Edit className="w-4 h-4 text-blue-600" />
+                <span>تعديل</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setIsDetailsDialogOpen(false)
+                  handleDeleteProject(selectedProject!.id)
+                }}
+                className="flex items-center space-x-1 space-x-reverse text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 border-red-200 dark:border-red-800"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>حذف</span>
+              </Button>
+            </div>
+          </div>
+        </DialogHeader>
+        {selectedProject && (
+          <div className="space-y-6">
+            {/* Project Header */}
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="text-2xl font-bold">{selectedProject.name}</h2>
+                <p className="text-gray-600 mt-1">{selectedProject.client}</p>
+                <Badge className={`mt-2 ${getStatusColor(selectedProject.status)}`}>{getStatusText(selectedProject.status)}</Badge>
               </div>
-              <div className="flex items-center space-x-2 space-x-reverse">
-                {selectedProject?.status !== 'completed' && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={async () => {
-                      if (confirm('هل أنت متأكد من إكمال هذا المشروع؟ سيتم وضع علامة "مكتمل" على جميع المهام.')) {
-                        try {
-                          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
-                          const response = await fetch(`${apiUrl}/api/projects/${selectedProject!.id}`, {
-                            method: 'PUT',
-                            headers: {
-                              'Content-Type': 'application/json',
-                              'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
-                            },
-                            body: JSON.stringify({
-                              status: 'completed',
-                              progress: 100,
-                              updatedBy: currentUser?.id
-                            })
-                          });
-
-                          if (response.ok) {
-                            const updatedProject = await response.json();
-                            // Update local state
-                            dispatch({ type: "UPDATE_PROJECT", payload: updatedProject.data });
-                            setSelectedProject(updatedProject.data);
-
-                            // Also update tasks locally if possible, or trigger a refetch
-                            // For simplicity, we'll just show success message and let realtime/refetch handle tasks
-                            toast({
-                              title: "تم إكمال المشروع",
-                              description: "تم تغيير حالة المشروع والمهام إلى مكتمل",
-                            });
-                          }
-                        } catch (error) {
-                          console.error('Error completing project:', error);
-                          toast({
-                            title: "خطأ",
-                            description: "فشل إكمال المشروع",
-                            variant: "destructive"
-                          });
-                        }
-                      }
-                    }}
-                    className="flex items-center space-x-1 space-x-reverse text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/20 border-green-200 dark:border-green-800"
-                  >
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>إكمال المشروع</span>
-                  </Button>
-                )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setIsDetailsDialogOpen(false)
-                    openEditDialog(selectedProject!)
-                  }}
-                  className="flex items-center space-x-1 space-x-reverse hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                >
-                  <Edit className="w-4 h-4 text-blue-600" />
-                  <span>تعديل</span>
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setIsDetailsDialogOpen(false)
-                    handleDeleteProject(selectedProject!.id)
-                  }}
-                  className="flex items-center space-x-1 space-x-reverse text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 border-red-200 dark:border-red-800"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  <span>حذف</span>
-                </Button>
+              <div className="text-right">
+                <div className="flex items-center justify-end">
+                  <span className="text-sm text-muted-foreground ml-1">ر.س</span>
+                  <span className="text-2xl font-bold text-green-600">{selectedProject.price.toLocaleString()}</span>
+                  <img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-5 h-5 opacity-80 mr-1 block dark:hidden" loading="lazy" />
+                  <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline w-5 h-5 opacity-80 mr-1 hidden dark:block" loading="lazy" />
+                </div>
+                <p className="text-sm text-gray-600">السعر الإجمالي</p>
               </div>
             </div>
-          </DialogHeader>
-          {selectedProject && (
-            <div className="space-y-6">
-              {/* Project Header */}
-              <div className="flex items-start justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold">{selectedProject.name}</h2>
-                  <p className="text-gray-600 mt-1">{selectedProject.client}</p>
-                  <Badge className={`mt-2 ${getStatusColor(selectedProject.status)}`}>{getStatusText(selectedProject.status)}</Badge>
-                </div>
-                <div className="text-right">
-                  <div className="flex items-center justify-end">
-                    <span className="text-sm text-muted-foreground ml-1">ر.س</span>
-                    <span className="text-2xl font-bold text-green-600">{selectedProject.price.toLocaleString()}</span>
-                    <img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-5 h-5 opacity-80 mr-1 block dark:hidden" loading="lazy" />
-                    <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline w-5 h-5 opacity-80 mr-1 hidden dark:block" loading="lazy" />
-                  </div>
-                  <p className="text-sm text-gray-600">السعر الإجمالي</p>
-                </div>
-              </div>
 
-              {/* Project Details Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <Card>
-                  <CardContent className="p-4">
-                    <h4 className="font-medium mb-2">معلومات المشروع</h4>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">النوع:</span>
-                        <span>{selectedProject.type}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">الأهمية:</span>
-                        <Badge
-                          variant={
-                            selectedProject.importance === "high"
-                              ? "destructive"
-                              : selectedProject.importance === "medium"
-                                ? "default"
-                                : "secondary"
-                          }
-                          className="text-xs"
-                        >
-                          {selectedProject.importance === "high"
-                            ? "عالية"
-                            : selectedProject.importance === "medium"
-                              ? "متوسطة"
-                              : "منخفضة"}
-                        </Badge>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">تاريخ البداية:</span>
-                        <span>{selectedProject.startDate}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">التاريخ الهجري:</span>
-                        <span>{selectedProject.startDateHijri}</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="p-4">
-                    <h4 className="font-medium mb-2">المعلومات المالية</h4>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">السعر الإجمالي:</span>
-                        <div className="flex items-center">
-                          <span className="text-xs text-muted-foreground ml-1">ر.س</span>
-                          <span className="font-medium">{selectedProject.price.toLocaleString()}</span>
-                          <img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-4 h-4 opacity-80 mr-1 block dark:hidden" loading="lazy" />
-                          <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline w-4 h-4 opacity-80 mr-1 hidden dark:block" loading="lazy" />
-                        </div>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">الدفعة المقدمة:</span>
-                        <div className="flex items-center">
-                          <span className="text-xs text-muted-foreground ml-1">ر.س</span>
-                          <span className="text-green-600">{selectedProject.downPayment.toLocaleString()}</span>
-                          <img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-4 h-4 opacity-80 mr-1 block dark:hidden" loading="lazy" />
-                          <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline w-4 h-4 opacity-80 mr-1 hidden dark:block" loading="lazy" />
-                        </div>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">المبلغ المتبقي:</span>
-                        <div className="flex items-center">
-                          <span className="text-xs text-muted-foreground ml-1">ر.س</span>
-                          <span className="text-red-600">{selectedProject.remainingBalance.toLocaleString()}</span>
-                          <img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-4 h-4 opacity-80 mr-1 block dark:hidden" loading="lazy" />
-                          <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline w-4 h-4 opacity-80 mr-1 hidden dark:block" loading="lazy" />
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="p-4">
-                    <h4 className="font-medium mb-2">فريق العمل</h4>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">المهندس المسؤول:</span>
-                        <span>{selectedProject.assignedEngineerName}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">عدد أعضاء الفريق:</span>
-                        <span>{selectedProject.team.length}</span>
-                      </div>
-                      <div className="flex flex-col gap-1 mt-2">
-                        <span className="text-gray-600">أعضاء الفريق:</span>
-                        <span>
-                          {selectedProject.team.map((id) => {
-                            const user = users.find(u => u.id === id);
-                            return user ? user.name : id;
-                          }).join("، ")}
-                        </span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Project Tasks */}
+            {/* Project Details Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <Card>
                 <CardContent className="p-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="font-medium">مهام المشروع</h4>
-                    <Badge variant="outline" className="text-xs">
-                      {tasks.filter(t => t.projectId === selectedProject.id).length} مهمة
-                    </Badge>
-                  </div>
-                  <div className="space-y-3">
-                    {tasks.filter(task => task.projectId === selectedProject.id).length > 0 ? (
-                      tasks.filter(task => task.projectId === selectedProject.id).map((task) => (
-                        <div key={task.id} className="flex items-center justify-between p-3 border rounded-lg bg-muted/50">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <h5 className="font-medium text-sm">{task.title}</h5>
-                              <Badge
-                                variant={
-                                  task.status === "completed" ? "default" :
-                                    task.status === "in-progress" ? "secondary" : "outline"
-                                }
-                                className="text-xs"
-                              >
-                                {task.status === "completed" ? "مكتملة" :
-                                  task.status === "in-progress" ? "قيد التنفيذ" : "قيد الانتظار"}
-                              </Badge>
-                            </div>
-                            <p className="text-xs text-muted-foreground mb-1">{task.description}</p>
-                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                              <span>المسؤول: {task.assigneeName}</span>
-                              {task.createdByName && <span>المنشئ: {task.createdByName}</span>}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                // Navigate to tasks page with this task highlighted
-                                window.location.href = `/tasks?highlight=${task.id}`;
-                              }}
-                            >
-                              عرض
-                            </Button>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-6 text-muted-foreground">
-                        <p>لا توجد مهام مرتبطة بهذا المشروع</p>
-                      </div>
-                    )}
+                  <h4 className="font-medium mb-2">معلومات المشروع</h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">النوع:</span>
+                      <span>{selectedProject.type}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">الأهمية:</span>
+                      <Badge
+                        variant={
+                          selectedProject.importance === "high"
+                            ? "destructive"
+                            : selectedProject.importance === "medium"
+                              ? "default"
+                              : "secondary"
+                        }
+                        className="text-xs"
+                      >
+                        {selectedProject.importance === "high"
+                          ? "عالية"
+                          : selectedProject.importance === "medium"
+                            ? "متوسطة"
+                            : "منخفضة"}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">تاريخ البداية:</span>
+                      <span>{selectedProject.startDate}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">التاريخ الهجري:</span>
+                      <span>{selectedProject.startDateHijri}</span>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Progress */}
               <Card>
                 <CardContent className="p-4">
-                  <h4 className="font-medium mb-4">تقدم المشروع</h4>
-                  <div className="space-y-4">
-                    <div className="flex flex-col md:flex-row md:items-center gap-4">
-                      <div className="flex items-center space-x-2 space-x-reverse">
-                        <Input
-                          type="number"
-                          min="0"
-                          max="100"
-                          value={selectedProject.progress}
-                          onChange={(e) => {
-                            const newProgress = Math.min(100, Math.max(0, parseInt(e.target.value) || 0))
-                            let newStatus = selectedProject.status
-                            if (newProgress === 100 && selectedProject.status !== "completed") {
-                              newStatus = "completed"
-                            } else if (newProgress < 100 && selectedProject.status === "completed") {
-                              newStatus = "in-progress"
-                            }
-                            const updatedProject = { ...selectedProject, progress: newProgress, status: newStatus }
-                            setSelectedProject(updatedProject)
-                            dispatch({ type: "UPDATE_PROJECT", payload: updatedProject })
-                          }}
-                          className="w-20 text-center"
-                        />
-                        <span className="text-sm text-gray-500">%</span>
+                  <h4 className="font-medium mb-2">المعلومات المالية</h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">السعر الإجمالي:</span>
+                      <div className="flex items-center">
+                        <span className="text-xs text-muted-foreground ml-1">ر.س</span>
+                        <span className="font-medium">{selectedProject.price.toLocaleString()}</span>
+                        <img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-4 h-4 opacity-80 mr-1 block dark:hidden" loading="lazy" />
+                        <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline w-4 h-4 opacity-80 mr-1 hidden dark:block" loading="lazy" />
                       </div>
-                      <input
-                        type="range"
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">الدفعة المقدمة:</span>
+                      <div className="flex items-center">
+                        <span className="text-xs text-muted-foreground ml-1">ر.س</span>
+                        <span className="text-green-600">{selectedProject.downPayment.toLocaleString()}</span>
+                        <img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-4 h-4 opacity-80 mr-1 block dark:hidden" loading="lazy" />
+                        <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline w-4 h-4 opacity-80 mr-1 hidden dark:block" loading="lazy" />
+                      </div>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">المبلغ المتبقي:</span>
+                      <div className="flex items-center">
+                        <span className="text-xs text-muted-foreground ml-1">ر.س</span>
+                        <span className="text-red-600">{selectedProject.remainingBalance.toLocaleString()}</span>
+                        <img src="/Saudi_Riyal_Symbol.svg" alt="ريال" className="inline w-4 h-4 opacity-80 mr-1 block dark:hidden" loading="lazy" />
+                        <img src="/Saudi_Riyal_Symbol_White.png" alt="ريال" className="inline w-4 h-4 opacity-80 mr-1 hidden dark:block" loading="lazy" />
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-4">
+                  <h4 className="font-medium mb-2">فريق العمل</h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">المهندس المسؤول:</span>
+                      <span>{selectedProject.assignedEngineerName}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">عدد أعضاء الفريق:</span>
+                      <span>{selectedProject.team.length}</span>
+                    </div>
+                    <div className="flex flex-col gap-1 mt-2">
+                      <span className="text-gray-600">أعضاء الفريق:</span>
+                      <span>
+                        {selectedProject.team.map((id) => {
+                          const user = users.find(u => u.id === id);
+                          return user ? user.name : id;
+                        }).join("، ")}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Project Tasks */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="font-medium">مهام المشروع</h4>
+                  <Badge variant="outline" className="text-xs">
+                    {tasks.filter(t => t.projectId === selectedProject.id).length} مهمة
+                  </Badge>
+                </div>
+                <div className="space-y-3">
+                  {tasks.filter(task => task.projectId === selectedProject.id).length > 0 ? (
+                    tasks.filter(task => task.projectId === selectedProject.id).map((task) => (
+                      <div key={task.id} className="flex items-center justify-between p-3 border rounded-lg bg-muted/50">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h5 className="font-medium text-sm">{task.title}</h5>
+                            <Badge
+                              variant={
+                                task.status === "completed" ? "default" :
+                                  task.status === "in-progress" ? "secondary" : "outline"
+                              }
+                              className="text-xs"
+                            >
+                              {task.status === "completed" ? "مكتملة" :
+                                task.status === "in-progress" ? "قيد التنفيذ" : "قيد الانتظار"}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mb-1">{task.description}</p>
+                          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                            <span>المسؤول: {task.assigneeName}</span>
+                            {task.createdByName && <span>المنشئ: {task.createdByName}</span>}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              // Navigate to tasks page with this task highlighted
+                              window.location.href = `/tasks?highlight=${task.id}`;
+                            }}
+                          >
+                            عرض
+                          </Button>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-6 text-muted-foreground">
+                      <p>لا توجد مهام مرتبطة بهذا المشروع</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Progress */}
+            <Card>
+              <CardContent className="p-4">
+                <h4 className="font-medium mb-4">تقدم المشروع</h4>
+                <div className="space-y-4">
+                  <div className="flex flex-col md:flex-row md:items-center gap-4">
+                    <div className="flex items-center space-x-2 space-x-reverse">
+                      <Input
+                        type="number"
                         min="0"
                         max="100"
                         value={selectedProject.progress}
-                        onChange={e => {
+                        onChange={(e) => {
                           const newProgress = Math.min(100, Math.max(0, parseInt(e.target.value) || 0))
                           let newStatus = selectedProject.status
                           if (newProgress === 100 && selectedProject.status !== "completed") {
@@ -2264,79 +2196,100 @@ function ProjectsPageContent() {
                           setSelectedProject(updatedProject)
                           dispatch({ type: "UPDATE_PROJECT", payload: updatedProject })
                         }}
-                        className="w-full md:w-64 accent-blue-600"
-                        dir={typeof document !== 'undefined' ? document.dir : 'rtl'}
+                        className="w-20 text-center"
                       />
+                      <span className="text-sm text-gray-500">%</span>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">يمكنك تحريك الشريط لتغيير نسبة الإنجاز أو إكمال المهام أعلاه</p>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={selectedProject.progress}
+                      onChange={e => {
+                        const newProgress = Math.min(100, Math.max(0, parseInt(e.target.value) || 0))
+                        let newStatus = selectedProject.status
+                        if (newProgress === 100 && selectedProject.status !== "completed") {
+                          newStatus = "completed"
+                        } else if (newProgress < 100 && selectedProject.status === "completed") {
+                          newStatus = "in-progress"
+                        }
+                        const updatedProject = { ...selectedProject, progress: newProgress, status: newStatus }
+                        setSelectedProject(updatedProject)
+                        dispatch({ type: "UPDATE_PROJECT", payload: updatedProject })
+                      }}
+                      className="w-full md:w-64 accent-blue-600"
+                      dir={typeof document !== 'undefined' ? document.dir : 'rtl'}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">يمكنك تحريك الشريط لتغيير نسبة الإنجاز أو إكمال المهام أعلاه</p>
 
-                    {/* Progress Bar */}
-                    <div className="relative">
-                      <div className="relative h-6 bg-gray-200 rounded-full">
-                        <div
-                          className="h-full bg-blue-600 rounded-full transition-all duration-200 relative"
-                          style={{ width: `${selectedProject.progress}%` }}
-                        />
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                          <span className="text-xs font-medium text-white drop-shadow-sm">
-                            {selectedProject.progress}%
-                          </span>
-                        </div>
+                  {/* Progress Bar */}
+                  <div className="relative">
+                    <div className="relative h-6 bg-gray-200 rounded-full">
+                      <div
+                        className="h-full bg-blue-600 rounded-full transition-all duration-200 relative"
+                        style={{ width: `${selectedProject.progress}%` }}
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <span className="text-xs font-medium text-white drop-shadow-sm">
+                          {selectedProject.progress}%
+                        </span>
                       </div>
                     </div>
-
-                    {/* Progress Labels */}
-                    <div className="flex justify-between text-xs text-gray-500">
-                      <span>0%</span>
-                      <span>25%</span>
-                      <span>50%</span>
-                      <span>75%</span>
-                      <span>100%</span>
-                    </div>
                   </div>
-                </CardContent>
-              </Card>
 
-              {/* Description */}
-              <Card>
-                <CardContent className="p-4">
-                  <h4 className="font-medium mb-2">وصف المشروع</h4>
-                  <p className="text-gray-700">{selectedProject.description}</p>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+                  {/* Progress Labels */}
+                  <div className="flex justify-between text-xs text-gray-500">
+                    <span>0%</span>
+                    <span>25%</span>
+                    <span>50%</span>
+                    <span>75%</span>
+                    <span>100%</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-      {/* Delete Confirmation Dialog */}
-      <DeleteConfirmationDialog
-        open={deleteDialogOpen}
-        onOpenChange={setDeleteDialogOpen}
-        onConfirm={confirmDelete}
-        itemName={projects.find(p => p.id === projectToDelete)?.name || "المشروع"}
-        itemType="المشروع"
-        error={deleteError}
-      />
-
-      {/* Update Success Dialog */}
-      <Dialog open={updateSuccessDialogOpen} onOpenChange={setUpdateSuccessDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-right">تم التحديث بنجاح</DialogTitle>
-            <DialogDescription className="text-right">
-              تم تحديث المشروع بنجاح
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-end mt-4">
-            <Button
-              onClick={() => setUpdateSuccessDialogOpen(false)}
-            >
-              موافق
-            </Button>
+            {/* Description */}
+            <Card>
+              <CardContent className="p-4">
+                <h4 className="font-medium mb-2">وصف المشروع</h4>
+                <p className="text-gray-700">{selectedProject.description}</p>
+              </CardContent>
+            </Card>
           </div>
-        </DialogContent>
-      </Dialog>
+        )}
+      </DialogContent>
+    </Dialog>
+
+      {/* Delete Confirmation Dialog */ }
+  <DeleteConfirmationDialog
+    open={deleteDialogOpen}
+    onOpenChange={setDeleteDialogOpen}
+    onConfirm={confirmDelete}
+    itemName={projects.find(p => p.id === projectToDelete)?.name || "المشروع"}
+    itemType="المشروع"
+    error={deleteError}
+  />
+
+  {/* Update Success Dialog */ }
+  <Dialog open={updateSuccessDialogOpen} onOpenChange={setUpdateSuccessDialogOpen}>
+    <DialogContent className="sm:max-w-md">
+      <DialogHeader>
+        <DialogTitle className="text-right">تم التحديث بنجاح</DialogTitle>
+        <DialogDescription className="text-right">
+          تم تحديث المشروع بنجاح
+        </DialogDescription>
+      </DialogHeader>
+      <div className="flex justify-end mt-4">
+        <Button
+          onClick={() => setUpdateSuccessDialogOpen(false)}
+        >
+          موافق
+        </Button>
+      </div>
+    </DialogContent>
+  </Dialog>
     </div >
   )
 }
