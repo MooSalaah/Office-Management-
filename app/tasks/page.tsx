@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Plus, Search, Calendar, CheckCircle, Circle, PlayCircle, AlertCircle, Trash2, X, Edit2 } from "lucide-react"
+import { Plus, Search, Calendar, CheckCircle, Circle, PlayCircle, AlertCircle, Trash2, X, Edit2, LayoutList, LayoutGrid } from "lucide-react"
 import { useApp, useAppActions } from "@/lib/context/AppContext"
 import { realtimeUpdates, useRealtimeUpdatesByType } from "@/lib/realtime-updates"
 import { hasPermission } from "@/lib/auth"
@@ -53,6 +53,7 @@ function TasksPageContent() {
 
   // Project filter state
   const [projectFilter, setProjectFilter] = useState<string>("all")
+  const [viewMode, setViewMode] = useState<'list' | 'board'>('list')
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -1121,6 +1122,26 @@ function TasksPageContent() {
                 إزالة التمييز
               </Button>
             )}
+            <div className="flex items-center border rounded-md bg-background">
+              <Button
+                variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('list')}
+                className="rounded-none rounded-r-md px-3"
+                title="عرض القائمة"
+              >
+                <LayoutList className="w-4 h-4" />
+              </Button>
+              <Button
+                variant={viewMode === 'board' ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('board')}
+                className="rounded-none rounded-l-md px-3"
+                title="عرض اللوحة"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -1128,77 +1149,169 @@ function TasksPageContent() {
 
 
       {/* Kanban Board */}
-      <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {(["todo", "in-progress", "completed"] as TaskStatus[]).map((status) => (
-            <Card key={status} className="h-fit">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2 space-x-reverse">
-                    {getStatusIcon(status)}
-                    <CardTitle className="text-lg">{getStatusTitle(status, tasks)}</CardTitle>
+      {viewMode === 'board' && (
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {(["todo", "in-progress", "completed"] as TaskStatus[]).map((status) => (
+              <Card key={status} className="h-fit">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2 space-x-reverse">
+                      {getStatusIcon(status)}
+                      <CardTitle className="text-lg">{getStatusTitle(status, tasks)}</CardTitle>
+                    </div>
+                    <Badge variant="outline" className="text-xs">
+                      {tasksByStatus[status].length}
+                    </Badge>
                   </div>
-                  <Badge variant="outline" className="text-xs">
-                    {tasksByStatus[status].length}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <Droppable droppableId={status}>
-                  {(provided, snapshot) => (
-                    <div
-                      ref={provided.innerRef}
-                      {...provided.droppableProps}
-                      className={`space-y-3 min-h-[200px] p-2 rounded-lg transition-colors ${snapshot.isDraggingOver ? "bg-blue-50" : ""
-                        }`}
-                    >
-                      {tasksByStatus[status].map((task, index) => (
-                        <Draggable key={task.id} draggableId={task.id} index={index}>
-                          {(provided, snapshot) => (
-                            <div
-                              ref={provided.innerRef}
-                              {...provided.draggableProps}
-                              {...provided.dragHandleProps}
-                            >
-                              <SwipeToDelete
-                                key={task.id}
-                                onDelete={() => handleDeleteTask(task.id)}
+                </CardHeader>
+                <CardContent>
+                  <Droppable droppableId={status}>
+                    {(provided, snapshot) => (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.droppableProps}
+                        className={`space-y-3 min-h-[200px] p-2 rounded-lg transition-colors ${snapshot.isDraggingOver ? "bg-blue-50" : ""
+                          }`}
+                      >
+                        {tasksByStatus[status].map((task, index) => (
+                          <Draggable key={task.id} draggableId={task.id} index={index}>
+                            {(provided, snapshot) => (
+                              <div
+                                ref={provided.innerRef}
+                                {...provided.draggableProps}
+                                {...provided.dragHandleProps}
                               >
-                                <TaskCard
-                                  task={task}
-                                  users={users}
-                                  canDelete={canDeleteTask}
-                                  canEdit={canEditTask(task)}
+                                <SwipeToDelete
+                                  key={task.id}
                                   onDelete={() => handleDeleteTask(task.id)}
-                                  onEdit={() => openEditDialog(task)}
-                                  onDetails={() => {
-                                    setSelectedTask(task)
-                                    setIsDetailsDialogOpen(true)
-                                  }}
-                                  isHighlighted={highlightedTaskId === task.id}
-                                />
-                              </SwipeToDelete>
+                                >
+                                  <TaskCard
+                                    task={task}
+                                    users={users}
+                                    canDelete={canDeleteTask}
+                                    canEdit={canEditTask(task)}
+                                    onDelete={() => handleDeleteTask(task.id)}
+                                    onEdit={() => openEditDialog(task)}
+                                    onDetails={() => {
+                                      setSelectedTask(task)
+                                      setIsDetailsDialogOpen(true)
+                                    }}
+                                    isHighlighted={highlightedTaskId === task.id}
+                                  />
+                                </SwipeToDelete>
+                              </div>
+                            )}
+                          </Draggable>
+                        ))}
+                        {provided.placeholder}
+
+                        {/* Empty State */}
+                        {tasksByStatus[status].length === 0 && (
+                          <div className="text-center py-8 text-muted-foreground">
+                            <Circle className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                            <p className="text-sm">لا توجد مهام</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </Droppable>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </DragDropContext>
+      )}
+
+      {/* List View */}
+      {viewMode === 'list' && (
+        <Card>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-right">
+                <thead className="bg-muted/50 text-muted-foreground">
+                  <tr>
+                    <th className="p-4 font-medium">المهمة</th>
+                    <th className="p-4 font-medium">المشروع</th>
+                    <th className="p-4 font-medium">المسؤول</th>
+                    <th className="p-4 font-medium">الحالة</th>
+                    <th className="p-4 font-medium">الأولوية</th>
+                    <th className="p-4 font-medium">تاريخ الاستحقاق</th>
+                    <th className="p-4 font-medium">الإجراءات</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {filteredTasks.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="p-8 text-center text-muted-foreground">
+                        لا توجد مهام
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredTasks.map((task) => (
+                      <tr key={task.id} className="hover:bg-muted/50 transition-colors">
+                        <td className="p-4">
+                          <div className="font-medium">{task.title}</div>
+                          {task.description && (
+                            <div className="text-xs text-muted-foreground truncate max-w-[200px]">
+                              {task.description}
                             </div>
                           )}
-                        </Draggable>
-                      ))}
-                      {provided.placeholder}
-
-                      {/* Empty State */}
-                      {tasksByStatus[status].length === 0 && (
-                        <div className="text-center py-8 text-muted-foreground">
-                          <Circle className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                          <p className="text-sm">لا توجد مهام</p>
-                        </div>
-                      )}
-                    </div>
+                        </td>
+                        <td className="p-4">
+                          {projects.find(p => p.id === task.projectId)?.name || '-'}
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-2">
+                            <Avatar className="w-6 h-6">
+                              <AvatarImage src="" />
+                              <AvatarFallback className="text-xs">
+                                {task.assigneeName?.charAt(0) || '?'}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span>{task.assigneeName}</span>
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-2">
+                            {getStatusIcon(task.status)}
+                            <span>{getStatusTitle(task.status, [])}</span>
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <Badge variant={getPriorityColor(task.priority) as any}>
+                            {getPriorityText(task.priority)}
+                          </Badge>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <Calendar className="w-4 h-4" />
+                            <span>{task.dueDate}</span>
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-2">
+                            {canEditTask(task) && (
+                              <Button variant="ghost" size="icon" onClick={() => openEditDialog(task)}>
+                                <Edit2 className="w-4 h-4" />
+                              </Button>
+                            )}
+                            {canDeleteTask && (
+                              <Button variant="ghost" size="icon" onClick={() => handleDeleteTask(task.id)} className="text-red-500 hover:text-red-600 hover:bg-red-50">
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
                   )}
-                </Droppable>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </DragDropContext>
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Edit Task Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
