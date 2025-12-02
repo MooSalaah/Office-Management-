@@ -811,6 +811,49 @@ function TasksPageContent() {
     }
   }
 
+  const handleCompleteTask = async (task: Task) => {
+    try {
+      // Check permission
+      if (!hasPermission(currentUser?.role || "", "edit", "tasks")) {
+        setAlert({ type: "error", message: "ليس لديك صلاحية لتعديل المهام" })
+        return
+      }
+
+      const updatedTask = { ...task, status: 'completed' as const }
+
+      // Optimistic update
+      dispatch({ type: "UPDATE_TASK", payload: updatedTask })
+
+      const response = await fetch(`/api/tasks?id=${task.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedTask)
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        showSuccessToast("تم إكمال المهمة", `تم تحديد المهمة "${task.title}" كمكتملة`)
+
+        // Broadcast update
+        realtimeUpdates.sendTaskUpdate({
+          action: 'update',
+          task: updatedTask,
+          userId: currentUser?.id,
+          userName: currentUser?.name
+        })
+      } else {
+        // Revert on failure
+        dispatch({ type: "UPDATE_TASK", payload: task })
+        setAlert({ type: "error", message: "فشل تحديث حالة المهمة" })
+      }
+    } catch (error) {
+      console.error('Error completing task:', error)
+      dispatch({ type: "UPDATE_TASK", payload: task })
+      setAlert({ type: "error", message: "حدث خطأ أثناء تحديث حالة المهمة" })
+    }
+  }
+
   return (
     <div className="space-y-6">
       {alert && (
