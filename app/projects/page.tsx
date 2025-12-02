@@ -1805,6 +1805,40 @@ function ProjectsPageContent() {
                 <SelectItem value="canceled">ملغي</SelectItem>
               </SelectContent>
             </Select>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={async () => {
+                try {
+                  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
+                  const response = await fetch(`${apiUrl}/api/projects/sync-status`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+                    }
+                  });
+                  const data = await response.json();
+                  if (data.success) {
+                    toast({
+                      title: "تم المزامنة",
+                      description: `تم تحديث ${data.updatedCount} مشروع`,
+                    });
+                    // Refresh projects
+                    fetchProjects();
+                  }
+                } catch (error) {
+                  toast({
+                    title: "خطأ",
+                    description: "فشل المزامنة",
+                    variant: "destructive"
+                  });
+                }
+              }}
+              title="مزامنة حالة المشاريع"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -1917,6 +1951,56 @@ function ProjectsPageContent() {
                 <DialogDescription>معلومات شاملة عن المشروع</DialogDescription>
               </div>
               <div className="flex items-center space-x-2 space-x-reverse">
+                {selectedProject?.status !== 'completed' && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      if (confirm('هل أنت متأكد من إكمال هذا المشروع؟ سيتم وضع علامة "مكتمل" على جميع المهام.')) {
+                        try {
+                          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
+                          const response = await fetch(`${apiUrl}/api/projects/${selectedProject!.id}`, {
+                            method: 'PUT',
+                            headers: {
+                              'Content-Type': 'application/json',
+                              'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+                            },
+                            body: JSON.stringify({
+                              status: 'completed',
+                              progress: 100,
+                              updatedBy: currentUser?.id
+                            })
+                          });
+
+                          if (response.ok) {
+                            const updatedProject = await response.json();
+                            // Update local state
+                            setProjects(prev => prev.map(p => p.id === updatedProject.data.id ? updatedProject.data : p));
+                            setSelectedProject(updatedProject.data);
+
+                            // Also update tasks locally if possible, or trigger a refetch
+                            // For simplicity, we'll just show success message and let realtime/refetch handle tasks
+                            toast({
+                              title: "تم إكمال المشروع",
+                              description: "تم تغيير حالة المشروع والمهام إلى مكتمل",
+                            });
+                          }
+                        } catch (error) {
+                          console.error('Error completing project:', error);
+                          toast({
+                            title: "خطأ",
+                            description: "فشل إكمال المشروع",
+                            variant: "destructive"
+                          });
+                        }
+                      }
+                    }}
+                    className="flex items-center space-x-1 space-x-reverse text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/20 border-green-200 dark:border-green-800"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>إكمال المشروع</span>
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   size="sm"
