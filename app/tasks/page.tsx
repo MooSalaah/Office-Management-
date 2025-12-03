@@ -44,7 +44,7 @@ export default function TasksPage() {
 
 function TasksPageContent() {
   const { state, dispatch } = useApp()
-  const { addNotification, broadcastTaskUpdate, showSuccessToast } = useAppActions()
+  const { addNotification, broadcastTaskUpdate, showSuccessToast, updateTask } = useAppActions()
   const { currentUser, tasks, projects, users } = state
   const { toast } = useToast()
 
@@ -264,35 +264,11 @@ function TasksPageContent() {
     }
 
     try {
-      // Save to backend database
-      const response = await fetch(`/api/tasks?id=${task.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updatedTask),
-      });
+      // استخدم المنطق المركزي لتحديث المهمة والمشروع (تقدّم وحالة) في AppContext
+      await updateTask(updatedTask);
 
-      if (!response.ok) {
-        throw new Error('Failed to update task in database');
-      }
-
-      const result = await response.json();
-      logger.info('Task updated in database', { result }, 'TASKS');
-
-      // Update local state
-      dispatch({ type: "UPDATE_TASK", payload: updatedTask })
-
-      // Update in localStorage
-      const existingTasks = JSON.parse(localStorage.getItem("tasks") || "[]")
-      const updatedTasks = existingTasks.map((t: any) => t.id === task.id ? updatedTask : t)
-      localStorage.setItem("tasks", JSON.stringify(updatedTasks))
-
-      // Broadcast realtime update
+      // Broadcast realtime update (للتوافق مع المنظومة الحالية)
       broadcastTaskUpdate('update', { task: updatedTask, userId: currentUser?.id, userName: currentUser?.name })
-
-      // إرسال تحديث فوري لجميع المستخدمين
-      realtimeUpdates.sendTaskUpdate({ action: 'update', task: updatedTask, userId: currentUser?.id, userName: currentUser?.name })
 
       // Add notification to admin when task is completed
       if (destinationStatus === "completed" && currentUser?.role !== "admin") {
@@ -312,7 +288,10 @@ function TasksPageContent() {
 
         // إشعار إضافي إذا كان المشروع مكتمل
         if (task.projectId) {
-          const projectTasks = tasks.filter(t => t.projectId === task.projectId);
+          // استخدم نسخة محدثة من مهام المشروع تتضمن المهمة بعد تحديث حالتها
+          const projectTasks = state.tasks
+            .map(t => t.id === updatedTask.id ? updatedTask : t)
+            .filter(t => t.projectId === task.projectId);
           const completedTasks = projectTasks.filter(t => t.status === "completed").length;
           const projectProgress = projectTasks.length > 0 ? Math.round((completedTasks / projectTasks.length) * 100) : 0;
 
@@ -449,21 +428,11 @@ function TasksPageContent() {
       updatedAt: new Date().toISOString(),
     }
     try {
-      const response = await fetch(`/api/tasks?id=${editingTask.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedTask),
-      });
-      const data = await response.json();
-      if (data.success && data.data) {
-        dispatch({ type: "UPDATE_TASK", payload: data.data });
-        showSuccessToast("تم تحديث المهمة بنجاح", `تم تحديث المهمة "${data.data.title}" بنجاح`);
-        setIsEditDialogOpen(false);
-        setEditingTask(null);
-        resetForm();
-      } else {
-        setAlert({ type: "error", message: data.error || "فشل تحديث المهمة في قاعدة البيانات" });
-      }
+      // استخدام المنطق المركزي لتحديث المهمة والمشروع
+      await updateTask(updatedTask);
+      setIsEditDialogOpen(false);
+      setEditingTask(null);
+      resetForm();
     } catch (error) {
       setAlert({ type: "error", message: "حدث خطأ أثناء تحديث المهمة في قاعدة البيانات" });
     }
