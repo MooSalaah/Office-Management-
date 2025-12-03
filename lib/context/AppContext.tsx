@@ -1078,18 +1078,51 @@ export function useAppActions() {
             const response = await api.tasks.update(task.id, task);
             if (response && response.success) {
                 const updatedTask = (response.data as Task) || task;
-                // نكتفي بتحديث المهمة محلياً؛ الباك-إند هو المسؤول عن تحديث حالة المشروع والتقدّم
+
+                // 1) تحديث المهمة محلياً فوراً (تجربة المستخدم)
                 dispatch({ type: "UPDATE_TASK", payload: updatedTask });
 
-                // بعد أن يقوم الباك-إند بإعادة حساب حالة المشروع والتقدّم، نجلب المشاريع لضمان تزامن الواجهة
+                // 2) إذا كانت المهمة مرتبطة بمشروع، احسب تقدّم المشروع وحالته من المهام الحالية في الواجهة
                 if (updatedTask.projectId) {
-                    try {
-                        const projectsResponse = await api.projects.getAll();
-                        if (projectsResponse.success && Array.isArray(projectsResponse.data)) {
-                            dispatch({ type: "LOAD_PROJECTS", payload: projectsResponse.data });
+                    const projectId = updatedTask.projectId;
+
+                    const projectTasks = state.tasks
+                        .map((t) => (t.id === updatedTask.id ? updatedTask : t))
+                        .filter((t) => t.projectId === projectId);
+
+                    if (projectTasks.length > 0) {
+                        const totalTasks = projectTasks.length;
+                        const completedTasks = projectTasks.filter((t) => t.status === "completed").length;
+                        const progress = Math.round((completedTasks / totalTasks) * 100);
+
+                        const project = state.projects.find((p) => p.id === projectId);
+                        if (project) {
+                            const newStatus: Project["status"] =
+                                progress === 100
+                                    ? "completed"
+                                    : progress === 0
+                                        ? "draft"
+                                        : "in-progress";
+
+                            const updatedProject: Project = {
+                                ...project,
+                                progress,
+                                status: newStatus,
+                            };
+
+                            // تحديث المشروع في الحالة المحلية فوراً
+                            dispatch({ type: "UPDATE_PROJECT", payload: updatedProject });
+
+                            // إرسال التحديث للباك-إند ليتم حفظه في قاعدة البيانات
+                            try {
+                                await api.projects.update(updatedProject.id, {
+                                    status: updatedProject.status,
+                                    progress: updatedProject.progress,
+                                });
+                            } catch (projectError) {
+                                logger.error("Error syncing project after task update", { projectError }, "TASKS");
+                            }
                         }
-                    } catch (projectSyncError) {
-                        logger.error("Failed to refresh projects after updating task", { projectSyncError }, "TASKS");
                     }
                 }
 

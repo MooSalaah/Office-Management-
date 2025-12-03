@@ -1991,7 +1991,8 @@ function ProjectsPageContent() {
                       <AlertDialogHeader>
                         <AlertDialogTitle>تأكيد إكمال المشروع</AlertDialogTitle>
                         <AlertDialogDescription>
-                          هل أنت متأكد من إكمال هذا المشروع؟ سيتم وضع علامة "مكتمل" على جميع المهام المرتبطة به.
+                          هل أنت متأكد من إكمال هذا المشروع؟ سيتم وضع علامة "مكتمل" على جميع المهام المرتبطة به،
+                          كما سيتم تحديث نسبة التقدم إلى 100٪ فوراً في الواجهة.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
@@ -2000,7 +2001,24 @@ function ProjectsPageContent() {
                           onClick={async () => {
                             if (!selectedProject) return;
                             try {
-                              // 1) اطلب من الباك-إند إكمال المشروع (سيقوم هو بإكمال المهام وضبط progress)
+                              // 1) تحديث متفائل في الواجهة: جعل المشروع مكتمل ونسبة التقدم 100٪
+                              const optimisticProject = {
+                                ...selectedProject,
+                                status: "completed" as const,
+                                progress: 100,
+                              };
+                              dispatch({ type: "UPDATE_PROJECT", payload: optimisticProject });
+                              setSelectedProject(optimisticProject);
+
+                              // تحديث جميع المهام المرتبطة بالمشروع في الواجهة لتكون مكتملة
+                              const updatedTasks = tasks.map((task) =>
+                                task.projectId === selectedProject.id
+                                  ? { ...task, status: "completed" as const, updatedAt: new Date().toISOString() }
+                                  : task
+                              );
+                              dispatch({ type: "LOAD_TASKS", payload: updatedTasks });
+
+                              // 2) إرسال التغييرات إلى الباك-إند لحفظها فعلياً
                               const response = await api.projects.update(selectedProject.id, {
                                 status: 'completed',
                                 progress: 100,
@@ -2012,21 +2030,10 @@ function ProjectsPageContent() {
                               }
 
                               const completedProject = response.data;
-
-                              // 2) حدّث المشروع في الحالة المحلية فقط (المهام سيتم جلبها من السيرفر كما هي بعد التحديث)
+                              // تأكيد أن البيانات النهائية من الباك-إند متزامنة مع الحالة
                               dispatch({ type: "UPDATE_PROJECT", payload: completedProject });
 
-                              // 3) أعد جلب المهام من الباك-إند لضمان تزامن حالة المهام (ستكون مكتملة للمشروع الحالي فقط)
-                              try {
-                                const tasksResponse = await api.tasks.getAll();
-                                if (tasksResponse.success && Array.isArray(tasksResponse.data)) {
-                                  dispatch({ type: "LOAD_TASKS", payload: tasksResponse.data });
-                                }
-                              } catch (tasksError) {
-                                console.error('Error refreshing tasks after completing project:', tasksError);
-                              }
-
-                              // 4) إغلاق نافذة التفاصيل وإظهار رسالة نجاح
+                              // 3) إغلاق نافذة التفاصيل وإظهار رسالة نجاح
                               setIsDetailsDialogOpen(false);
 
                               toast({
@@ -2034,10 +2041,27 @@ function ProjectsPageContent() {
                                 description: "تم تغيير حالة المشروع والمهام إلى مكتمل",
                               });
 
-                              // 5) إعادة جلب المشاريع لضمان التزامن مع قاعدة البيانات
+                              // 4) اختيارية: إعادة جلب المشاريع من الباك-إند للتأكد من التزامن في الحالات الخاصة
                               fetchProjects();
                             } catch (error) {
                               console.error('Error completing project:', error);
+
+                              // في حالة الفشل، أعد تحميل المشاريع والمهام من الباك-إند لإلغاء التحديث المتفائل
+                              try {
+                                const [projectsRes, tasksRes] = await Promise.all([
+                                  api.projects.getAll(),
+                                  api.tasks.getAll(),
+                                ]);
+                                if (projectsRes.success && Array.isArray(projectsRes.data)) {
+                                  dispatch({ type: "LOAD_PROJECTS", payload: projectsRes.data });
+                                }
+                                if (tasksRes.success && Array.isArray(tasksRes.data)) {
+                                  dispatch({ type: "LOAD_TASKS", payload: tasksRes.data });
+                                }
+                              } catch (reloadError) {
+                                console.error('Error reloading data after complete-project failure:', reloadError);
+                              }
+
                               toast({
                                 title: "خطأ",
                                 description: "فشل إكمال المشروع",
