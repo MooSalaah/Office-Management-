@@ -439,17 +439,127 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (typeof window !== 'undefined' && (window as any).realtimeUpdates) {
             const realtimeUpdates = (window as any).realtimeUpdates;
             if (realtimeUpdates && typeof realtimeUpdates.on === 'function') {
+                // Notification updates
                 realtimeUpdates.on('notification', (notification: any) => {
                     try {
-                        if (!notification || !notification.id) {
-                            console.warn('Invalid notification data received:', notification);
-                            return;
-                        }
+                        if (!notification || !notification.id) return;
                         if (!state.notifications.some(n => n.id === notification.id)) {
                             dispatch({ type: 'ADD_NOTIFICATION', payload: notification })
                         }
                     } catch (error) {
-                        console.error('Error in realtime update callback:', error);
+                        console.error('Error in notification update callback:', error);
+                    }
+                });
+
+                // Task updates
+                realtimeUpdates.on('task', (update: any) => {
+                    try {
+                        const task = update.data || update;
+                        if (!task || !task.id) return;
+
+                        const action = update.action || 'update';
+                        if (action === 'create') {
+                            dispatch({ type: 'ADD_TASK', payload: task });
+                        } else if (action === 'update') {
+                            dispatch({ type: 'UPDATE_TASK', payload: task });
+                        } else if (action === 'delete') {
+                            dispatch({ type: 'DELETE_TASK', payload: task.id });
+                        }
+                    } catch (error) {
+                        console.error('Error in task update callback:', error);
+                    }
+                });
+
+                // Project updates
+                realtimeUpdates.on('project', (update: any) => {
+                    try {
+                        const project = update.data || update;
+                        if (!project || !project.id) return;
+
+                        const action = update.action || 'update';
+                        if (action === 'create') {
+                            dispatch({ type: 'ADD_PROJECT', payload: project });
+                        } else if (action === 'update') {
+                            dispatch({ type: 'UPDATE_PROJECT', payload: project });
+                        } else if (action === 'delete') {
+                            dispatch({ type: 'DELETE_PROJECT', payload: project.id });
+                        }
+                    } catch (error) {
+                        console.error('Error in project update callback:', error);
+                    }
+                });
+
+                // Client updates
+                realtimeUpdates.on('client', (update: any) => {
+                    try {
+                        const client = update.data || update;
+                        if (!client || !client.id) return;
+
+                        const action = update.action || 'update';
+                        if (action === 'create') {
+                            dispatch({ type: 'ADD_CLIENT', payload: client });
+                        } else if (action === 'update') {
+                            dispatch({ type: 'UPDATE_CLIENT', payload: client });
+                        } else if (action === 'delete') {
+                            dispatch({ type: 'DELETE_CLIENT', payload: client.id });
+                        }
+                    } catch (error) {
+                        console.error('Error in client update callback:', error);
+                    }
+                });
+
+                // Transaction updates
+                realtimeUpdates.on('transaction', (update: any) => {
+                    try {
+                        const transaction = update.data || update;
+                        if (!transaction || !transaction.id) return;
+
+                        const action = update.action || 'update';
+                        if (action === 'create') {
+                            dispatch({ type: 'ADD_TRANSACTION', payload: transaction });
+                        } else if (action === 'update') {
+                            dispatch({ type: 'UPDATE_TRANSACTION', payload: transaction });
+                        } else if (action === 'delete') {
+                            dispatch({ type: 'DELETE_TRANSACTION', payload: transaction.id });
+                        }
+                    } catch (error) {
+                        console.error('Error in transaction update callback:', error);
+                    }
+                });
+
+                // Attendance updates
+                realtimeUpdates.on('attendance', (update: any) => {
+                    try {
+                        const attendance = update.data || update;
+                        if (!attendance || !attendance.id) return;
+
+                        const action = update.action || 'update';
+                        if (action === 'create') {
+                            dispatch({ type: 'ADD_ATTENDANCE', payload: attendance });
+                        } else if (action === 'update') {
+                            dispatch({ type: 'UPDATE_ATTENDANCE', payload: attendance });
+                        }
+                    } catch (error) {
+                        console.error('Error in attendance update callback:', error);
+                    }
+                });
+
+                // User updates
+                realtimeUpdates.on('user', (update: any) => {
+                    try {
+                        const user = update.data || update;
+                        if (!user || !user.id) return;
+
+                        const action = update.action || 'update';
+                        if (action === 'create') {
+                            dispatch({ type: 'ADD_USER', payload: user });
+                        } else if (action === 'update') {
+                            dispatch({ type: 'UPDATE_USER', payload: user });
+                        } else if (action === 'delete') {
+                            dispatch({ type: 'DELETE_USER', payload: user.id });
+                        }
+                    } catch (error) {
+                        console.error('Error in user update callback:', error);
                     }
                 });
             }

@@ -54,12 +54,106 @@ router.get('/:id', async (req, res) => {
 
 // Create new project
 router.post('/', async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
   try {
-    const { id, ...projectData } = req.body;
-    const project = new Project(projectData);
-    const newProject = await project.save();
+    const { project, tasks, createdByName } = req.body;
+
+    // 1. Create Project
+    const { id, ...projectData } = project;
+    const newProject = new Project(projectData);
+    await newProject.save({ session });
+
+    // 2. Create Tasks if any
+    const createdTasks = [];
+    if (tasks && tasks.length > 0) {
+      for (const taskData of tasks) {
+        const newTask = new Task({
+          title: taskData.typeName, // Use type name as title
+          description: taskData.typeDescription,
+          status: 'in-progress',
+          priority: 'medium',
+          assigneeId: taskData.assigneeId,
+          assigneeName: taskData.assigneeName,
+          projectId: newProject._id,
+          projectName: newProject.name,
+          createdBy: newProject.createdBy,
+          createdByName: createdByName
+        });
+        await newTask.save({ session });
+        createdTasks.push(newTask);
+      }
+    }
+
+    await session.commitTransaction();
+    session.endSession();
+
+    // 3. Broadcast Updates
+    try {
+      // Broadcast Project
+      await fetch(`${req.protocol}://${req.get('host')}/api/realtime/broadcast`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'project',
+          action: 'create',
+          data: newProject,
+          userId: req.user ? req.user.id : 'system',
+          timestamp: Date.now()
+        })
+      });
+
+      // Broadcast Tasks
+      for (const task of createdTasks) {
+        await fetch(`${req.protocol}://${req.get('host')}/api/realtime/broadcast`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'task',
+            action: 'create',
+            data: task,
+            userId: req.user ? req.user.id : 'system',
+            timestamp: Date.now()
+          })
+        });
+
+        // Create notification for assignee
+        if (task.assigneeId && task.assigneeId !== task.createdBy) {
+          const Notification = require('../models/Notification');
+          const notification = new Notification({
+            userId: task.assigneeId,
+            title: "مهمة جديدة مسندة إليك",
+            message: `تم إسناد مهمة جديدة إليك: "${task.title}" في مشروع "${newProject.name}"`,
+            type: "task",
+            isRead: false,
+            actionUrl: `/tasks?highlight=${task._id}`,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          });
+          await notification.save();
+
+          // Broadcast notification
+          await fetch(`${req.protocol}://${req.get('host')}/api/realtime/broadcast`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'notification',
+              action: 'create',
+              data: notification,
+              userId: 'system',
+              timestamp: Date.now()
+            })
+          });
+        }
+      }
+    } catch (broadcastError) {
+      console.error('Broadcast error', broadcastError);
+    }
+
     res.status(201).json({ success: true, data: newProject });
   } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
     res.status(500).json({ success: false, error: err.message });
   }
 });
