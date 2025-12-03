@@ -1081,6 +1081,18 @@ export function useAppActions() {
                 // نكتفي بتحديث المهمة محلياً؛ الباك-إند هو المسؤول عن تحديث حالة المشروع والتقدّم
                 dispatch({ type: "UPDATE_TASK", payload: updatedTask });
 
+                // بعد أن يقوم الباك-إند بإعادة حساب حالة المشروع والتقدّم، نجلب المشاريع لضمان تزامن الواجهة
+                if (updatedTask.projectId) {
+                    try {
+                        const projectsResponse = await api.projects.getAll();
+                        if (projectsResponse.success && Array.isArray(projectsResponse.data)) {
+                            dispatch({ type: "LOAD_PROJECTS", payload: projectsResponse.data });
+                        }
+                    } catch (projectSyncError) {
+                        logger.error("Failed to refresh projects after updating task", { projectSyncError }, "TASKS");
+                    }
+                }
+
                 if (typeof window !== 'undefined' && window.realtimeUpdates && typeof window.realtimeUpdates === 'object' && typeof (window.realtimeUpdates as any).sendTaskUpdate === 'function') {
                     (window.realtimeUpdates as any).sendTaskUpdate({ action: 'update', task: updatedTask });
                 }
