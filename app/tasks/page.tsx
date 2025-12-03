@@ -377,8 +377,8 @@ function TasksPageContent() {
     const assignee = users.find(u => u.id === formData.assigneeId);
     const project = projects.find(p => p.id === formData.projectId);
 
-    const newTask: Task = {
-      id: Date.now().toString(),
+    // Create payload WITHOUT id - let backend generate it
+    const newTaskPayload = {
       title: formData.title,
       description: formData.description,
       assigneeId: formData.assigneeId,
@@ -395,37 +395,35 @@ function TasksPageContent() {
     }
 
     try {
-      // تعيين حالة التحميل لمنع الحفظ المتكرر
+      // Set loading state
       dispatch({ type: "SET_LOADING_STATE", payload: { key: 'tasks', value: true } });
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
-      const response = await fetch(`${apiUrl}/api/tasks`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
-        },
-        body: JSON.stringify(newTask),
-      });
+      // Use API client
+      const data = await api.tasks.create(newTaskPayload);
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          dispatch({ type: "ADD_TASK", payload: data.data || newTask });
-          setAlert({ type: "success", message: "تم إنشاء المهمة بنجاح" });
-          resetForm();
-          setIsDialogOpen(false);
-        } else {
-          setAlert({ type: "error", message: data.error || "فشل في إنشاء المهمة" });
-        }
+      if (data.success) {
+        // Use the returned task which has the correct _id
+        const createdTask = data.data;
+        dispatch({ type: "ADD_TASK", payload: createdTask });
+        setAlert({ type: "success", message: "تم إنشاء المهمة بنجاح" });
+        resetForm();
+        setIsDialogOpen(false);
+
+        // Broadcast realtime update
+        realtimeUpdates.sendTaskUpdate({
+          action: 'create',
+          task: createdTask,
+          userId: currentUser?.id,
+          userName: currentUser?.name
+        });
       } else {
-        setAlert({ type: "error", message: "فشل في إنشاء المهمة" });
+        setAlert({ type: "error", message: data.error || "فشل في إنشاء المهمة" });
       }
     } catch (error) {
       console.error('خطأ في إنشاء المهمة:', error);
       setAlert({ type: "error", message: "حدث خطأ في إنشاء المهمة" });
     } finally {
-      // إزالة حالة التحميل
+      // Remove loading state
       dispatch({ type: "SET_LOADING_STATE", payload: { key: 'tasks', value: false } });
     }
   }

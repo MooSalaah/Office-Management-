@@ -6,6 +6,7 @@ const logger = require('../logger');
 require('dotenv').config();
 const fetch = require('node-fetch');
 const mongoose = require('mongoose');
+const { updateTask } = require('../controllers/taskController');
 
 // JWT middleware
 function authenticateToken(req, res, next) {
@@ -25,6 +26,7 @@ async function findTask(id) {
   if (isObjectId) {
     return await Task.findById(id);
   } else {
+    // Fallback for legacy IDs
     return await Task.findOne({ id: id });
   }
 }
@@ -53,7 +55,10 @@ router.get('/:id', async (req, res) => {
 // Create new task
 router.post('/', async (req, res) => {
   try {
-    const task = new Task(req.body);
+    // Remove id if present to let Mongoose generate _id
+    const { id, ...taskData } = req.body;
+
+    const task = new Task(taskData);
     const newTask = await task.save();
 
     // Create notification for task assignment
@@ -78,7 +83,7 @@ router.post('/', async (req, res) => {
 
     // Broadcast
     try {
-      const broadcastResponse = await fetch(`${req.protocol}://${req.get('host')}/api/realtime/broadcast`, {
+      await fetch(`${req.protocol}://${req.get('host')}/api/realtime/broadcast`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -93,8 +98,19 @@ router.post('/', async (req, res) => {
       logger.error('Broadcast error', { error: broadcastError.message }, 'TASKS');
     }
 
+    res.status(201).json({ success: true, data: newTask });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
-    // Strict check for MongoDB ObjectId (24 hex characters)
+// Update task using new controller logic
+router.put('/:id', updateTask);
+
+// Delete task
+router.delete('/:id', async (req, res) => {
+  try {
+    let deletedTask;
     const isObjectId = mongoose.Types.ObjectId.isValid(req.params.id) && /^[0-9a-fA-F]{24}$/.test(req.params.id);
 
     if (isObjectId) {
@@ -145,7 +161,7 @@ router.post('/', async (req, res) => {
 
     // Broadcast Task Delete
     try {
-      const broadcastResponse = await fetch(`${req.protocol}://${req.get('host')}/api/realtime/broadcast`, {
+      await fetch(`${req.protocol}://${req.get('host')}/api/realtime/broadcast`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

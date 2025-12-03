@@ -1,20 +1,43 @@
 const mongoose = require('mongoose');
 
 const TaskSchema = new mongoose.Schema({
-  id: { type: String },
   title: { type: String, required: true },
   description: { type: String },
+  status: {
+    type: String,
+    enum: ['todo', 'in-progress', 'completed'],
+    default: 'todo'
+  },
+  priority: {
+    type: String,
+    enum: ['low', 'medium', 'high'],
+    default: 'medium'
+  },
+  dueDate: { type: String },
   assigneeId: { type: String },
   assigneeName: { type: String },
-  projectId: { type: String },
+  projectId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Project',
+    required: false
+  },
   projectName: { type: String },
-  priority: { type: String, default: 'medium' },
-  status: { type: String, default: 'todo' },
-  dueDate: { type: String },
   createdBy: { type: String },
   createdByName: { type: String },
-  createdAt: { type: String },
-  updatedAt: { type: String },
+}, { timestamps: true });
+
+// Add id field for frontend compatibility if needed, but prefer _id
+TaskSchema.virtual('id').get(function () {
+  return this._id.toHexString();
 });
 
-module.exports = mongoose.model('Task', TaskSchema); 
+TaskSchema.set('toJSON', {
+  virtuals: true,
+  versionKey: false,
+  transform: function (doc, ret) {
+    delete ret._id;
+    return ret;
+  }
+});
+
+module.exports = mongoose.model('Task', TaskSchema);
