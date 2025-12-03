@@ -2033,6 +2033,13 @@ function ProjectsPageContent() {
                               // تأكيد أن البيانات النهائية من الباك-إند متزامنة مع الحالة
                               dispatch({ type: "UPDATE_PROJECT", payload: completedProject });
 
+                              // تحديث المهام إذا تم إرجاعها من الباك-إند
+                              if ((response as any).updatedTasks && Array.isArray((response as any).updatedTasks)) {
+                                const updatedTasksMap = new Map((response as any).updatedTasks.map((t: any) => [t.id, t]));
+                                const newTasks = tasks.map(t => updatedTasksMap.get(t.id) || t);
+                                dispatch({ type: "LOAD_TASKS", payload: newTasks });
+                              }
+
                               // 3) إغلاق نافذة التفاصيل وإظهار رسالة نجاح
                               setIsDetailsDialogOpen(false);
 

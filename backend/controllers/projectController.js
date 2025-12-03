@@ -38,6 +38,7 @@ async function updateProject(req, res) {
         await session.commitTransaction();
         session.endSession();
 
+        let updatedTasks = [];
         // Broadcast Project Update
         try {
             const fetch = require('node-fetch');
@@ -55,7 +56,7 @@ async function updateProject(req, res) {
 
             // If tasks were updated, broadcast task updates
             if (updates.status === 'completed') {
-                const updatedTasks = await Task.find({ projectId });
+                updatedTasks = await Task.find({ projectId });
                 for (const task of updatedTasks) {
                     await fetch(`${req.protocol}://${req.get('host')}/api/realtime/broadcast`, {
                         method: 'POST',
@@ -74,7 +75,7 @@ async function updateProject(req, res) {
             console.error('Broadcast error', broadcastError);
         }
 
-        return res.json({ success: true, data: project });
+        return res.json({ success: true, data: project, updatedTasks });
     } catch (err) {
         await session.abortTransaction();
         session.endSession();
