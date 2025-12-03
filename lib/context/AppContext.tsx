@@ -1078,53 +1078,8 @@ export function useAppActions() {
             const response = await api.tasks.update(task.id, task);
             if (response && response.success) {
                 const updatedTask = (response.data as Task) || task;
-                // حدّث المهمة في الحالة المحلية
+                // نكتفي بتحديث المهمة محلياً؛ الباك-إند هو المسؤول عن تحديث حالة المشروع والتقدّم
                 dispatch({ type: "UPDATE_TASK", payload: updatedTask });
-
-                // إذا كانت المهمة مرتبطة بمشروع، حدّث حالة المشروع وتقدّمه بناءً على المهام
-                if (updatedTask.projectId) {
-                    const projectId = updatedTask.projectId;
-
-                    // اجمع جميع مهام المشروع (مع المهمة المحدّثة)
-                    const projectTasks = state.tasks
-                        .map((t) => (t.id === updatedTask.id ? updatedTask : t))
-                        .filter((t) => t.projectId === projectId);
-
-                    if (projectTasks.length > 0) {
-                        const totalTasks = projectTasks.length;
-                        const completedTasks = projectTasks.filter((t) => t.status === "completed").length;
-                        const progress = Math.round((completedTasks / totalTasks) * 100);
-
-                        const project = state.projects.find((p) => p.id === projectId);
-                        if (project) {
-                            const newStatus =
-                                progress === 100
-                                    ? "completed"
-                                    : progress === 0
-                                        ? "draft"
-                                        : "in-progress";
-
-                            const updatedProject: Project = {
-                                ...project,
-                                progress,
-                                status: newStatus,
-                            };
-
-                            // تحديث المشروع في الحالة المحلية
-                            dispatch({ type: "UPDATE_PROJECT", payload: updatedProject });
-
-                            // إرسال التحديث للباك-إند لضمان التزامن (سيطبّق أيضاً منطق التحديث هناك)
-                            try {
-                                await api.projects.update(updatedProject.id, {
-                                    status: updatedProject.status,
-                                    progress: updatedProject.progress,
-                                });
-                            } catch (projectError) {
-                                logger.error("Error updating project from updateTask", { projectError }, "TASKS");
-                            }
-                        }
-                    }
-                }
 
                 if (typeof window !== 'undefined' && window.realtimeUpdates && typeof window.realtimeUpdates === 'object' && typeof (window.realtimeUpdates as any).sendTaskUpdate === 'function') {
                     (window.realtimeUpdates as any).sendTaskUpdate({ action: 'update', task: updatedTask });

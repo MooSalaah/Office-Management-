@@ -2001,6 +2001,8 @@ function ProjectsPageContent() {
                             if (!selectedProject) return;
                             try {
                               const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
+
+                              // 1) اطلب من الباك-إند إكمال المشروع (سيقوم هو بإكمال المهام وضبط progress)
                               const response = await fetch(`${apiUrl}/api/projects/${selectedProject.id}`, {
                                 method: 'PUT',
                                 headers: {
@@ -2014,37 +2016,44 @@ function ProjectsPageContent() {
                                 })
                               });
 
-                              if (response.ok) {
-                                const updatedProjectResponse = await response.json();
-                                const completedProject = updatedProjectResponse.data;
-
-                                // تحديث المشروع في الحالة المحلية
-                                dispatch({ type: "UPDATE_PROJECT", payload: completedProject });
-
-                                // تحديث جميع المهام المرتبطة بالمشروع في الحالة المحلية لتكون مكتملة
-                                dispatch({
-                                  type: "LOAD_TASKS",
-                                  payload: tasks.map((task) =>
-                                    task.projectId === selectedProject.id
-                                      ? { ...task, status: "completed", updatedAt: new Date().toISOString() }
-                                      : task
-                                  ),
-                                });
-
-                                // إغلاق نافذة التفاصيل
-                                setIsDetailsDialogOpen(false);
-
-                                toast({
-                                  title: "تم إكمال المشروع",
-                                  description: "تم تغيير حالة المشروع والمهام إلى مكتمل",
-                                });
-
-                                // إعادة جلب المشاريع لضمان التزامن مع قاعدة البيانات
-                                fetchProjects();
-                              } else {
+                              if (!response.ok) {
                                 const errorData = await response.json().catch(() => ({}));
                                 throw new Error(errorData.error || 'فشل إكمال المشروع في الباكند');
                               }
+
+                              const updatedProjectResponse = await response.json();
+                              const completedProject = updatedProjectResponse.data;
+
+                              // 2) حدّث المشروع في الحالة المحلية فقط (المهام سيتم جلبها من السيرفر كما هي بعد التحديث)
+                              dispatch({ type: "UPDATE_PROJECT", payload: completedProject });
+
+                              // 3) أعد جلب المهام من الباك-إند لضمان تزامن حالة المهام (ستكون مكتملة للمشروع الحالي فقط)
+                              try {
+                                const tasksResponse = await fetch(`${apiUrl}/api/tasks`, {
+                                  headers: {
+                                    'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+                                  }
+                                });
+                                if (tasksResponse.ok) {
+                                  const tasksData = await tasksResponse.json();
+                                  if (tasksData.success && Array.isArray(tasksData.data)) {
+                                    dispatch({ type: "LOAD_TASKS", payload: tasksData.data });
+                                  }
+                                }
+                              } catch (tasksError) {
+                                console.error('Error refreshing tasks after completing project:', tasksError);
+                              }
+
+                              // 4) إغلاق نافذة التفاصيل وإظهار رسالة نجاح
+                              setIsDetailsDialogOpen(false);
+
+                              toast({
+                                title: "تم إكمال المشروع",
+                                description: "تم تغيير حالة المشروع والمهام إلى مكتمل",
+                              });
+
+                              // 5) إعادة جلب المشاريع لضمان التزامن مع قاعدة البيانات
+                              fetchProjects();
                             } catch (error) {
                               console.error('Error completing project:', error);
                               toast({
