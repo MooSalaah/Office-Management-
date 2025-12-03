@@ -22,6 +22,7 @@ async function updateProject(req, res) {
         // If status is completed, mark all tasks as completed
         if (updates.status === 'completed') {
             await Task.updateMany({ projectId }, { status: 'completed' }, { session });
+
             // set progress to 100 explicitly
             project.progress = 100;
             await project.save({ session });

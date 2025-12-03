@@ -62,8 +62,28 @@ async function updateTask(req, res) {
             ]);
 
             // Calculate progress
+            // Calculate progress
             const progress = totalTasks === 0 ? 0 : Math.round(((totalTasks - incompleteTasks) / totalTasks) * 100);
-            const newStatus = (progress === 100) ? 'completed' : (progress === 0 ? 'draft' : 'in-progress');
+
+            // Determine new status
+            // We only auto-complete if progress is 100%
+            // We do NOT auto-revert from completed to in-progress here to avoid fighting with manual completion
+            let newStatus = undefined; // undefined means don't change status by default
+
+            const currentProject = await Project.findById(projectId).session(session);
+            if (currentProject) {
+                if (progress === 100 && currentProject.status !== 'canceled') {
+                    newStatus = 'completed';
+                } else if (progress < 100 && currentProject.status === 'completed') {
+                    // If project is completed but tasks are not, keep it completed (manual override)
+                    // OR we could decide to revert it. The user complaint says "reverts to in-progress", so we should STOP doing that.
+                    newStatus = 'completed';
+                } else if (progress > 0 && currentProject.status === 'draft') {
+                    newStatus = 'in-progress';
+                } else {
+                    newStatus = currentProject.status;
+                }
+            }
 
             const updatedProject = await Project.findByIdAndUpdate(projectId, { progress, status: newStatus }, { session, new: true });
 

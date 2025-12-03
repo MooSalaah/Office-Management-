@@ -193,10 +193,19 @@ router.post('/sync-status', async (req, res) => {
         const progress = Math.round((completedTasks / tasks.length) * 100);
 
         let newStatus = project.status;
-        if (progress === 100) newStatus = 'completed';
-        else if (progress > 0 && newStatus === 'draft') newStatus = 'in-progress';
-        else if (progress < 100 && newStatus === 'completed') newStatus = 'in-progress';
 
+        // Only auto-complete if progress is 100% and it wasn't canceled
+        if (progress === 100 && project.status !== 'canceled') {
+          newStatus = 'completed';
+        }
+        // If progress is not 100%, we should NOT revert a completed project to in-progress automatically
+        // This allows manual completion of projects even if tasks aren't all done (e.g. some tasks were optional)
+        // However, if it was 'draft' and has progress, move to 'in-progress'
+        else if (progress > 0 && newStatus === 'draft') {
+          newStatus = 'in-progress';
+        }
+
+        // Check if update is needed
         if (progress !== project.progress || newStatus !== project.status) {
           project.progress = progress;
           project.status = newStatus;

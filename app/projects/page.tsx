@@ -2042,7 +2042,7 @@ function ProjectsPageContent() {
                               });
 
                               // 4) اختيارية: إعادة جلب المشاريع من الباك-إند للتأكد من التزامن في الحالات الخاصة
-                              fetchProjects();
+                              // fetchProjects(); // Removed to avoid race condition with realtime updates
                             } catch (error) {
                               console.error('Error completing project:', error);
 
