@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const Task = require('../models/Task');
 const Project = require('../models/Project');
+const Notification = require('../models/Notification');
 
 async function updateTask(req, res) {
     const taskId = req.params.id;
@@ -11,13 +12,43 @@ async function updateTask(req, res) {
     const session = await mongoose.startSession();
     session.startTransaction();
     try {
-        // Update task
-        const updates = req.body;
-        const task = await Task.findByIdAndUpdate(taskId, updates, { new: true, session });
-        if (!task) {
+        // Get original task to check for status changes
+        const originalTask = await Task.findById(taskId).session(session);
+        if (!originalTask) {
             await session.abortTransaction();
             session.endSession();
             return res.status(404).json({ success: false, error: 'Task not found' });
+        }
+
+        // Update task
+        const updates = req.body;
+        const task = await Task.findByIdAndUpdate(taskId, updates, { new: true, session });
+
+        // Notification Logic
+        if (updates.status && updates.status !== originalTask.status) {
+            const statusArabic = {
+                'todo': 'قيد الانتظار',
+                'in-progress': 'جاري العمل',
+                'completed': 'مكتملة'
+            };
+
+            const actorName = req.user ? req.user.name : 'مستخدم';
+            const statusText = statusArabic[updates.status] || updates.status;
+
+            // Notify assignee if it's not the actor
+            if (task.assigneeId && task.assigneeId !== (req.user ? req.user.id : '')) {
+                const notification = new Notification({
+                    userId: task.assigneeId,
+                    title: "تحديث حالة مهمة",
+                    message: `تم تحديث حالة مهمة "${task.title}" إلى ${statusText} بواسطة ${actorName}`,
+                    type: "task",
+                    isRead: false,
+                    actionUrl: `/tasks`,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                });
+                await notification.save({ session });
+            }
         }
 
         // Sync with Project
