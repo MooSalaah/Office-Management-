@@ -37,6 +37,42 @@ async function updateProject(req, res) {
         await session.commitTransaction();
         session.endSession();
 
+        // Broadcast Project Update
+        try {
+            const fetch = require('node-fetch');
+            await fetch(`${req.protocol}://${req.get('host')}/api/realtime/broadcast`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: 'project',
+                    action: 'update',
+                    data: project,
+                    userId: req.user ? req.user.id : 'system',
+                    timestamp: Date.now()
+                })
+            });
+
+            // If tasks were updated, broadcast task updates
+            if (updates.status === 'completed') {
+                const updatedTasks = await Task.find({ projectId });
+                for (const task of updatedTasks) {
+                    await fetch(`${req.protocol}://${req.get('host')}/api/realtime/broadcast`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            type: 'task',
+                            action: 'update',
+                            data: task,
+                            userId: req.user ? req.user.id : 'system',
+                            timestamp: Date.now()
+                        })
+                    });
+                }
+            }
+        } catch (broadcastError) {
+            console.error('Broadcast error', broadcastError);
+        }
+
         return res.json({ success: true, data: project });
     } catch (err) {
         await session.abortTransaction();

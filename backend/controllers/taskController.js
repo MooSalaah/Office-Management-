@@ -65,7 +65,27 @@ async function updateTask(req, res) {
             const progress = totalTasks === 0 ? 0 : Math.round(((totalTasks - incompleteTasks) / totalTasks) * 100);
             const newStatus = (progress === 100) ? 'completed' : (progress === 0 ? 'draft' : 'in-progress');
 
-            await Project.findByIdAndUpdate(projectId, { progress, status: newStatus }, { session });
+            const updatedProject = await Project.findByIdAndUpdate(projectId, { progress, status: newStatus }, { session, new: true });
+
+            // Broadcast Project Update
+            if (updatedProject) {
+                try {
+                    const fetch = require('node-fetch');
+                    await fetch(`${req.protocol}://${req.get('host')}/api/realtime/broadcast`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            type: 'project',
+                            action: 'update',
+                            data: updatedProject,
+                            userId: req.user ? req.user.id : 'system',
+                            timestamp: Date.now()
+                        })
+                    });
+                } catch (broadcastError) {
+                    console.error('Project broadcast error', broadcastError);
+                }
+            }
         }
 
         await session.commitTransaction();

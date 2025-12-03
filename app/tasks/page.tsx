@@ -610,9 +610,13 @@ function TasksPageContent() {
 
     const result = userFilter && projectFilterResult;
 
-    // Filter out completed tasks unless showCompleted is true
-    if (!showCompleted && task.status === 'completed') {
-      return false;
+    // Filter based on showCompleted toggle
+    if (showCompleted) {
+      // If showCompleted is true, show ONLY completed tasks
+      if (task.status !== 'completed') return false;
+    } else {
+      // If showCompleted is false, show ONLY non-completed tasks
+      if (task.status === 'completed') return false;
     }
 
     return result;
