@@ -1998,9 +1998,10 @@ function ProjectsPageContent() {
                         <AlertDialogCancel>إلغاء</AlertDialogCancel>
                         <AlertDialogAction
                           onClick={async () => {
+                            if (!selectedProject) return;
                             try {
                               const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://office-management-fsy7.onrender.com';
-                              const response = await fetch(`${apiUrl}/api/projects/${selectedProject!.id}`, {
+                              const response = await fetch(`${apiUrl}/api/projects/${selectedProject.id}`, {
                                 method: 'PUT',
                                 headers: {
                                   'Content-Type': 'application/json',
@@ -2014,11 +2015,23 @@ function ProjectsPageContent() {
                               });
 
                               if (response.ok) {
-                                const updatedProject = await response.json();
-                                // Update local state
-                                dispatch({ type: "UPDATE_PROJECT", payload: updatedProject.data });
+                                const updatedProjectResponse = await response.json();
+                                const completedProject = updatedProjectResponse.data;
 
-                                // Close the details dialog
+                                // تحديث المشروع في الحالة المحلية
+                                dispatch({ type: "UPDATE_PROJECT", payload: completedProject });
+
+                                // تحديث جميع المهام المرتبطة بالمشروع في الحالة المحلية لتكون مكتملة
+                                dispatch({
+                                  type: "LOAD_TASKS",
+                                  payload: tasks.map((task) =>
+                                    task.projectId === selectedProject.id
+                                      ? { ...task, status: "completed", updatedAt: new Date().toISOString() }
+                                      : task
+                                  ),
+                                });
+
+                                // إغلاق نافذة التفاصيل
                                 setIsDetailsDialogOpen(false);
 
                                 toast({
@@ -2026,8 +2039,11 @@ function ProjectsPageContent() {
                                   description: "تم تغيير حالة المشروع والمهام إلى مكتمل",
                                 });
 
-                                // Refresh projects to ensure everything is synced
+                                // إعادة جلب المشاريع لضمان التزامن مع قاعدة البيانات
                                 fetchProjects();
+                              } else {
+                                const errorData = await response.json().catch(() => ({}));
+                                throw new Error(errorData.error || 'فشل إكمال المشروع في الباكند');
                               }
                             } catch (error) {
                               console.error('Error completing project:', error);
