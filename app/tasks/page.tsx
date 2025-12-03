@@ -866,7 +866,7 @@ function TasksPageContent() {
       dispatch({ type: "UPDATE_TASK", payload: updatedTask })
 
       // Use api client if available, otherwise fetch
-      const response = await fetch(`/api/tasks/${task.id}`, {
+      const response = await fetch(`/api/tasks?id=${task.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
