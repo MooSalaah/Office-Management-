@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Plus, Search, Calendar, CheckCircle, Circle, PlayCircle, AlertCircle, Trash2, X, Edit2, LayoutList, LayoutGrid } from "lucide-react"
+import { Plus, Search, Calendar, CheckCircle, Circle, PlayCircle, AlertCircle, Trash2, X, Edit2, LayoutList, LayoutGrid, RotateCcw } from "lucide-react"
 import { useApp, useAppActions } from "@/lib/context/AppContext"
 import { realtimeUpdates, useRealtimeUpdatesByType } from "@/lib/realtime-updates"
 import { hasPermission } from "@/lib/auth"
@@ -1356,6 +1356,18 @@ function TasksPageContent() {
                                 <CheckCircle className="w-4 h-4" />
                               </Button>
                             )}
+                            {task.status === 'completed' && canEditTask(task) && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleReopenTask(task)}
+                                className="text-orange-500 hover:text-orange-600 hover:bg-orange-50"
+                                title="إعادة فتح المهمة"
+                              >
+                                <RotateCcw className="w-4 h-4" />
+                              </Button>
+                            )}
+
                             {canEditTask(task) && (
                               <Button variant="ghost" size="icon" onClick={() => openEditDialog(task)}>
                                 <Edit2 className="w-4 h-4" />
